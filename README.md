@@ -9,7 +9,7 @@
 ---
 2. 메인 브랜치에 템플릿, 워크플로우 파일 생성 (.yml 파일)
 
-  - 템플릿 위치 주소
+  - 템플릿 위치 주소 <br>
     .github/ISSUE_TEMPLATE/issue-form.yml
 
   - 워크플로우 위치 주소 <br>
