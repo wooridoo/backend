@@ -1,0 +1,111 @@
+name: Create Jira issue
+on:
+  issues:
+    types:
+      - opened
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write # PR 생성을 위해 반드시 필요합니다.
+
+jobs:
+  create-issue:
+    name: Create Jira issue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Jira
+        uses: atlassian/gajira-login@v3
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Issue Parser
+        uses: stefanbuck/github-issue-parser@v3
+        id: issue-parser
+        with:
+          template-path: .github/ISSUE_TEMPLATE/issue-form.yml
+
+      - name: Convert markdown to Jira Syntax
+        uses: peter-evans/jira2md@v1
+        id: md2jira
+        with:
+          input-text: |
+            ### Github Issue Link
+            - ${{ github.event.issue.html_url }}
+            ${{ github.event.issue.body }}
+          mode: md2jira
+
+      - name: Create Jira Issue
+        id: create
+        uses: atlassian/gajira-create@v3
+        with:
+          project: KAN
+          issuetype: Task
+          summary: '${{ github.event.issue.title }}'
+          description: '${{ steps.md2jira.outputs.output-text }}'
+          fields: |
+            {
+              "parent": {
+                "key": "${{ steps.issue-parser.outputs.issueparser_parentKey }}"
+              }
+            }
+
+      - name: Create Branch and Push
+        id: create-branch
+        run: |
+          ISSUE_NUMBER="${{ steps.create.outputs.issue }}"
+          RAW_BRANCH_NAME="${{ steps.issue-parser.outputs.issueparser_branch }}"
+          
+          # 안전한 이름 가공 (한글/특수문자 제거)
+          CLEAN_NAME=$(echo "${RAW_BRANCH_NAME}" | sed 's/[^a-zA-Z0-9 ]//g' | sed 's/ /-/g')
+          if [ -z "$CLEAN_NAME" ]; then CLEAN_NAME="work"; fi
+          SAFE_BRANCH_NAME="${ISSUE_NUMBER}-${CLEAN_NAME}"
+          
+          echo "SAFE_BRANCH_NAME=${SAFE_BRANCH_NAME}" >> $GITHUB_ENV
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # -B 옵션으로 중복 생성 에러 방지
+          git checkout -B "${SAFE_BRANCH_NAME}"
+          git commit --allow-empty -m "Chore: Start working on ${ISSUE_NUMBER}"
+          # -f 옵션으로 강제 푸시
+          git push origin "${SAFE_BRANCH_NAME}" -f
+
+      - name: Update GitHub Issue
+        uses: actions-cool/issues-helper@v3
+        with:
+          actions: 'update-issue'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          title: '[${{ steps.create.outputs.issue }}] ${{ github.event.issue.title }}'
+
+      - name: Add Comment to GitHub Issue
+        uses: actions-cool/issues-helper@v3
+        with:
+          actions: 'create-comment'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          body: '✅ Jira 이슈가 생성되었습니다: [${{ steps.create.outputs.issue }}](${{ secrets.JIRA_BASE_URL }}/browse/${{ steps.create.outputs.issue }})'
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ env.SAFE_BRANCH_NAME }}
+          base: main
+          title: "PR: [${{ steps.create.outputs.issue }}] ${{ github.event.issue.title }}"
+          body: |
+            ## 관련 이슈
+            - Jira: [${{ steps.create.outputs.issue }}](${{ secrets.JIRA_BASE_URL }}/browse/${{ steps.create.outputs.issue }})
+            - GitHub Issue: #${{ github.event.issue.number }}
+            
+            ---
+            자동 생성된 PR입니다. 작업 완료 후 리뷰를 요청하세요.
