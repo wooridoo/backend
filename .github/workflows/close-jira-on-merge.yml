@@ -43,7 +43,7 @@ jobs:
         uses: atlassian/gajira-transition@v3
         with:
           issue: ${{ env.JIRA_KEY }}
-          transition: 3
+          transition: "종료"
 
       - name: Debug Environment Variable
         run: echo "The issue number is ${{ env.GH_ISSUE_NUM }}"
