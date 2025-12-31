@@ -12,9 +12,9 @@
   - 템플릿 위치 주소
     .github/ISSUE_TEMPLATE/issue-form.yml
 
-  - 워크플로우 위치 주소
-    .github/workflows/close-jira-on-merge.yml
-    .github/workflows/create-jira-issue.yml
+  - 워크플로우 위치 주소 <br>
+    .github/workflows/close-jira-on-merge.yml <br>
+    .github/workflows/create-jira-issue.yml <br>
 ---
 ### **확인해야 할 내용**
   - Setting에서 확인
