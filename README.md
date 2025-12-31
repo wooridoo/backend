@@ -64,6 +64,8 @@ https://id.atlassian.com/manage-profile/security/api-tokens
 
 - PR 본문 유지: 자동 생성된 PR 본문의 #GitHub이슈번호를 지우면 머지 후 이슈가 자동으로 닫히지 않습니다.
 
+- 이슈 등록 후 To Do를 In Progress로 바꾼 후 작업을 시작해야 합니다.
+
 <br>
 
 ---
