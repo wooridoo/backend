@@ -100,4 +100,4 @@ https://id.atlassian.com/manage-profile/security/api-tokens
 
 **봇이 만든 브랜치로 바로 가는 법 <br>**
   git fetch <br>
-  git checkout [탭 키를 눌러 자동완성] 
+  git checkout [탭 키를 눌러 자동완성]
