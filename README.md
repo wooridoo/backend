@@ -1,4 +1,4 @@
-# 깃 허브 세팅 
+# 깃 허브 세팅    
 
 1. 해당 Repository 선택 -> Settings
   - General -> Pull Requests -> "Automatically delete head branches" 체크
