@@ -8,7 +8,7 @@ body:
     attributes:
       label: '🎟️ 상위 작업 (Ticket Number)'
       description: '상위 작업의 Ticket Number를 기입해주세요'
-      placeholder: 'WRD-1'
+      value: 'WRD-86'
     validations:
       required: true
 
