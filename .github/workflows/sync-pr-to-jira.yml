@@ -29,7 +29,7 @@ jobs:
           issue: ${{ steps.parse.outputs.jira_key }}
           # 지라 워크플로우에 있는 실제 이름으로 설정해야 합니다. 
           # 아까 로그를 보니 '진행 중'은 확실히 있었습니다.
-          transition: 6
+          transition: "검토 요청"
 
       - name: Add PR Link Comment to Jira
         if: steps.parse.outputs.jira_key != ''
