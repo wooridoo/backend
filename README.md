@@ -35,6 +35,7 @@ https://id.atlassian.com/manage-profile/security/api-tokens
 	  - name: Create Jira Issue => project: KAN, issuetype: Task
 	    - project = 티켓 이름(숫자 제외) ex) WRD-01
 	    - issuetype = 생성할 업무 유형 ex) Epic, Task, 에픽, 작업 (***영어***, ***한글*** 구분 확실히)
+      - name: Close Jira issue => transition: DONE (DONE, 완료 등 지라 세팅에 맞게)
 
 <br>
 
