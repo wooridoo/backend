@@ -1,0 +1,64 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.0.2'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.woorido'
+version = '0.0.1-SNAPSHOT'
+description = 'Woorido Backend - 로그인 및 회원가입 통합 프로젝트'
+
+java {
+	sourceCompatibility = '21'
+	targetCompatibility = '21'
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// Spring Boot Starters
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	
+	// MyBatis
+	implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.1'
+	
+	// JWT
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+	
+	// Lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	
+	// DevTools
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	
+	// Oracle Database
+	implementation 'com.oracle.database.jdbc:ojdbc11'
+	
+	// Oracle Cloud Wallet 지원
+	implementation 'com.oracle.database.security:oraclepki:21.9.0.0'
+	implementation 'com.oracle.database.security:osdt_core:21.9.0.0'
+	implementation 'com.oracle.database.security:osdt_cert:21.9.0.0'
+	
+	// Test
+	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.0.1'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
