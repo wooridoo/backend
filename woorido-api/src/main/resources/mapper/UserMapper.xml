@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.woorido.mapper.UserMapper">
+
+    <resultMap id="UserResultMap" type="com.woorido.entity.User">
+        <id property="id" column="id"/>
+        <result property="email" column="email"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="name" column="name"/>
+        <result property="nickname" column="nickname"/>
+        <result property="phone" column="phone"/>
+        <result property="profileImageUrl" column="profile_image_url"/>
+        <result property="birthDate" column="birth_date"/>
+        <result property="gender" column="gender"/>
+        <result property="bio" column="bio"/>
+        <result property="isVerified" column="is_verified"/>
+        <result property="verificationToken" column="verification_token"/>
+        <result property="verificationTokenExpires" column="verification_token_expires"/>
+        <result property="socialProvider" column="social_provider"/>
+        <result property="socialId" column="social_id"/>
+        <result property="passwordResetToken" column="password_reset_token"/>
+        <result property="passwordResetExpires" column="password_reset_expires"/>
+        <result property="failedLoginAttempts" column="failed_login_attempts"/>
+        <result property="lockedUntil" column="locked_until"/>
+        <result property="accountStatus" column="account_status"/>
+        <result property="suspendedAt" column="suspended_at"/>
+        <result property="suspendedUntil" column="suspended_until"/>
+        <result property="suspensionReason" column="suspension_reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="lastLoginAt" column="last_login_at"/>
+        <result property="agreedTerms" column="agreed_terms"/>
+        <result property="agreedPrivacy" column="agreed_privacy"/>
+        <result property="agreedMarketing" column="agreed_marketing"/>
+        <result property="termsAgreedAt" column="terms_agreed_at"/>
+    </resultMap>
+
+    <select id="findByEmail" resultMap="UserResultMap">
+        SELECT * FROM woorido.users WHERE email = #{email}
+    </select>
+
+    <update id="updateLastLoginAt">
+        UPDATE woorido.users SET last_login_at = CURRENT_TIMESTAMP WHERE id = #{id}
+    </update>
+
+    <update id="incrementFailedLoginAttempts">
+        UPDATE woorido.users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = #{id}
+    </update>
+
+    <update id="resetFailedLoginAttempts">
+        UPDATE woorido.users SET failed_login_attempts = 0 WHERE id = #{id}
+    </update>
+
+    <update id="lockAccount">
+        UPDATE woorido.users SET locked_until = #{lockedUntil} WHERE id = #{id}
+    </update>
+
+</mapper>

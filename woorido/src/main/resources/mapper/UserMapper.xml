@@ -37,6 +37,11 @@
         <result property="termsAgreedAt" column="terms_agreed_at"/>
     </resultMap>
 
+    <!-- ID로 사용자 조회 -->
+    <select id="findById" resultMap="UserResultMap">
+        SELECT * FROM woorido.users WHERE id = #{id}
+    </select>
+
     <!-- 이메일로 사용자 조회 (로그인용) -->
     <select id="findByEmail" resultMap="UserResultMap">
         SELECT * FROM woorido.users WHERE email = #{email}
@@ -80,4 +85,35 @@
         UPDATE woorido.users SET locked_until = #{lockedUntil} WHERE id = #{id}
     </update>
 
+    <!-- 비밀번호 재설정 토큰 저장 -->
+    <update id="updatePasswordResetToken">
+        UPDATE woorido.users 
+        SET password_reset_token = #{resetToken}, 
+            password_reset_expires = #{expiresAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 닉네임 중복 체크 (본인 제외) -->
+    <select id="countByNicknameExcludingUser" resultType="int">
+        SELECT COUNT(*) FROM woorido.users 
+        WHERE nickname = #{nickname} AND id != #{userId}
+    </select>
+
+    <!-- 사용자 프로필 업데이트 -->
+    <update id="updateUserProfile">
+        UPDATE woorido.users 
+        SET nickname = COALESCE(#{nickname,jdbcType=VARCHAR}, nickname),
+            phone = COALESCE(#{phone,jdbcType=VARCHAR}, phone),
+            profile_image_url = COALESCE(#{profileImage,jdbcType=VARCHAR}, profile_image_url),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- 닉네임 중복 체크 (전체) -->
+    <select id="countByNickname" resultType="int">
+        SELECT COUNT(*) FROM woorido.users WHERE nickname = #{nickname}
+    </select>
+
 </mapper>
+
+

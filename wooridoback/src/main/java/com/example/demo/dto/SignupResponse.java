@@ -2,12 +2,23 @@ package com.example.demo.dto;
 
 import lombok.Builder;
 import lombok.Getter;
+import com.example.demo.entity.User;
 
 @Getter @Builder
 public class SignupResponse {
-    private Long userId;     // 사용자 ID
-    private String email;    // 이메일
-    private String nickname; // 닉네임
-    private String status;   // 상태 (ACTIVE)
-    private String createdAt; // 가입일시
+	private String userId; // UUID String
+    private String email;
+    private String nickname;
+    private String status;
+    private String createdAt;
+    
+    public static SignupResponse from(User user) {
+        return SignupResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .status(user.getStatus())
+                .createdAt(user.getCreatedAt().toString())
+                .build();
+    }
 }

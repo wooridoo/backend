@@ -36,6 +36,19 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-webservices-test'
 	testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.0.1'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	
+	
+	
+	implementation 'com.oracle.database.jdbc:ojdbc11'
+    
+    // 오라클 클라우드 전자지갑(Wallet) 접속에 필요한 보안 라이브러리들도 함께 추가하는 것을 권장합니다.
+    implementation 'com.oracle.database.security:oraclepki'
+    implementation 'com.oracle.database.security:osdt_cert'
+    implementation 'com.oracle.database.security:osdt_core'
+	
+	
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 }
 
 tasks.named('test') {
