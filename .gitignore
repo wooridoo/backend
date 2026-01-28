@@ -1,0 +1,7 @@
+### User specific ignores
+.gradle/
+.idea/
+.settings/
+.vscode/
+bin/
+build/
