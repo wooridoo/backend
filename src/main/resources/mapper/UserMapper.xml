@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.woorido.common.mapper.UserMapper">
+
+    <resultMap id="UserResultMap" type="com.woorido.common.entity.User">
+        <id property="id" column="id"/>
+        <result property="email" column="email"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="name" column="name"/>
+        <result property="nickname" column="nickname"/>
+        <result property="phone" column="phone"/>
+        <result property="profileImageUrl" column="profile_image_url"/>
+        <result property="birthDate" column="birth_date"/>
+        <result property="gender" column="gender"/>
+        <result property="bio" column="bio"/>
+        <result property="isVerified" column="is_verified"/>
+        <result property="verificationToken" column="verification_token"/>
+        <result property="verificationTokenExpires" column="verification_token_expires"/>
+        <result property="socialProvider" column="social_provider"/>
+        <result property="socialId" column="social_id"/>
+        <result property="passwordResetToken" column="password_reset_token"/>
+        <result property="passwordResetExpires" column="password_reset_expires"/>
+        <result property="failedLoginAttempts" column="failed_login_attempts"/>
+        <result property="lockedUntil" column="locked_until"/>
+        <result property="accountStatus" column="account_status"/>
+        <result property="suspendedAt" column="suspended_at"/>
+        <result property="suspendedUntil" column="suspended_until"/>
+        <result property="suspensionReason" column="suspension_reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="lastLoginAt" column="last_login_at"/>
+        <result property="agreedTerms" column="agreed_terms"/>
+        <result property="agreedPrivacy" column="agreed_privacy"/>
+        <result property="agreedMarketing" column="agreed_marketing"/>
+        <result property="termsAgreedAt" column="terms_agreed_at"/>
+    </resultMap>
+
+    <!-- ID로 사용자 조회 -->
+    <select id="findById" resultMap="UserResultMap">
+        SELECT * FROM woorido.users WHERE id = #{id}
+    </select>
+
+    <!-- 이메일로 사용자 조회 (로그인용) -->
+    <select id="findByEmail" resultMap="UserResultMap">
+        SELECT * FROM woorido.users WHERE email = #{email}
+    </select>
+
+    <!-- 이메일 중복 체크 (회원가입용) -->
+    <select id="countByEmail" resultType="int">
+        SELECT COUNT(*) FROM woorido.users WHERE email = #{email}
+    </select>
+
+    <!-- 회원가입 - 사용자 등록 -->
+    <insert id="insertUser" parameterType="com.woorido.common.entity.User">
+        INSERT INTO woorido.users (
+            id, email, password_hash, name, nickname, phone, birth_date,
+            account_status, agreed_terms, agreed_privacy, agreed_marketing,
+            created_at, failed_login_attempts
+        ) VALUES (
+            #{id}, #{email}, #{passwordHash}, #{name}, #{nickname}, #{phone}, #{birthDate},
+            #{accountStatus}, #{agreedTerms}, #{agreedPrivacy}, #{agreedMarketing},
+            #{createdAt}, 0
+        )
+    </insert>
+
+    <!-- 마지막 로그인 시간 업데이트 -->
+    <update id="updateLastLoginAt">
+        UPDATE woorido.users SET last_login_at = CURRENT_TIMESTAMP WHERE id = #{id}
+    </update>
+
+    <!-- 로그인 실패 횟수 증가 -->
+    <update id="incrementFailedLoginAttempts">
+        UPDATE woorido.users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = #{id}
+    </update>
+
+    <!-- 로그인 실패 횟수 초기화 -->
+    <update id="resetFailedLoginAttempts">
+        UPDATE woorido.users SET failed_login_attempts = 0 WHERE id = #{id}
+    </update>
+
+    <!-- 계정 잠금 -->
+    <update id="lockAccount">
+        UPDATE woorido.users SET locked_until = #{lockedUntil} WHERE id = #{id}
+    </update>
+
+    <!-- 비밀번호 재설정 토큰 저장 -->
+    <update id="updatePasswordResetToken">
+        UPDATE woorido.users 
+        SET password_reset_token = #{resetToken}, 
+            password_reset_expires = #{expiresAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 닉네임 중복 체크 (본인 제외) -->
+    <select id="countByNicknameExcludingUser" resultType="int">
+        SELECT COUNT(*) FROM woorido.users 
+        WHERE nickname = #{nickname} AND id != #{userId}
+    </select>
+
+    <!-- 사용자 프로필 업데이트 -->
+    <update id="updateUserProfile">
+        UPDATE woorido.users 
+        SET nickname = COALESCE(#{nickname,jdbcType=VARCHAR}, nickname),
+            phone = COALESCE(#{phone,jdbcType=VARCHAR}, phone),
+            profile_image_url = COALESCE(#{profileImage,jdbcType=VARCHAR}, profile_image_url),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- 닉네임 중복 체크 (전체) -->
+    <select id="countByNickname" resultType="int">
+        SELECT COUNT(*) FROM woorido.users WHERE nickname = #{nickname}
+    </select>
+
+</mapper>
