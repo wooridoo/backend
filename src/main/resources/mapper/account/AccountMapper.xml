@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.account.repository.AccountMapper">
+
+    <resultMap id="AccountResultMap" type="com.woorido.account.domain.Account">
+        <id property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="balance" column="balance" />
+        <result property="lockedBalance" column="locked_balance" />
+        <result property="bankCode" column="bank_code" />
+        <result property="accountNumber" column="account_number" />
+        <result property="accountHolder" column="account_holder" />
+        <result property="version" column="version" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+    </resultMap>
+
+    <select id="findByUserId" parameterType="string" resultMap="AccountResultMap">
+        SELECT 
+            id,
+            user_id,
+            balance,
+            locked_balance,
+            bank_code,
+            account_number,
+            account_holder,
+            version,
+            created_at,
+            updated_at
+        FROM woorido.accounts
+        WHERE user_id = #{userId}
+    </select>
+    
+    <insert id="save" parameterType="com.woorido.account.domain.Account">
+        INSERT INTO woorido.accounts (
+            id, user_id, balance, locked_balance, bank_code, account_number, account_holder, version, created_at, updated_at
+        ) VALUES (
+            #{id}, #{userId}, #{balance}, #{lockedBalance}, #{bankCode}, #{accountNumber}, #{accountHolder}, #{version}, SYSTIMESTAMP, SYSTIMESTAMP
+        )
+    </insert>
+
+    <update id="update" parameterType="com.woorido.account.domain.Account">
+        UPDATE woorido.accounts
+        SET 
+            balance = #{balance},
+            locked_balance = #{lockedBalance},
+            version = version + 1,
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+</mapper>
