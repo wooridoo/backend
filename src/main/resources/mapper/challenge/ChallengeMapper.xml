@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.challenge.repository.ChallengeMapper">
+
+    <resultMap id="ChallengeResultMap" type="com.woorido.challenge.domain.Challenge">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="description" column="description" />
+        <result property="category" column="category" />
+        <result property="creatorId" column="creator_id" />
+        <result property="leaderLastActiveAt" column="leader_last_active_at" />
+        <result property="leaderBenefitRate" column="leader_benefit_rate" />
+        <result property="currentMembers" column="current_members" />
+        <result property="minMembers" column="min_members" />
+        <result property="maxMembers" column="max_members" />
+        <result property="balance" column="balance" />
+        <result property="monthlyFee" column="monthly_fee" />
+        <result property="depositAmount" column="deposit_amount" />
+        <result property="status" column="status" />
+        <result property="activatedAt" column="activated_at" />
+        <result property="isVerified" column="is_verified" />
+        <result property="verifiedAt" column="verified_at" />
+        <result property="isPublic" column="is_public" />
+        <result property="thumbnailUrl" column="thumbnail_url" />
+        <result property="bannerUrl" column="banner_url" />
+        <result property="version" column="version" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+    </resultMap>
+
+    <select id="findById" parameterType="string" resultMap="ChallengeResultMap">
+        SELECT *
+        FROM woorido.challenges
+        WHERE id = #{id}
+    </select>
+    
+    <select id="countMemberByChallengeIdAndUserId" resultType="int">
+        SELECT COUNT(*)
+        FROM woorido.challenge_members
+        WHERE challenge_id = #{challengeId} AND user_id = #{userId}
+    </select>
+    
+    <update id="updateBalance" parameterType="com.woorido.challenge.domain.Challenge">
+        UPDATE woorido.challenges
+        SET balance = #{balance},
+            version = version + 1,
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+</mapper>
