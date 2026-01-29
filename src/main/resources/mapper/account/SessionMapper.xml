@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.account.repository.SessionMapper">
+
+    <resultMap id="SessionResultMap" type="com.woorido.account.domain.Session">
+        <id property="id" column="ID" />
+        <result property="userId" column="USER_ID" />
+        <result property="sessionType" column="SESSION_TYPE" />
+        <result property="returnUrl" column="RETURN_URL" />
+        <result property="isUsed" column="IS_USED" />
+        <result property="createdAt" column="CREATED_AT" />
+        <result property="expiresAt" column="EXPIRES_AT" />
+    </resultMap>
+
+    <insert id="save" parameterType="com.woorido.account.domain.Session">
+        INSERT INTO WOORIDO.SESSIONS (
+            ID, USER_ID, SESSION_TYPE, RETURN_URL, IS_USED, CREATED_AT, EXPIRES_AT
+        ) VALUES (
+            #{id}, #{userId}, #{sessionType}, #{returnUrl}, 'N', SYSTIMESTAMP, #{expiresAt}
+        )
+    </insert>
+
+    <select id="findById" parameterType="string" resultMap="SessionResultMap">
+        SELECT 
+            ID, USER_ID, SESSION_TYPE, RETURN_URL, IS_USED, CREATED_AT, EXPIRES_AT
+        FROM WOORIDO.SESSIONS
+        WHERE ID = #{id}
+    </select>
+
+    <update id="markAsUsed" parameterType="string">
+        UPDATE WOORIDO.SESSIONS
+        SET IS_USED = 'Y'
+        WHERE ID = #{id}
+    </update>
+
+</mapper>
