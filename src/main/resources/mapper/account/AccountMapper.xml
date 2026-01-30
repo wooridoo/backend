@@ -30,12 +30,12 @@
         FROM woorido.accounts
         WHERE user_id = #{userId}
     </select>
-    
+
     <insert id="save" parameterType="com.woorido.account.domain.Account">
         INSERT INTO woorido.accounts (
             id, user_id, balance, locked_balance, bank_code, account_number, account_holder, version, created_at, updated_at
         ) VALUES (
-            #{id}, #{userId}, #{balance}, #{lockedBalance}, #{bankCode}, #{accountNumber}, #{accountHolder}, #{version}, SYSTIMESTAMP, SYSTIMESTAMP
+            #{id}, #{userId}, #{balance}, #{lockedBalance}, #{bankCode, jdbcType=VARCHAR}, #{accountNumber, jdbcType=VARCHAR}, #{accountHolder, jdbcType=VARCHAR}, #{version}, SYSTIMESTAMP, SYSTIMESTAMP
         )
     </insert>
 
@@ -69,8 +69,7 @@
     </resultMap>
 
     <!-- 거래 내역 조회 (페이지네이션) -->
-    <select id="findTransactions" parameterType="com.woorido.account.dto.request.TransactionSearchRequest"
-            resultMap="AccountTransactionResultMap">
+    <select id="findTransactions" parameterType="com.woorido.account.dto.request.TransactionSearchRequest" resultMap="AccountTransactionResultMap">
         SELECT * FROM (
             SELECT t.*, ROWNUM AS rn FROM (
                 SELECT 
@@ -91,15 +90,15 @@
                     at.created_at
                 FROM woorido.account_transactions at
                 WHERE at.account_id = #{accountId}
-                <if test="type != null and type != ''">
+        <if test="type != null and type != ''">
                     AND at.type = #{type}
-                </if>
-                <if test="startDate != null and startDate != ''">
+        </if>
+        <if test="startDate != null and startDate != ''">
                     AND at.created_at >= TO_TIMESTAMP(#{startDate} || ' 00:00:00', 'YYYY-MM-DD HH24:MI:SS')
-                </if>
-                <if test="endDate != null and endDate != ''">
+        </if>
+        <if test="endDate != null and endDate != ''">
                     AND at.created_at &lt;= TO_TIMESTAMP(#{endDate} || ' 23:59:59', 'YYYY-MM-DD HH24:MI:SS')
-                </if>
+        </if>
                 ORDER BY at.created_at DESC
             ) t
             WHERE ROWNUM &lt;= (#{page} + 1) * #{size}
@@ -107,8 +106,7 @@
     </select>
 
     <!-- 거래 내역 총 개수 -->
-    <select id="countTransactions" parameterType="com.woorido.account.dto.request.TransactionSearchRequest"
-            resultType="long">
+    <select id="countTransactions" parameterType="com.woorido.account.dto.request.TransactionSearchRequest" resultType="long">
         SELECT COUNT(*)
         FROM woorido.account_transactions at
         WHERE at.account_id = #{accountId}
@@ -124,8 +122,7 @@
     </select>
 
     <!-- 총 수입/지출 합계 -->
-    <select id="sumAmountsByDirection" parameterType="com.woorido.account.dto.request.TransactionSearchRequest"
-            resultType="java.util.HashMap">
+    <select id="sumAmountsByDirection" parameterType="com.woorido.account.dto.request.TransactionSearchRequest" resultType="java.util.HashMap">
         SELECT 
             NVL(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS totalIncome,
             NVL(SUM(CASE WHEN amount &lt; 0 THEN ABS(amount) ELSE 0 END), 0) AS totalExpense
@@ -166,9 +163,9 @@
             locked_before, locked_after, related_challenge_id, related_user_id,
             description, pg_provider, pg_tx_id, created_at
         ) VALUES (
-            #{id}, #{accountId}, #{type}, #{amount}, #{balanceBefore}, #{balanceAfter},
+            #{id}, #{accountId}, #{type, jdbcType=VARCHAR}, #{amount}, #{balanceBefore}, #{balanceAfter},
             #{lockedBefore}, #{lockedAfter}, #{relatedChallengeId, jdbcType=VARCHAR}, #{relatedUserId, jdbcType=VARCHAR},
-            #{description}, #{pgProvider, jdbcType=VARCHAR}, #{pgTxId, jdbcType=VARCHAR}, SYSTIMESTAMP
+            #{description, jdbcType=VARCHAR}, #{pgProvider, jdbcType=VARCHAR}, #{pgTxId, jdbcType=VARCHAR}, SYSTIMESTAMP
         )
     </insert>
 

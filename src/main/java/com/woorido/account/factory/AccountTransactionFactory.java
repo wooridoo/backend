@@ -46,4 +46,22 @@ public class AccountTransactionFactory {
                 .createdAt(LocalDateTime.now())
                 .build();
     }
+
+    public AccountTransaction createLockTransaction(String accountId, long amount,
+            long balanceBefore, long balanceAfter, long lockedBefore, long lockedAfter,
+            String challengeId, String description) {
+        return AccountTransaction.builder()
+                .id(UUID.randomUUID().toString())
+                .accountId(accountId)
+                .type(TransactionType.LOCK)
+                .amount(-amount) // 잔액에서 차감되므로 음수
+                .balanceBefore(balanceBefore)
+                .balanceAfter(balanceAfter)
+                .lockedBefore(lockedBefore)
+                .lockedAfter(lockedAfter)
+                .relatedChallengeId(challengeId)
+                .description(description)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
 }

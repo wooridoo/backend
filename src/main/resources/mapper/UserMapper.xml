@@ -59,7 +59,7 @@
             account_status, agreed_terms, agreed_privacy, agreed_marketing,
             created_at, failed_login_attempts
         ) VALUES (
-            #{id}, #{email}, #{passwordHash}, #{name}, #{nickname}, #{phone}, #{birthDate},
+            #{id}, #{email}, #{passwordHash}, #{name}, #{nickname}, #{phone}, #{birthDate, jdbcType=DATE},
             #{accountStatus}, #{agreedTerms}, #{agreedPrivacy}, #{agreedMarketing},
             #{createdAt}, 0
         )
