@@ -35,7 +35,7 @@
         INSERT INTO woorido.accounts (
             id, user_id, balance, locked_balance, bank_code, account_number, account_holder, version, created_at, updated_at
         ) VALUES (
-            #{id}, #{userId}, #{balance}, #{lockedBalance}, #{bankCode}, #{accountNumber}, #{accountHolder}, #{version}, SYSTIMESTAMP, SYSTIMESTAMP
+            #{id}, #{userId}, #{balance}, #{lockedBalance}, #{bankCode, jdbcType=VARCHAR}, #{accountNumber, jdbcType=VARCHAR}, #{accountHolder, jdbcType=VARCHAR}, #{version}, SYSTIMESTAMP, SYSTIMESTAMP
         )
     </insert>
 

@@ -12,6 +12,10 @@ import com.woorido.auth.dto.request.SignupRequest;
 import com.woorido.auth.dto.response.SignupResponse;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
+import com.woorido.account.domain.Account;
+import com.woorido.account.repository.AccountMapper;
+
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,7 +24,10 @@ import lombok.RequiredArgsConstructor;
 public class SignupService {
 
     private final UserMapper userMapper;
+    private final AccountMapper accountMapper;
     private final PasswordEncoder passwordEncoder;
+
+    @Transactional
 
     public SignupResponse signup(SignupRequest request) {
         System.out.println("========== SIGNUP SERVICE 시작 ==========");
@@ -77,6 +84,20 @@ public class SignupService {
             System.out.println("DB INSERT 시작...");
             userMapper.insertUser(user);
             System.out.println("DB INSERT 완료!");
+
+            // 5-2. Account(지갑) 생성
+            System.out.println("Account(지갑) 생성 시작...");
+            Account account = Account.builder()
+                    .id(UUID.randomUUID().toString())
+                    .userId(user.getId())
+                    .balance(0L)
+                    .lockedBalance(0L)
+                    .version(1)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            accountMapper.save(account);
+            System.out.println("Account 생성 완료! ID: " + account.getId());
 
             // 6. 응답 생성
             return SignupResponse.from(user);

@@ -9,17 +9,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.woorido.auth.dto.request.LoginRequest;
 import com.woorido.auth.dto.request.LogoutRequest;
-import com.woorido.auth.dto.request.PasswordResetRequest;
 import com.woorido.auth.dto.request.RefreshRequest;
 import com.woorido.auth.dto.request.SignupRequest;
 import com.woorido.auth.dto.response.LoginResponse;
 import com.woorido.auth.dto.response.LogoutResponse;
-import com.woorido.auth.dto.response.PasswordResetResponse;
 import com.woorido.auth.dto.response.RefreshResponse;
 import com.woorido.auth.dto.response.SignupResponse;
 import com.woorido.auth.service.LoginService;
 import com.woorido.auth.service.LogoutService;
-import com.woorido.auth.service.PasswordResetService;
 import com.woorido.auth.service.RefreshService;
 import com.woorido.auth.service.SignupService;
 import com.woorido.common.dto.ApiResponse;
@@ -34,7 +31,6 @@ public class AuthController {
 
     private final LoginService loginService;
     private final LogoutService logoutService;
-    private final PasswordResetService passwordResetService;
     private final RefreshService refreshService;
     private final SignupService signupService;
 
@@ -142,33 +138,6 @@ public class AuthController {
             String message = e.getMessage();
             if (message.startsWith("AUTH_004")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error(message));
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
-        }
-    }
-
-    /**
-     * 비밀번호 재설정 요청 API
-     * POST /auth/password/reset
-     */
-    @PostMapping("/password/reset")
-    public ResponseEntity<ApiResponse<PasswordResetResponse>> requestPasswordReset(
-            @Valid @RequestBody PasswordResetRequest request) {
-
-        System.out.println("========== PASSWORD RESET 요청 들어옴 ==========");
-        System.out.println("email: " + request.getEmail());
-
-        try {
-            PasswordResetResponse response = passwordResetService.requestPasswordReset(request.getEmail());
-            return ResponseEntity.ok(ApiResponse.success(response, "비밀번호 재설정 링크가 발송되었습니다"));
-        } catch (RuntimeException e) {
-            System.out.println("에러 발생: " + e.getMessage());
-
-            String message = e.getMessage();
-            if (message.startsWith("USER_001")) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error(message));
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

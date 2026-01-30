@@ -85,14 +85,6 @@
         UPDATE woorido.users SET locked_until = #{lockedUntil} WHERE id = #{id}
     </update>
 
-    <!-- 비밀번호 재설정 토큰 저장 -->
-    <update id="updatePasswordResetToken">
-        UPDATE woorido.users 
-        SET password_reset_token = #{resetToken}, 
-            password_reset_expires = #{expiresAt}
-        WHERE id = #{id}
-    </update>
-
     <!-- 닉네임 중복 체크 (본인 제외) -->
     <select id="countByNicknameExcludingUser" resultType="int">
         SELECT COUNT(*) FROM woorido.users 
