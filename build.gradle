@@ -40,6 +40,11 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
+// Java 컴파일러에 -parameters 플래그 추가
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.add('-parameters')
+}
+
 // STS(Eclipse) 호환성을 위한 플러그인 설정 및 어노테이션 처리 활성화
 eclipse {
     classpath {

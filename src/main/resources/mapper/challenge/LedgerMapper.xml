@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.challenge.repository.LedgerMapper">
+  <insert id="insert" parameterType="com.woorido.challenge.domain.LedgerEntry">
+        INSERT INTO woorido.ledger_entries (
+            id, challenge_id, type, amount, description,
+            balance_before, balance_after,
+            related_user_id, related_meeting_id, related_expense_request_id, related_barcode_id,
+            merchant_name, merchant_category, pg_provider, pg_approval_number,
+            memo, memo_updated_at, memo_updated_by, created_at
+        ) VALUES (
+            #{id}, #{challengeId}, #{type}, #{amount}, #{description},
+            #{balanceBefore}, #{balanceAfter},
+            #{relatedUserId, jdbcType=VARCHAR}, #{relatedMeetingId, jdbcType=VARCHAR},
+            #{relatedExpenseRequestId, jdbcType=VARCHAR}, #{relatedBarcodeId, jdbcType=VARCHAR},
+            #{merchantName, jdbcType=VARCHAR}, #{merchantCategory, jdbcType=VARCHAR},
+            #{pgProvider, jdbcType=VARCHAR}, #{pgApprovalNumber, jdbcType=VARCHAR},
+            #{memo, jdbcType=VARCHAR}, #{memoUpdatedAt, jdbcType=TIMESTAMP},
+            #{memoUpdatedBy, jdbcType=VARCHAR}, SYSTIMESTAMP
+        )
+  </insert>
+</mapper>

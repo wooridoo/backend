@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.challenge.repository.ChallengeMemberMapper">
+
+  <resultMap id="ChallengeMemberResultMap" type="com.woorido.challenge.domain.ChallengeMember">
+    <id property="id" column="id" />
+    <result property="challengeId" column="challenge_id" />
+    <result property="userId" column="user_id" />
+    <result property="role" column="role" />
+    <result property="depositStatus" column="deposit_status" />
+    <result property="depositLockedAt" column="deposit_locked_at" />
+    <result property="depositUnlockedAt" column="deposit_unlocked_at" />
+    <result property="entryFeeAmount" column="entry_fee_amount" />
+    <result property="entryFeePaidAt" column="entry_fee_paid_at" />
+    <result property="privilegeStatus" column="privilege_status" />
+    <result property="privilegeRevokedAt" column="privilege_revoked_at" />
+    <result property="lastSupportPaidAt" column="last_support_paid_at" />
+    <result property="totalSupportPaid" column="total_support_paid" />
+    <result property="autoPayEnabled" column="auto_pay_enabled" />
+    <result property="joinedAt" column="joined_at" />
+    <result property="leftAt" column="left_at" />
+    <result property="leaveReason" column="leave_reason" />
+  </resultMap>
+
+  <!-- 챌린지 멤버 등록 -->
+  <insert id="insert" parameterType="com.woorido.challenge.domain.ChallengeMember">
+        INSERT INTO woorido.challenge_members (
+            id, challenge_id, user_id, role,
+            deposit_status, deposit_locked_at,
+            entry_fee_amount, privilege_status,
+            total_support_paid, auto_pay_enabled, joined_at
+        ) VALUES (
+            #{id}, #{challengeId}, #{userId}, #{role},
+            #{depositStatus}, #{depositLockedAt, jdbcType=TIMESTAMP},
+            #{entryFeeAmount, jdbcType=NUMERIC}, #{privilegeStatus},
+            #{totalSupportPaid, jdbcType=NUMERIC}, #{autoPayEnabled, jdbcType=VARCHAR}, SYSTIMESTAMP
+        )
+  </insert>
+
+  <!-- 사용자의 챌린지 멤버십 조회 -->
+  <select id="findByUserIdAndChallengeId" resultType="java.util.HashMap">
+    SELECT 
+        id AS member_id,
+        role,
+        joined_at,
+        privilege_status AS status
+    FROM woorido.challenge_members
+    WHERE user_id = #{userId} AND challenge_id = #{challengeId}
+  </select>
+
+  <select id="findAllByChallengeId" resultMap="ChallengeMemberResultMap">
+    SELECT *
+    FROM woorido.challenge_members
+    WHERE challenge_id = #{challengeId}
+  </select>
+
+  <update id="updateLeaveMember">
+    UPDATE woorido.challenge_members
+    SET privilege_status = 'LEFT',
+        deposit_status = 'RELEASED',
+        left_at = SYSTIMESTAMP,
+        leave_reason = #{leaveReason}
+    WHERE user_id = #{userId} AND challenge_id = #{challengeId}
+  </update>
+
+  <update id="updateRejoinMember" parameterType="com.woorido.challenge.domain.ChallengeMember">
+    UPDATE woorido.challenge_members
+    SET role = #{role},
+        deposit_status = #{depositStatus},
+        deposit_locked_at = #{depositLockedAt, jdbcType=TIMESTAMP},
+        entry_fee_amount = #{entryFeeAmount, jdbcType=NUMERIC},
+        privilege_status = 'ACTIVE',
+        total_support_paid = 0,
+        auto_pay_enabled = #{autoPayEnabled},
+        joined_at = SYSTIMESTAMP,
+        left_at = NULL,
+        leave_reason = NULL
+    WHERE id = #{id}
+  </update>
+
+  <select id="findMembersWithUserInfo" resultType="java.util.Map">
+    SELECT 
+        cm.id as MEMBER_ID,
+        cm.user_id as USER_ID,
+        cm.role as ROLE,
+        cm.privilege_status as STATUS,
+        cm.joined_at as JOINED_AT,
+        cm.left_at as LEFT_AT,
+        cm.deposit_status as DEPOSIT_STATUS,
+        cm.total_support_paid as TOTAL_SUPPORT_PAID,
+        cm.leave_reason as LEAVE_REASON,
+        u.nickname as NICKNAME,
+        u.profile_image_url as PROFILE_IMAGE
+    FROM woorido.challenge_members cm
+    JOIN woorido.users u ON cm.user_id = u.id
+    WHERE cm.challenge_id = #{challengeId}
+    ORDER BY 
+        CASE WHEN cm.role = 'LEADER' THEN 1 ELSE 2 END,
+        cm.joined_at ASC
+  </select>
+
+</mapper>

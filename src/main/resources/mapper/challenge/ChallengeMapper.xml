@@ -33,19 +33,217 @@
         FROM woorido.challenges
         WHERE id = #{id}
     </select>
-    
+
     <select id="countMemberByChallengeIdAndUserId" resultType="int">
         SELECT COUNT(*)
         FROM woorido.challenge_members
         WHERE challenge_id = #{challengeId} AND user_id = #{userId}
     </select>
-    
+
     <update id="updateBalance" parameterType="com.woorido.challenge.domain.Challenge">
         UPDATE woorido.challenges
         SET balance = #{balance},
             version = version + 1,
             updated_at = SYSTIMESTAMP
         WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <!-- 챌린지 생성 -->
+    <insert id="insert" parameterType="com.woorido.challenge.domain.Challenge">
+        INSERT INTO woorido.challenges (
+            id, name, description, category, creator_id,
+            leader_last_active_at, leader_benefit_rate,
+            current_members, min_members, max_members,
+            balance, monthly_fee, deposit_amount,
+            status, is_verified, is_public,
+            thumbnail_url, version, created_at, updated_at
+        ) VALUES (
+            #{id}, #{name}, #{description}, #{category}, #{creatorId},
+            SYSTIMESTAMP, #{leaderBenefitRate, jdbcType=NUMERIC},
+            #{currentMembers}, #{minMembers}, #{maxMembers},
+            #{balance}, #{monthlyFee}, #{depositAmount},
+            #{status}, 'N', 'Y',
+            #{thumbnailUrl, jdbcType=VARCHAR}, 0, SYSTIMESTAMP, SYSTIMESTAMP
+        )
+    </insert>
+
+    <!-- 리더로 참여중인 챌린지 수 조회 -->
+    <select id="countLeaderChallenges" parameterType="string" resultType="int">
+        SELECT COUNT(*)
+        FROM woorido.challenge_members
+        WHERE user_id = #{userId} AND role = 'LEADER'
+    </select>
+
+    <!-- 챌린지 목록 조회 (필터링, 정렬, 페이지네이션) -->
+    <select id="findAllWithFilter" resultType="java.util.HashMap">
+        SELECT 
+            c.id AS challenge_id,
+            c.name,
+            c.description,
+            c.category,
+            c.status,
+            c.current_members,
+            c.max_members,
+            c.monthly_fee AS support_amount,
+            c.thumbnail_url AS thumbnail_image,
+            c.is_verified,
+            c.created_at,
+            u.id AS leader_user_id,
+            u.nickname AS leader_nickname
+        FROM woorido.challenges c
+        LEFT JOIN woorido.users u ON c.creator_id = u.id
+        WHERE c.is_public = 'Y'
+        <if test="status != null and status != ''">
+            AND c.status = #{status}
+        </if>
+        <if test="category != null and category != ''">
+            AND c.category = #{category}
+        </if>
+        ORDER BY 
+        <choose>
+            <when test="sortField == 'name'">c.name</when>
+            <when test="sortField == 'current_members'">c.current_members</when>
+            <otherwise>c.created_at</otherwise>
+        </choose>
+        <choose>
+            <when test="sortDirection == 'ASC'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <!-- 챌린지 총 개수 조회 -->
+    <select id="countAllWithFilter" resultType="long">
+        SELECT COUNT(*)
+        FROM woorido.challenges c
+        WHERE c.is_public = 'Y'
+        <if test="status != null and status != ''">
+            AND c.status = #{status}
+        </if>
+        <if test="category != null and category != ''">
+            AND c.category = #{category}
+        </if>
+    </select>
+
+    <!-- 챌린지 상세 조회 -->
+    <select id="findDetailById" parameterType="string" resultType="java.util.HashMap">
+        SELECT 
+            c.id AS challenge_id,
+            c.name,
+            c.description,
+            c.category,
+            c.status,
+            c.current_members,
+            c.max_members,
+            c.monthly_fee AS support_amount,
+            c.deposit_amount,
+            c.balance,
+            c.thumbnail_url AS thumbnail_image,
+            c.is_verified,
+            c.activated_at AS started_at,
+            c.created_at,
+            u.id AS leader_id,
+            u.nickname AS leader_nickname
+        FROM woorido.challenges c
+        LEFT JOIN woorido.users u ON c.creator_id = u.id
+        WHERE c.id = #{id}
+    </select>
+
+    <!-- 챌린지 리더 여부 확인 -->
+    <select id="isLeader" resultType="int">
+        SELECT COUNT(*)
+        FROM woorido.challenge_members
+        WHERE challenge_id = #{challengeId}
+          AND user_id = #{userId}
+          AND role = 'LEADER'
+    </select>
+
+    <!-- 챌린지 정보 수정 -->
+    <update id="update" parameterType="com.woorido.challenge.domain.Challenge">
+        UPDATE woorido.challenges
+        SET name = #{name, jdbcType=VARCHAR},
+            description = #{description, jdbcType=VARCHAR},
+            thumbnail_url = #{thumbnailUrl, jdbcType=VARCHAR},
+            max_members = #{maxMembers, jdbcType=INTEGER},
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- 내 챌린지 목록 조회 -->
+    <select id="findMyChallenges" resultType="java.util.HashMap">
+        SELECT 
+            c.id AS challenge_id,
+            c.name,
+            c.status,
+            c.current_members,
+            c.max_members,
+            c.monthly_fee AS support_amount,
+            c.thumbnail_url AS thumbnail_image,
+            cm.role AS my_role,
+            cm.privilege_status AS my_status,
+            cm.joined_at
+        FROM woorido.challenge_members cm
+        INNER JOIN woorido.challenges c ON cm.challenge_id = c.id
+        WHERE cm.user_id = #{userId}
+        <if test="role != null and role != ''">
+            AND cm.role = #{role}
+        </if>
+        <if test="status != null and status == 'ACTIVE'">
+            AND c.status IN ('RECRUITING', 'ACTIVE')
+        </if>
+        <if test="status != null and status == 'CLOSED'">
+            AND c.status IN ('COMPLETED', 'DISSOLVED')
+        </if>
+        ORDER BY cm.joined_at DESC
+    </select>
+
+    <!-- 챌린지 어카운트 정보 조회 -->
+    <select id="findChallengeAccount" resultType="java.util.HashMap">
+        SELECT 
+            c.id AS challenge_id,
+            c.balance,
+            c.deposit_amount AS locked_deposits,
+            c.monthly_fee,
+            c.current_members,
+            (SELECT NVL(SUM(CASE WHEN le.type = 'INCOME' THEN le.amount ELSE 0 END), 0)
+             FROM woorido.ledger_entries le WHERE le.challenge_id = c.id) AS total_income,
+            (SELECT NVL(SUM(CASE WHEN le.type = 'EXPENSE' THEN le.amount ELSE 0 END), 0)
+             FROM woorido.ledger_entries le WHERE le.challenge_id = c.id) AS total_expense
+        FROM woorido.challenges c
+        WHERE c.id = #{challengeId}
+    </select>
+
+    <!-- 최근 장부 내역 조회 -->
+    <select id="findRecentLedgerEntries" resultType="java.util.HashMap">
+        SELECT * FROM (
+            SELECT 
+                le.id AS transaction_id,
+                le.amount,
+                le.type,
+                le.description,
+                le.created_at
+            FROM woorido.ledger_entries le
+            WHERE le.challenge_id = #{challengeId}
+            ORDER BY le.created_at DESC
+        ) WHERE ROWNUM                         <![CDATA[<=]]> #{limit}
+    </select>
+
+    <!-- 챌린지 멤버 수 증가 -->
+    <update id="incrementCurrentMembers">
+        UPDATE woorido.challenges
+        SET current_members = current_members + 1,
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{challengeId}
+          AND current_members                 <![CDATA[<]]> max_members
+    </update>
+
+    <!-- 챌린지 멤버 수 감소 -->
+    <update id="decrementCurrentMembers">
+        UPDATE woorido.challenges
+        SET current_members = current_members - 1,
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{challengeId}
+          AND current_members > 0
     </update>
 
 </mapper>

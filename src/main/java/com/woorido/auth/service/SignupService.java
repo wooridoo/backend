@@ -12,14 +12,20 @@ import com.woorido.auth.dto.request.SignupRequest;
 import com.woorido.auth.dto.response.SignupResponse;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
+import com.woorido.account.domain.Account;
+import com.woorido.account.repository.AccountMapper;
+
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class SignupService {
 
     private final UserMapper userMapper;
+    private final AccountMapper accountMapper;
     private final PasswordEncoder passwordEncoder;
 
     public SignupResponse signup(SignupRequest request) {
@@ -78,7 +84,22 @@ public class SignupService {
             userMapper.insertUser(user);
             System.out.println("DB INSERT 완료!");
 
-            // 6. 응답 생성
+            // 6. 계좌 생성 (초기 잔액 0원)
+            System.out.println("계좌 생성 시작...");
+            Account account = Account.builder()
+                    .id(UUID.randomUUID().toString())
+                    .userId(user.getId())
+                    .balance(0L)
+                    .lockedBalance(0L)
+                    .accountNumber(generateAccountNumber())
+                    .version(0)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            accountMapper.save(account);
+            System.out.println("계좌 생성 완료!");
+
+            // 7. 응답 생성
             return SignupResponse.from(user);
 
         } catch (Exception e) {
@@ -88,5 +109,11 @@ public class SignupService {
             e.printStackTrace();
             throw e;
         }
+    }
+
+    private String generateAccountNumber() {
+        // 12자리 랜덤 숫자 (예: 1000-0000-0000 형식이나 DB는 String)
+        // 여기서는 간단히 랜덤 숫자만 생성
+        return String.valueOf((long) (Math.random() * 900000000000L) + 100000000000L);
     }
 }

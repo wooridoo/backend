@@ -34,6 +34,7 @@ public class Challenge {
     private String isPublic;
     private String thumbnailUrl;
     private String bannerUrl;
+    private String rules;
     private LocalDateTime deletedAt;
     private String dissolutionReason;
     private Integer version;
