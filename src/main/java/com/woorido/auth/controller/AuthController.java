@@ -7,14 +7,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.woorido.auth.dto.request.EmailConfirmRequest;
+import com.woorido.auth.dto.request.EmailVerificationRequest;
 import com.woorido.auth.dto.request.LoginRequest;
 import com.woorido.auth.dto.request.LogoutRequest;
 import com.woorido.auth.dto.request.RefreshRequest;
 import com.woorido.auth.dto.request.SignupRequest;
+import com.woorido.auth.dto.response.EmailConfirmResponse;
+import com.woorido.auth.dto.response.EmailVerificationResponse;
 import com.woorido.auth.dto.response.LoginResponse;
 import com.woorido.auth.dto.response.LogoutResponse;
 import com.woorido.auth.dto.response.RefreshResponse;
 import com.woorido.auth.dto.response.SignupResponse;
+import com.woorido.auth.service.EmailVerificationService;
 import com.woorido.auth.service.LoginService;
 import com.woorido.auth.service.LogoutService;
 import com.woorido.auth.service.RefreshService;
@@ -29,10 +34,61 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthController {
 
+    private final EmailVerificationService emailVerificationService;
     private final LoginService loginService;
     private final LogoutService logoutService;
     private final RefreshService refreshService;
     private final SignupService signupService;
+
+    /**
+     * 이메일 인증 코드 발송 API
+     * POST /auth/email/verify
+     */
+    @PostMapping("/email/verify")
+    public ResponseEntity<ApiResponse<EmailVerificationResponse>> sendEmailVerification(
+            @RequestBody EmailVerificationRequest request) {
+
+        try {
+            EmailVerificationResponse response = emailVerificationService.sendVerificationCode(request);
+            return ResponseEntity.ok(ApiResponse.success(response, "인증 코드가 발송되었습니다"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            if (message != null && message.startsWith("AUTH_007")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error(message));
+            } else if (message != null && message.startsWith("USER_002")) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(ApiResponse.error(message));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
+        }
+    }
+
+    /**
+     * 이메일 인증 코드 확인 API
+     * POST /auth/email/confirm
+     */
+    @PostMapping("/email/confirm")
+    public ResponseEntity<ApiResponse<EmailConfirmResponse>> confirmEmailVerification(
+            @RequestBody EmailConfirmRequest request) {
+
+        try {
+            EmailConfirmResponse response = emailVerificationService.confirmVerificationCode(request);
+            return ResponseEntity.ok(ApiResponse.success(response, "이메일이 인증되었습니다"));
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            if (message != null && (message.startsWith("AUTH_006") || message.startsWith("AUTH_008"))) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error(message));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
+        }
+    }
 
     /**
      * 로그인 API
