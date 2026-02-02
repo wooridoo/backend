@@ -106,4 +106,19 @@
         SELECT COUNT(*) FROM woorido.users WHERE nickname = #{nickname}
     </select>
 
+    <!-- 비밀번호 변경 -->
+    <update id="updatePassword">
+        UPDATE woorido.users SET password_hash = #{passwordHash}, updated_at = CURRENT_TIMESTAMP WHERE id = #{id}
+    </update>
+
+    <!-- 회원 탈퇴 (Soft Delete) -->
+    <!-- suspensionReason 컬럼을 탈퇴 사유 저장에 재활용 -->
+    <update id="softDeleteUser">
+        UPDATE woorido.users 
+        SET account_status = #{status}, 
+            suspension_reason = #{reason},
+            updated_at = CURRENT_TIMESTAMP 
+        WHERE id = #{id}
+    </update>
+
 </mapper>

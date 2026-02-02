@@ -26,16 +26,11 @@ public class LoginService {
         User user = userMapper.findByEmail(email);
 
         // === 디버그 로그 ===
-        System.out.println("========== LOGIN DEBUG ==========");
         if (user == null) {
-            System.out.println("user is NULL!");
+            // log.debug("user is NULL!");
         } else {
-            System.out.println("id: " + user.getId());
-            System.out.println("email: " + user.getEmail());
-            System.out.println("passwordHash: " + user.getPasswordHash());
-            System.out.println("accountStatus: " + user.getAccountStatus());
+            // log.debug("id: {}", user.getId());
         }
-        System.out.println("==================================");
 
         if (user == null) {
             throw new RuntimeException("AUTH_001:이메일 또는 비밀번호가 일치하지 않습니다");

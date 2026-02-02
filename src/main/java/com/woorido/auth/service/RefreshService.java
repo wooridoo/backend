@@ -30,10 +30,6 @@ public class RefreshService {
         // 2. 토큰에서 사용자 ID 추출
         String userId = jwtUtil.getUserIdFromToken(refreshToken);
 
-        System.out.println("========== TOKEN REFRESH 처리 ==========");
-        System.out.println("userId: " + userId);
-        System.out.println("========================================");
-
         // 3. 사용자 정보 조회 (이메일 가져오기 위함)
         User user = userMapper.findById(userId);
         if (user == null) {

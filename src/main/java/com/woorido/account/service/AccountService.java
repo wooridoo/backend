@@ -67,12 +67,16 @@ public class AccountService {
         Account account = accountMapper.findByUserId(userId);
 
         if (account == null) {
-            System.out.println("DEBUG: 계좌 조회 실패. userId: " + userId);
+
             throw new RuntimeException("ACCOUNT_001:계좌를 찾을 수 없습니다");
         }
 
-        // 3. 응답 DTO 변환
-        return MyAccountResponse.from(account);
+        // 3. 사용량 조회 (추가)
+        java.math.BigDecimal usedToday = accountMapper.sumUsedToday(account.getId());
+        java.math.BigDecimal usedThisMonth = accountMapper.sumUsedThisMonth(account.getId());
+
+        // 4. 응답 DTO 변환
+        return MyAccountResponse.from(account, usedToday.longValue(), usedThisMonth.longValue());
     }
 
     /**

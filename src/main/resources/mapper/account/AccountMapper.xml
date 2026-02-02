@@ -158,6 +158,26 @@
         AND created_at &lt; ADD_MONTHS(TRUNC(SYSTIMESTAMP, 'MM'), 1)
     </select>
 
+    <!-- 오늘 사용 금액 조회 (지출 성격: WITHDRAW, SUPPORT, ENTRY_FEE) -->
+    <select id="sumUsedToday" resultType="java.math.BigDecimal">
+        SELECT NVL(SUM(ABS(amount)), 0)
+        FROM woorido.account_transactions
+        WHERE account_id = #{accountId}
+          AND type IN ('WITHDRAW', 'SUPPORT', 'ENTRY_FEE')
+          AND created_at >= TRUNC(SYSTIMESTAMP)
+          AND created_at &lt; TRUNC(SYSTIMESTAMP) + 1
+    </select>
+
+    <!-- 이번 달 사용 금액 조회 -->
+    <select id="sumUsedThisMonth" resultType="java.math.BigDecimal">
+        SELECT NVL(SUM(ABS(amount)), 0)
+        FROM woorido.account_transactions
+        WHERE account_id = #{accountId}
+          AND type IN ('WITHDRAW', 'SUPPORT', 'ENTRY_FEE')
+          AND created_at >= TRUNC(SYSTIMESTAMP, 'MM')
+          AND created_at &lt; ADD_MONTHS(TRUNC(SYSTIMESTAMP, 'MM'), 1)
+    </select>
+
 
     <!-- 거래 내역 저장 -->
     <insert id="saveTransaction" parameterType="com.woorido.account.domain.AccountTransaction">

@@ -38,5 +38,11 @@ public interface AccountMapper {
 
     long sumWithdrawalsThisMonth(String accountId);
 
+    // 오늘 사용 금액 (출금, 서포트, 입회비 등 지출)
+    java.math.BigDecimal sumUsedToday(@Param("accountId") String accountId);
+
+    // 이번 달 사용 금액
+    java.math.BigDecimal sumUsedThisMonth(@Param("accountId") String accountId);
+
     void saveTransaction(AccountTransaction transaction);
 }

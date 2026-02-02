@@ -10,6 +10,7 @@ import lombok.Getter;
 public class UserProfileResponse {
 
     private Long userId;
+    private String uuid;
     private String email;
     private String nickname;
     private String phone;

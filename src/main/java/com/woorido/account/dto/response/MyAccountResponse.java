@@ -44,7 +44,7 @@ public class MyAccountResponse {
         private Boolean isVerified;
     }
 
-    public static MyAccountResponse from(Account account) {
+    public static MyAccountResponse from(Account account, Long usedToday, Long usedThisMonth) {
         // LinkedBankAccount 구성
         LinkedBankAccount linkedInfo = null;
         if (account.getBankCode() != null) {
@@ -57,12 +57,12 @@ public class MyAccountResponse {
                     .build();
         }
 
-        // Limits 구성 (임시 하드코딩)
+        // Limits 구성
         Limits limitsInfo = Limits.builder()
                 .dailyWithdrawLimit(1000000L)
                 .monthlyWithdrawLimit(5000000L)
-                .usedToday(0L) // TODO: 트랜잭션 조회하여 계산 필요
-                .usedThisMonth(0L) // TODO: 트랜잭션 조회하여 계산 필요
+                .usedToday(usedToday)
+                .usedThisMonth(usedThisMonth)
                 .build();
 
         // availableBalance 계산 (현재는 balance와 동일하지만 락 로직에 따라 다를 수 있음)

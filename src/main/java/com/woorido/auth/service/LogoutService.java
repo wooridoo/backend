@@ -24,11 +24,8 @@ public class LogoutService {
             throw new RuntimeException("AUTH_001:인증이 필요합니다");
         }
 
-        // 2. 토큰에서 사용자 ID 추출 (로그 목적)
-        String userId = jwtUtil.getUserIdFromToken(refreshToken);
-        System.out.println("========== LOGOUT 처리 ==========");
-        System.out.println("userId: " + userId);
-        System.out.println("==================================");
+        // 2. 토큰에서 사용자 ID 추출 (로그 목적) - 로그 제거로 인해 사용 안함
+        // String userId = jwtUtil.getUserIdFromToken(refreshToken);
 
         // 3. 로그아웃 성공 응답
         // Note: 실제 운영환경에서는 여기서 리프레시 토큰을

@@ -97,14 +97,11 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
 
-        System.out.println("========== LOGIN 요청 들어옴 ==========");
-        System.out.println("email: " + request.getEmail());
-
         try {
             LoginResponse response = loginService.login(request.getEmail(), request.getPassword());
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (RuntimeException e) {
-            System.out.println("에러 발생: " + e.getMessage());
+
             e.printStackTrace();
 
             String message = e.getMessage();
@@ -126,10 +123,6 @@ public class AuthController {
      */
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<SignupResponse>> signup(@RequestBody SignupRequest request) {
-
-        System.out.println("========== SIGNUP 요청 들어옴 ==========");
-        System.out.println("email: " + request.getEmail());
-        System.out.println("nickname: " + request.getNickname());
 
         try {
             SignupResponse response = signupService.signup(request);
@@ -156,14 +149,10 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<LogoutResponse>> logout(@Valid @RequestBody LogoutRequest request) {
 
-        System.out.println("========== LOGOUT 요청 들어옴 ==========");
-        System.out.println("refreshToken: " + request.getRefreshToken().substring(0, 20) + "...");
-
         try {
             LogoutResponse response = logoutService.logout(request.getRefreshToken());
             return ResponseEntity.ok(ApiResponse.success(response, "로그아웃되었습니다"));
         } catch (RuntimeException e) {
-            System.out.println("에러 발생: " + e.getMessage());
 
             String message = e.getMessage();
             if (message.startsWith("AUTH_001")) {
@@ -182,14 +171,10 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<RefreshResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
 
-        System.out.println("========== TOKEN REFRESH 요청 들어옴 ==========");
-        System.out.println("refreshToken: " + request.getRefreshToken().substring(0, 20) + "...");
-
         try {
             RefreshResponse response = refreshService.refresh(request.getRefreshToken());
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (RuntimeException e) {
-            System.out.println("에러 발생: " + e.getMessage());
 
             String message = e.getMessage();
             if (message.startsWith("AUTH_004")) {

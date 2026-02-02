@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.woorido.common.mapper.ChallengeMemberMapper">
+
+    <!-- 사용자가 참여 중인 활성 챌린지 수 조회 -->
+    <select id="countActiveMembershipsByUserId" resultType="int">
+        SELECT COUNT(*) FROM woorido.challenge_members 
+        WHERE user_id = #{userId} AND left_at IS NULL
+    </select>
+
+    <!-- 사용자가 완주한 챌린지 수 조회 -->
+    <select id="countCompletedChallengesByUserId" resultType="int">
+        SELECT COUNT(*) 
+        FROM woorido.challenge_members cm
+        JOIN woorido.challenges c ON cm.challenge_id = c.id
+        WHERE cm.user_id = #{userId} 
+          AND cm.leave_reason = 'CHALLENGE_CLOSED'
+          AND c.status = 'COMPLETED'
+    </select>
+
+    <!-- 공통 챌린지 조회 -->
+    <select id="findCommonChallenges" resultType="map">
+        SELECT c.id AS "id", c.name AS "name"
+        FROM woorido.challenges c
+        WHERE c.id IN (
+            SELECT challenge_id FROM woorido.challenge_members 
+            WHERE user_id = #{currentUserId, jdbcType=VARCHAR} AND left_at IS NULL
+        )
+        AND c.id IN (
+            SELECT challenge_id FROM woorido.challenge_members 
+            WHERE user_id = #{targetUserId} AND left_at IS NULL
+        )
+    </select>
+
+</mapper>

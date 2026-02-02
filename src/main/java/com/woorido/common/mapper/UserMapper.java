@@ -44,4 +44,10 @@ public interface UserMapper {
 
         // 닉네임 중복 체크 (전체)
         int countByNickname(@Param("nickname") String nickname);
+
+        // 비밀번호 변경
+        void updatePassword(@Param("id") String id, @Param("passwordHash") String passwordHash);
+
+        // 회원 탈퇴 (Soft Delete)
+        void softDeleteUser(@Param("id") String id, @Param("status") String status, @Param("reason") String reason);
 }
