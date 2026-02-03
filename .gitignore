@@ -1,4 +1,9 @@
 ### User specific ignores
+.metadata/
+.settings/
+*.class
+.project
+.classpath
 .gradle/
 .idea/
 .settings/
