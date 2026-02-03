@@ -62,6 +62,9 @@ public interface ChallengeMapper {
                         @Param("challengeId") String challengeId,
                         @Param("limit") int limit);
 
+        // 챌린지 상태 및 삭제일시 업데이트 (Soft Delete)
+        int updateStatusAndDeletedAt(Challenge challenge);
+
         // 챌린지 멤버 수 증가
         int incrementCurrentMembers(@Param("challengeId") String challengeId);
 

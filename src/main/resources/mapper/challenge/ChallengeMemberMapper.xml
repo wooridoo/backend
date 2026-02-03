@@ -86,12 +86,45 @@
         cm.joined_at ASC
   </select>
 
+  <!-- 자동 납입 설정 업데이트 -->
+  <update id="updateAutoPayEnabled">
+    UPDATE woorido.challenge_members
+    SET auto_pay_enabled = #{autoPayEnabled}
+    WHERE user_id = #{userId} AND challenge_id = #{challengeId}
+  </update>
+
+  <!-- 멤버 상세 정보 조회 -->
+  <select id="findMemberDetail" resultType="java.util.Map">
+    SELECT 
+        cm.id as MEMBER_ID,
+        cm.user_id as USER_ID,
+        cm.role as ROLE,
+        cm.privilege_status as STATUS,
+        cm.joined_at as JOINED_AT,
+        cm.total_support_paid as TOTAL_SUPPORT_PAID,
+        u.nickname as NICKNAME,
+        u.profile_image_url as PROFILE_IMAGE,
+        COALESCE(us.total_score, 12) as BRIX
+    FROM woorido.challenge_members cm
+    JOIN woorido.users u ON cm.user_id = u.id
+    LEFT JOIN woorido.user_scores us ON u.id = us.user_id
+    WHERE cm.challenge_id = #{challengeId}
+      AND cm.id = #{memberId}
+  </select>
+
   <update id="leaveChallenge">
     UPDATE woorido.challenge_members
     SET privilege_status = 'LEFT',
         left_at = CURRENT_TIMESTAMP,
         deposit_status = 'RELEASED'
     WHERE challenge_id = #{challengeId} AND user_id = #{userId}
+  </update>
+
+  <update id="updateRole">
+    UPDATE woorido.challenge_members
+    SET role = #{newRole}
+    WHERE id = #{memberId}
+      AND challenge_id = #{challengeId}
   </update>
 
 </mapper>

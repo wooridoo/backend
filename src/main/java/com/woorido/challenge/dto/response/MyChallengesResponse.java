@@ -25,6 +25,7 @@ public class MyChallengesResponse {
   @AllArgsConstructor
   public static class MyChallengeItem {
     private String challengeId;
+    private String memberId;
     private String name;
     private String status;
     private String myRole;

@@ -19,4 +19,13 @@
             #{memoUpdatedBy, jdbcType=VARCHAR}, SYSTIMESTAMP
         )
   </insert>
+
+  <select id="findSupportHistory" resultType="com.woorido.challenge.domain.LedgerEntry">
+    SELECT *
+    FROM woorido.ledger_entries
+    WHERE challenge_id = #{challengeId}
+      AND related_user_id = #{userId}
+      AND type = 'SUPPORT'
+    ORDER BY created_at DESC
+  </select>
 </mapper>
