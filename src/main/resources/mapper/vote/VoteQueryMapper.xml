@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.vote.repository.VoteQueryMapper">
+
+  <select id="findAllUnionByChallengeId" resultType="map">
+    SELECT * FROM (
+      SELECT V.*, ROWNUM AS RNUM FROM (
+        -- 1. Meeting Votes
+        SELECT 
+          mv.id AS VOTE_ID,
+          'MEETING_ATTENDANCE' AS TYPE,
+          m.title AS TITLE,
+          mv.status AS STATUS,
+          m.created_by AS CREATED_BY_ID,
+          u.nickname AS CREATED_BY_NICKNAME,
+          mv.created_at AS CREATED_AT,
+          mv.expires_at AS DEADLINE,
+          mv.attend_count AS AGREE_COUNT,
+          mv.absent_count AS DISAGREE_COUNT,
+          (mv.attend_count + mv.absent_count) AS TOTAL_VOTE_COUNT
+        FROM woorido.meeting_votes mv
+        JOIN woorido.meetings m ON mv.meeting_id = m.id
+        LEFT JOIN woorido.users u ON m.created_by = u.id
+        WHERE m.challenge_id = #{challengeId}
+
+        UNION ALL
+
+        -- 2. Expense Votes
+        SELECT 
+          ev.id AS VOTE_ID,
+          'EXPENSE' AS TYPE,
+          ev.title AS TITLE,
+          ev.status AS STATUS,
+          ev.created_by AS CREATED_BY_ID,
+          u.nickname AS CREATED_BY_NICKNAME,
+          ev.created_at AS CREATED_AT,
+          ev.expires_at AS DEADLINE,
+          ev.approve_count AS AGREE_COUNT,
+          ev.reject_count AS DISAGREE_COUNT,
+          (ev.approve_count + ev.reject_count) AS TOTAL_VOTE_COUNT
+        FROM woorido.expense_votes ev
+        LEFT JOIN woorido.users u ON ev.created_by = u.id
+        WHERE ev.challenge_id = #{challengeId}
+
+        UNION ALL
+
+        -- 3. General Votes
+        SELECT 
+          gv.id AS VOTE_ID,
+          gv.type AS TYPE,
+          gv.title AS TITLE,
+          gv.status AS STATUS,
+          gv.created_by AS CREATED_BY_ID,
+          u.nickname AS CREATED_BY_NICKNAME,
+          gv.created_at AS CREATED_AT,
+          gv.expires_at AS DEADLINE,
+          gv.approve_count AS AGREE_COUNT,
+          gv.reject_count AS DISAGREE_COUNT,
+          (gv.approve_count + gv.reject_count) AS TOTAL_VOTE_COUNT
+        FROM woorido.general_votes gv
+        LEFT JOIN woorido.users u ON gv.created_by = u.id
+        WHERE gv.challenge_id = #{challengeId}
+
+        ORDER BY CREATED_AT DESC
+      ) V
+      WHERE ROWNUM &lt;= #{offset} + #{limit}
+    )
+    WHERE RNUM &gt; #{offset}
+  </select>
+
+  <select id="countAllUnionByChallengeId" resultType="long">
+    SELECT SUM(CNT) FROM (
+      SELECT COUNT(*) AS CNT FROM woorido.meeting_votes mv JOIN woorido.meetings m ON mv.meeting_id = m.id WHERE m.challenge_id = #{challengeId}
+      UNION ALL
+      SELECT COUNT(*) AS CNT FROM woorido.expense_votes WHERE challenge_id = #{challengeId}
+      UNION ALL
+      SELECT COUNT(*) AS CNT FROM woorido.general_votes WHERE challenge_id = #{challengeId}
+    )
+  </select>
+
+  <select id="findByIdBasic" resultType="map">
+    SELECT * FROM (
+      SELECT 
+        mv.id AS VOTE_ID, 
+        'MEETING_ATTENDANCE' AS TYPE, 
+        m.challenge_id AS CHALLENGE_ID, 
+        mv.expires_at AS DEADLINE
+      FROM woorido.meeting_votes mv
+      JOIN woorido.meetings m ON mv.meeting_id = m.id
+      WHERE mv.id = #{voteId}
+      
+      UNION ALL
+      
+      SELECT 
+        id AS VOTE_ID, 
+        'EXPENSE' AS TYPE, 
+        challenge_id AS CHALLENGE_ID, 
+        expires_at AS DEADLINE
+      FROM woorido.expense_votes
+      WHERE id = #{voteId}
+      
+      UNION ALL
+      
+      SELECT 
+        id AS VOTE_ID, 
+        type AS TYPE, 
+        challenge_id AS CHALLENGE_ID, 
+        expires_at AS DEADLINE
+      FROM woorido.general_votes
+      WHERE id = #{voteId}
+    ) WHERE ROWNUM = 1
+  </select>
+
+</mapper>

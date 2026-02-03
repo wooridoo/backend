@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.vote.repository.GeneralVoteMapper">
+
+  <insert id="insert">
+    INSERT INTO woorido.general_votes (
+      id, challenge_id, created_by, type, title, description,
+      target_user_id, status, required_count, eligible_count,
+      created_at, expires_at
+    ) VALUES (
+      #{id}, #{challengeId}, #{createdBy}, #{type}, #{title}, #{description},
+      #{targetUserId}, #{status}, #{requiredCount}, #{eligibleCount},
+      #{createdAt}, #{expiresAt}
+    )
+  </insert>
+
+  <select id="findById" resultType="com.woorido.vote.domain.GeneralVote">
+    SELECT * FROM woorido.general_votes WHERE id = #{id}
+  </select>
+
+  <insert id="insertRecord">
+    INSERT INTO woorido.general_vote_records (
+      id, general_vote_id, user_id, choice, created_at
+    ) VALUES (
+      #{id}, #{generalVoteId}, #{userId}, #{choice}, CURRENT_TIMESTAMP
+    )
+  </insert>
+
+  <select id="checkRecordExisting" resultType="int">
+    SELECT COUNT(*) FROM woorido.general_vote_records
+    WHERE general_vote_id = #{voteId} AND user_id = #{userId}
+  </select>
+
+  <select id="findVoteCounts" resultType="map">
+    SELECT 
+      NVL(SUM(CASE WHEN choice = 'APPROVE' THEN 1 ELSE 0 END), 0) as AGREE,
+      NVL(SUM(CASE WHEN choice = 'REJECT' THEN 1 ELSE 0 END), 0) as DISAGREE,
+      COUNT(*) as TOTAL
+    FROM woorido.general_vote_records
+    WHERE general_vote_id = #{voteId}
+  </select>
+
+</mapper>

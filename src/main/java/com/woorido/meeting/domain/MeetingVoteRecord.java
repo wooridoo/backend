@@ -20,7 +20,7 @@ public class MeetingVoteRecord {
   private String meetingVoteId;
   private String userId;
   private String choice; // AGREE, DISAGREE
-  private String actualAttendance; // PENDING, ATTENDED, NO_SHOW
+  private String actualAttendance; // PENDING, ATTENDED
   private LocalDateTime attendanceConfirmedAt;
   private LocalDateTime createdAt;
 }
