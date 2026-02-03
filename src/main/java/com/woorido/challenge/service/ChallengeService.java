@@ -32,6 +32,8 @@ import com.woorido.challenge.dto.response.UpdateChallengeResponse;
 import com.woorido.challenge.dto.response.LeaveChallengeResponse;
 import com.woorido.challenge.dto.response.LeaveChallengeResponse.Refund;
 import com.woorido.challenge.dto.response.ChallengeDeleteResponse;
+import com.woorido.challenge.dto.request.DelegateLeaderRequest;
+import com.woorido.challenge.dto.response.DelegateLeaderResponse;
 
 import com.woorido.challenge.dto.response.ChallengeMemberListResponse;
 import com.woorido.challenge.dto.request.UpdateSupportSettingsRequest;
@@ -40,7 +42,6 @@ import com.woorido.challenge.repository.ChallengeMapper;
 import com.woorido.challenge.repository.ChallengeMemberMapper;
 import com.woorido.challenge.repository.LedgerMapper;
 import com.woorido.challenge.domain.LedgerEntry;
-import com.woorido.challenge.repository.MeetingMapper;
 import com.woorido.common.util.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,7 @@ public class ChallengeService {
   private final ChallengeMemberMapper challengeMemberMapper;
   private final AccountMapper accountMapper;
   private final AccountTransactionFactory accountTransactionFactory;
-  private final MeetingMapper meetingMapper;
+  // private final MeetingMapper meetingMapper; // Removed
   private final JwtUtil jwtUtil;
   private final LedgerMapper ledgerMapper;
 
@@ -1144,15 +1145,15 @@ public class ChallengeService {
         : 0L;
 
     // 5. 통계 계산
-    // 5-1. 정기 모임 출석률
-    System.out.println("DEBUG: Calculating meeting stats...");
-    int meetingsTotal = meetingMapper.countTotalMeetings(challengeId);
-    int meetingsAttended = meetingMapper.countAttendedMeetings(challengeId, targetUserId);
-    Double attendanceRate = meetingsTotal > 0 ? (double) meetingsAttended / meetingsTotal * 100 : 0.0;
-    System.out.println("DEBUG: Meeting stats calculated. Total: " + meetingsTotal + ", Attended: " + meetingsAttended);
+    // 5-1. 정기 모임 출석률 (테이블 삭제로 인해 미지원 - 0으로 고정)
+    // System.out.println("DEBUG: Calculating meeting stats...");
+    int meetingsTotal = 0; // meetingMapper.countTotalMeetings(challengeId);
+    int meetingsAttended = 0; // meetingMapper.countAttendedMeetings(challengeId, targetUserId);
+    Double attendanceRate = 0.0; // meetingsTotal > 0 ? (double) meetingsAttended / meetingsTotal * 100 : 0.0;
+    // System.out.println("DEBUG: Meeting stats calculated. Total: " + meetingsTotal
+    // + ", Attended: " + meetingsAttended);
 
     // 5-2. 서포트 달성률 (임시 로직: 100.0 고정 or 납부액 기반)
-    // 기획상 정확한 수식 부재로, 납부액이 있으면 100, 아니면 0 등으로 간단히 처리하거나, 일단 100.0 반환 (예시 데이터 따름)
     Double supportRate = totalSupportPaid > 0 ? 100.0 : 0.0;
 
     com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.Stats stats = com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.Stats
@@ -1199,6 +1200,85 @@ public class ChallengeService {
         .stats(stats)
         .supportHistory(supportHistory)
         .joinedAt(memberData.get("JOINED_AT") != null ? memberData.get("JOINED_AT").toString() : null)
+        .build();
+  }
+
+  // ------------------------------------------------------------------------------------------------
+  // [NEW] API 034: 리더 위임 (Transaction Required)
+  // ------------------------------------------------------------------------------------------------
+  @Transactional
+  public DelegateLeaderResponse delegateLeaderWithToken(String challengeId, String token, String targetMemberId) {
+    String userId = jwtUtil.getUserIdFromToken(token);
+    return delegateLeader(challengeId, userId, targetMemberId);
+  }
+
+  @Transactional
+  public DelegateLeaderResponse delegateLeader(String challengeId, String userId,
+      String targetMemberId) {
+    // 1. 현재 리더(나) 검증
+    Map<String, Object> myMemberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+
+    // 디버깅용 로그 (나중에 삭제)
+    // System.out.println("Delegate Debug: userId=" + userId + ", challengeId=" +
+    // challengeId);
+    // System.out.println("Delegate Debug: myMemberInfo=" + myMemberInfo);
+
+    if (myMemberInfo == null || !"LEADER".equals(myMemberInfo.get("ROLE"))) {
+      // 혹시 대소문자 문제일 수 있으니 'role' 도 체크
+      String role = myMemberInfo != null ? (String) myMemberInfo.get("role") : null;
+      if (role == null && myMemberInfo != null)
+        role = (String) myMemberInfo.get("ROLE");
+
+      if (!"LEADER".equals(role)) {
+        throw new RuntimeException("리더만 위임할 수 있습니다.");
+      }
+    }
+    String myMemberId = (String) myMemberInfo.get("MEMBER_ID");
+    if (myMemberId == null)
+      myMemberId = (String) myMemberInfo.get("member_id"); // Fallback
+
+    // 2. 대상 멤버 검증
+    if (myMemberId.equals(targetMemberId)) {
+      throw new RuntimeException("자신에게 위임할 수 없습니다.");
+    }
+
+    com.woorido.challenge.domain.ChallengeMember targetMember = challengeMemberMapper.findById(targetMemberId);
+    if (targetMember == null || !challengeId.equals(targetMember.getChallengeId())) {
+      throw new RuntimeException("멤버를 찾을 수 없습니다."); // 404
+    }
+    if (!"ACTIVE".equals(targetMember.getPrivilegeStatus())) {
+      throw new RuntimeException("정지된 멤버에게 위임할 수 없습니다."); // MEMBER_005
+    }
+
+    // 3. 역할 교체 (Atomic Update)
+    challengeMemberMapper.updateRole(myMemberId, challengeId, "FOLLOWER");
+    challengeMemberMapper.updateRole(targetMemberId, challengeId, "LEADER");
+
+    // 4. 응답 생성 (닉네임 조회 위해 findMemberDetail 활용)
+    Map<String, Object> myDetail = challengeMemberMapper.findMemberDetail(challengeId, myMemberId);
+    Map<String, Object> targetDetail = challengeMemberMapper.findMemberDetail(challengeId, targetMemberId);
+
+    DelegateLeaderResponse.MemberInfo prevLeaderInfo = DelegateLeaderResponse.MemberInfo
+        .builder()
+        .memberId(myMemberId)
+        .userId(userId)
+        .nickname((String) myDetail.get("NICKNAME"))
+        .newRole("FOLLOWER")
+        .build();
+
+    DelegateLeaderResponse.MemberInfo newLeaderInfo = DelegateLeaderResponse.MemberInfo
+        .builder()
+        .memberId(targetMemberId)
+        .userId(targetMember.getUserId())
+        .nickname((String) targetDetail.get("NICKNAME"))
+        .newRole("LEADER")
+        .build();
+
+    return DelegateLeaderResponse.builder()
+        .challengeId(challengeId)
+        .previousLeader(prevLeaderInfo)
+        .newLeader(newLeaderInfo)
+        .delegatedAt(java.time.LocalDateTime.now().toString())
         .build();
   }
 }

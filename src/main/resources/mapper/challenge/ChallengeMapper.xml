@@ -67,11 +67,14 @@
         )
     </insert>
 
-    <!-- 리더로 참여중인 챌린지 수 조회 -->
+    <!-- 리더로 참여중인 챌린지 수 조회 (활성 상태만 카운트) -->
     <select id="countLeaderChallenges" parameterType="string" resultType="int">
         SELECT COUNT(*)
-        FROM woorido.challenge_members
-        WHERE user_id = #{userId} AND role = 'LEADER'
+        FROM woorido.challenge_members cm
+        JOIN woorido.challenges c ON cm.challenge_id = c.id
+        WHERE cm.user_id = #{userId} 
+          AND cm.role = 'LEADER'
+          AND c.status IN ('RECRUITING', 'ACTIVE', 'IN_PROGRESS')
     </select>
 
     <!-- 챌린지 목록 조회 (필터링, 정렬, 페이지네이션) -->
@@ -199,7 +202,7 @@
             AND cm.role = #{role}
         </if>
         <if test="status != null and status == 'ACTIVE'">
-            AND c.status IN ('RECRUITING', 'ACTIVE')
+            AND c.status IN ('RECRUITING', 'ACTIVE', 'IN_PROGRESS')
         </if>
         <if test="status != null and status == 'CLOSED'">
             AND c.status IN ('COMPLETED', 'DISSOLVED')

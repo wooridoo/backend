@@ -120,4 +120,11 @@
     WHERE challenge_id = #{challengeId} AND user_id = #{userId}
   </update>
 
+  <update id="updateRole">
+    UPDATE woorido.challenge_members
+    SET role = #{newRole}
+    WHERE id = #{memberId}
+      AND challenge_id = #{challengeId}
+  </update>
+
 </mapper>

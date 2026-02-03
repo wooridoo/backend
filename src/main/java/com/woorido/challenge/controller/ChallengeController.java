@@ -29,6 +29,8 @@ import com.woorido.challenge.dto.response.JoinChallengeResponse;
 import com.woorido.challenge.dto.response.LeaveChallengeResponse;
 import com.woorido.challenge.dto.response.MyChallengesResponse;
 import com.woorido.challenge.dto.response.UpdateChallengeResponse;
+import com.woorido.challenge.dto.request.DelegateLeaderRequest;
+import com.woorido.challenge.dto.response.DelegateLeaderResponse;
 import com.woorido.challenge.service.ChallengeService;
 import com.woorido.common.dto.ApiResponse;
 
@@ -384,5 +386,35 @@ public class ChallengeController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
+  }
+
+  // API 034: 리더 위임
+  // API 034: 리더 위임
+  @PostMapping("/{challengeId}/delegate")
+  public ResponseEntity<DelegateLeaderResponse> delegateLeader(
+      @RequestHeader("Authorization") String authorization,
+      @PathVariable("challengeId") String challengeId,
+      @RequestBody DelegateLeaderRequest request) {
+
+    // 토큰에서 userId 추출 (다른 API와 일관성 유지)
+    String token = authorization;
+    if (token != null && token.startsWith("Bearer ")) {
+      token = token.substring(7);
+    }
+    // Controller에는 JwtUtil이 주입되어 있지 않으므로, Service에 토큰과 로직을 위임하는 것이 가장 깔끔함.
+    // 하지만 Service 시그니처 변경은 번거로움.
+    // 임시로 여기서 파싱...을 하려면 JwtUtil이 필요함.
+    // ChallengeController 상단에 JwtUtil 주입 코드가 보이지 않음 (`private final
+    // ChallengeService challengeService;` 만 보임)
+    // 따라서, 가장 확실한 방법은 Service에 메서드를 하나 더 만들거나(오버로딩), Service 시그니처를 변경하는 것임.
+    // 기존 Service 메서드: delegateLeader(challengeId, userId, targetMemberId)
+    // 변경: delegateLeader(challengeId, token, targetMemberId) -> Service 내부에서
+    // parsing.
+
+    // Service 변경이 낫다. (Controller 복잡도 감소)
+
+    DelegateLeaderResponse response = challengeService.delegateLeaderWithToken(challengeId, token,
+        request.getTargetMemberId());
+    return ResponseEntity.ok(response);
   }
 }

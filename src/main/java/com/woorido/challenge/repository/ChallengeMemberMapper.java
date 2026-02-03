@@ -14,6 +14,9 @@ public interface ChallengeMemberMapper {
         // 챌린지 멤버 등록
         void insert(ChallengeMember member);
 
+        // ID로 멤버 조회
+        ChallengeMember findById(@Param("id") String id);
+
         // 사용자의 챌린지 멤버십 조회
         Map<String, Object> findByUserIdAndChallengeId(
                         @Param("userId") String userId,
@@ -42,4 +45,8 @@ public interface ChallengeMemberMapper {
 
         // 활성 멤버 목록 조회 (가입일 순)
         List<Map<String, Object>> findAllActiveMembers(@Param("challengeId") String challengeId);
+
+        // 멤버 역할 변경 (리더 위임 등)
+        int updateRole(@Param("memberId") String memberId, @Param("challengeId") String challengeId,
+                        @Param("newRole") String newRole);
 }
