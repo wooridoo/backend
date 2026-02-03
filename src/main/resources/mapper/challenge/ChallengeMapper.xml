@@ -169,6 +169,15 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 챌린지 상태 및 삭제일시 업데이트 (Soft Delete) -->
+    <update id="updateStatusAndDeletedAt" parameterType="com.woorido.challenge.domain.Challenge">
+        UPDATE woorido.challenges
+        SET status = #{status},
+            deleted_at = SYSTIMESTAMP,
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{id}
+    </update>
+
     <!-- 내 챌린지 목록 조회 -->
     <select id="findMyChallenges" resultType="java.util.HashMap">
         SELECT 
@@ -181,7 +190,8 @@
             c.thumbnail_url AS thumbnail_image,
             cm.role AS my_role,
             cm.privilege_status AS my_status,
-            cm.joined_at
+            cm.joined_at,
+            cm.id AS member_id
         FROM woorido.challenge_members cm
         INNER JOIN woorido.challenges c ON cm.challenge_id = c.id
         WHERE cm.user_id = #{userId}

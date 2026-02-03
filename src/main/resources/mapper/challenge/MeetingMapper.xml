@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.challenge.repository.MeetingMapper">
+
+  <!-- 챌린지의 완료된 모임 총 개수 -->
+  <select id="countTotalMeetings" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meetings
+    WHERE challenge_id = #{challengeId}
+      AND status = 'COMPLETED'
+  </select>
+
+  <!-- 사용자가 실제 참석한 모임 개수 -->
+  <select id="countAttendedMeetings" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meeting_attendees ma
+    JOIN woorido.meetings m ON ma.meeting_id = m.id
+    WHERE m.challenge_id = #{challengeId}
+      AND ma.user_id = #{userId}
+      AND ma.status = 'ATTENDED'
+      AND m.status = 'COMPLETED'
+  </select>
+
+</mapper>

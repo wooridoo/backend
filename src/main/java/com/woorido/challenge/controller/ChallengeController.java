@@ -21,6 +21,9 @@ import com.woorido.challenge.dto.response.ChallengeAccountResponse;
 import com.woorido.challenge.dto.response.ChallengeDetailResponse;
 import com.woorido.challenge.dto.response.ChallengeListResponse;
 import com.woorido.challenge.dto.response.CreateChallengeResponse;
+import com.woorido.challenge.dto.response.ChallengeDeleteResponse;
+import com.woorido.challenge.dto.request.UpdateSupportSettingsRequest;
+import com.woorido.challenge.dto.response.UpdateSupportSettingsResponse;
 import com.woorido.challenge.dto.response.ChallengeMemberListResponse;
 import com.woorido.challenge.dto.response.JoinChallengeResponse;
 import com.woorido.challenge.dto.response.LeaveChallengeResponse;
@@ -298,6 +301,101 @@ public class ChallengeController {
           return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("챌린지를 찾을 수 없습니다"));
         if (message.startsWith("CHALLENGE_003"))
           return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
+   * 챌린지 삭제 API (API 026)
+   * DELETE /challenges/{challengeId}
+   */
+  @DeleteMapping("/{challengeId}")
+  public ResponseEntity<ApiResponse<ChallengeDeleteResponse>> deleteChallenge(
+      @PathVariable("challengeId") String challengeId,
+      @RequestHeader("Authorization") String authorization) {
+
+    try {
+      ChallengeDeleteResponse response = challengeService
+          .deleteChallenge(authorization, challengeId);
+      return ResponseEntity.ok(ApiResponse.success(response, "챌린지가 삭제되었습니다"));
+    } catch (RuntimeException e) {
+      System.out.println("에러 발생: " + e.getMessage());
+
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("CHALLENGE_001"))
+          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("챌린지를 찾을 수 없습니다"));
+        if (message.startsWith("CHALLENGE_004"))
+          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("리더만 삭제할 수 있습니다"));
+        if (message.startsWith("CHALLENGE_010"))
+          return ResponseEntity.badRequest().body(ApiResponse.error("활성화된 챌린지는 삭제할 수 없습니다"));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
+   * 자동 납입 설정 API (API 029)
+   * PUT /challenges/{challengeId}/support/settings
+   */
+  @PutMapping("/{challengeId}/support/settings")
+  public ResponseEntity<ApiResponse<UpdateSupportSettingsResponse>> updateSupportSettings(
+      @PathVariable("challengeId") String challengeId,
+      @RequestHeader("Authorization") String authorization,
+      @Valid @RequestBody UpdateSupportSettingsRequest request) {
+
+    try {
+      UpdateSupportSettingsResponse response = challengeService
+          .updateSupportSettings(challengeId, authorization, request);
+      return ResponseEntity.ok(ApiResponse.success(response, "자동 납입이 설정되었습니다"));
+    } catch (RuntimeException e) {
+      System.out.println("에러 발생: " + e.getMessage());
+
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("CHALLENGE_001"))
+          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("챌린지를 찾을 수 없습니다"));
+        if (message.startsWith("CHALLENGE_003"))
+          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
+        if (message.startsWith("VALIDATION_"))
+          return ResponseEntity.badRequest().body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
+   * API 033: 챌린지 멤버 상세 조회
+   * GET /challenges/{challengeId}/members/{memberId}
+   */
+  @GetMapping("/{challengeId}/members/{memberId}")
+  public ResponseEntity<ApiResponse<com.woorido.challenge.dto.response.ChallengeMemberDetailResponse>> getMemberDetail(
+      @PathVariable("challengeId") String challengeId,
+      @PathVariable("memberId") String memberId,
+      @RequestHeader("Authorization") String authorization) {
+
+    try {
+      com.woorido.challenge.dto.response.ChallengeMemberDetailResponse response = challengeService
+          .getMemberDetail(challengeId, memberId, authorization);
+      return ResponseEntity.ok(ApiResponse.success(response, "멤버 상세 정보 조회 성공"));
+    } catch (RuntimeException e) {
+      System.out.println("API 033 Error: " + e.getMessage());
+      e.printStackTrace();
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("CHALLENGE_") || message.startsWith("MEMBER_")) {
+          // 403 or 404 depending on error, but for simplicity returning 400 or specific
+          // status
+          if (message.startsWith("CHALLENGE_003"))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
+          if (message.startsWith("MEMBER_001"))
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("멤버를 찾을 수 없습니다"));
+          return ResponseEntity.badRequest().body(ApiResponse.error(message));
+        }
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));

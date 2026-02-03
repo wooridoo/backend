@@ -31,4 +31,12 @@ public interface ChallengeMemberMapper {
 
         // 멤버 정보 포함 조회 (API 032)
         List<Map<String, Object>> findMembersWithUserInfo(@Param("challengeId") String challengeId);
+
+        // 자동 납입 설정 업데이트
+        int updateAutoPayEnabled(@Param("userId") String userId, @Param("challengeId") String challengeId,
+                        @Param("autoPayEnabled") String autoPayEnabled);
+
+        // 멤버 상세 정보 조회 (API 033)
+        Map<String, Object> findMemberDetail(@Param("challengeId") String challengeId,
+                        @Param("memberId") String memberId);
 }
