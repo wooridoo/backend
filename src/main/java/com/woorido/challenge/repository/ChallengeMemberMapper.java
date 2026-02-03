@@ -31,4 +31,7 @@ public interface ChallengeMemberMapper {
 
         // 멤버 정보 포함 조회 (API 032)
         List<Map<String, Object>> findMembersWithUserInfo(@Param("challengeId") String challengeId);
+
+        // 활성 멤버 목록 조회 (가입일 순)
+        List<Map<String, Object>> findAllActiveMembers(@Param("challengeId") String challengeId);
 }

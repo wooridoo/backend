@@ -35,8 +35,6 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        System.out.println("========== GET /users/me 요청 들어옴 ==========");
-
         try {
             // Authorization 헤더에서 Bearer 토큰 추출
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -44,13 +42,11 @@ public class UserController {
             }
 
             String accessToken = authHeader.substring(7); // "Bearer " 제거
-            System.out.println("accessToken: " + accessToken.substring(0, 20) + "...");
 
             UserProfileResponse response = userService.getMyProfile(accessToken);
             return ResponseEntity.ok(ApiResponse.success(response));
 
         } catch (RuntimeException e) {
-            System.out.println("에러 발생: " + e.getMessage());
 
             String message = e.getMessage();
             if (message != null && message.startsWith("AUTH_001")) {
@@ -71,8 +67,6 @@ public class UserController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @Valid @RequestBody UserUpdateRequest request) {
 
-        System.out.println("========== PUT /users/me 요청 들어옴 ==========");
-
         try {
             // Authorization 헤더에서 Bearer 토큰 추출
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -80,13 +74,11 @@ public class UserController {
             }
 
             String accessToken = authHeader.substring(7); // "Bearer " 제거
-            System.out.println("accessToken: " + accessToken.substring(0, 20) + "...");
 
             UserUpdateResponse response = userService.updateMyProfile(accessToken, request);
             return ResponseEntity.ok(ApiResponse.success(response, "정보가 수정되었습니다"));
 
         } catch (RuntimeException e) {
-            System.out.println("에러 발생: " + e.getMessage());
 
             String message = e.getMessage();
             if (message != null && message.startsWith("AUTH_001")) {
@@ -112,9 +104,6 @@ public class UserController {
     public ResponseEntity<ApiResponse<NicknameCheckResponse>> checkNickname(
             @RequestParam("nickname") String nickname) {
 
-        System.out.println("========== GET /users/check-nickname 요청 들어옴 ==========");
-        System.out.println("nickname: " + nickname);
-
         try {
             NicknameCheckResponse response = userService.checkNicknameAvailability(nickname);
 
@@ -125,7 +114,6 @@ public class UserController {
             }
 
         } catch (RuntimeException e) {
-            System.out.println("에러 발생: " + e.getMessage());
 
             String message = e.getMessage();
             if (message != null && message.startsWith("USER_006")) {

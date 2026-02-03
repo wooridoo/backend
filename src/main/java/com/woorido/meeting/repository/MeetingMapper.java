@@ -1,0 +1,37 @@
+package com.woorido.meeting.repository;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import com.woorido.meeting.domain.Meeting;
+
+@Mapper
+public interface MeetingMapper {
+
+        // 모임 생성
+        void insert(Meeting meeting);
+
+        // 모임 목록 조회 (필터링, 페이징)
+        List<Map<String, Object>> findAllByChallengeIdWithFilter(
+                        @Param("challengeId") String challengeId,
+                        @Param("status") String status,
+                        @Param("offset") int offset,
+                        @Param("limit") int limit);
+
+        // 모임 총 개수 조회 (필터링)
+        long countAllByChallengeIdWithFilter(
+                        @Param("challengeId") String challengeId,
+                        @Param("status") String status);
+
+        // 모임 상세 조회
+        Map<String, Object> findById(@Param("meetingId") String meetingId);
+
+        // 모임 수정
+        void update(Meeting meeting);
+
+        // 모임 완료 처리
+        void complete(Meeting meeting);
+}
