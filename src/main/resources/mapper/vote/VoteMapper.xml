@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.vote.repository.VoteMapper">
+
+  <insert id="insert" parameterType="com.woorido.vote.domain.Vote">
+    <!-- MeetingVote 테이블에는 제한된 정보만 저장 가능. 모임 투표(MEETING_ATTENDANCE)만 지원 -->
+    INSERT INTO woorido.meeting_votes (
+      id, meeting_id, status, expires_at, created_at, required_count
+    ) VALUES (
+      #{id}, #{meetingId}, #{status}, #{deadline}, #{createdAt}, #{requiredCount}
+    )
+  </insert>
+
+  <select id="findById" resultType="com.woorido.vote.domain.Vote">
+    SELECT 
+      mv.id, 
+      m.challenge_id as challengeId, 
+      CASE WHEN m.status = 'VOTE' THEN TO_CHAR(m.location) ELSE 'MEETING_ATTENDANCE' END as type, 
+      m.title as title, 
+      m.description as description, 
+      CASE WHEN m.status = 'VOTE' THEN TO_CHAR(m.agenda) ELSE m.id END as targetId, 
+      mv.meeting_id as meetingId, 
+      mv.status, 
+      m.created_by as createdBy, 
+      mv.expires_at as deadline, 
+      mv.created_at as createdAt, 
+      mv.closed_at as completedAt,
+      mv.required_count as requiredCount
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meetings m ON mv.meeting_id = m.id
+    WHERE mv.id = #{id}
+  </select>
+
+  <!-- 목록 조회: Meeting 테이블과 조인하여 정보 구성 -->
+  <select id="findAllByChallengeIdWithFilter" resultType="java.util.Map">
+    SELECT * FROM (
+      SELECT A.*, ROWNUM AS RNUM FROM (
+        SELECT 
+          mv.id as VOTE_ID,
+          CASE WHEN m.status = 'VOTE' THEN TO_CHAR(m.location) ELSE 'MEETING_ATTENDANCE' END as TYPE,
+          m.title as TITLE,
+          mv.status as STATUS,
+          m.created_by as CREATED_BY_ID,
+          u.nickname as CREATED_BY_NICKNAME,
+          mv.expires_at as DEADLINE,
+          mv.created_at as CREATED_AT,
+          -- 레코드 테이블에서 직접 카운트 (데이터 일관성 보장)
+          (SELECT COUNT(*) FROM woorido.meeting_vote_records mvr WHERE mvr.meeting_vote_id = mv.id AND mvr.choice = 'AGREE') as AGREE_COUNT,
+          (SELECT COUNT(*) FROM woorido.meeting_vote_records mvr WHERE mvr.meeting_vote_id = mv.id AND mvr.choice = 'DISAGREE') as DISAGREE_COUNT,
+          (SELECT COUNT(*) FROM woorido.meeting_vote_records mvr WHERE mvr.meeting_vote_id = mv.id) as TOTAL_VOTE_COUNT
+        FROM woorido.meeting_votes mv
+        JOIN woorido.meetings m ON mv.meeting_id = m.id
+        LEFT JOIN woorido.users u ON m.created_by = u.id
+        WHERE m.challenge_id = #{challengeId}
+    <if test="status != null">
+          AND mv.status = #{status}
+    </if>
+    <if test="type != null">
+          AND (
+            (m.status = 'VOTE' AND TO_CHAR(m.location) = #{type}) OR
+            (m.status != 'VOTE' AND 'MEETING_ATTENDANCE' = #{type})
+          )
+    </if>
+        ORDER BY mv.created_at DESC
+      ) A
+      WHERE ROWNUM &lt;= #{offset} + #{size}
+    )
+    WHERE RNUM &gt; #{offset}
+  </select>
+
+  <select id="countAllByChallengeIdWithFilter" resultType="long">
+    SELECT COUNT(*)
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meetings m ON mv.meeting_id = m.id
+    WHERE m.challenge_id = #{challengeId}
+    <if test="status != null">
+      AND mv.status = #{status}
+    </if>
+    <if test="type != null">
+      AND (
+        (m.status = 'VOTE' AND TO_CHAR(m.location) = #{type}) OR
+        (m.status != 'VOTE' AND 'MEETING_ATTENDANCE' = #{type})
+      )
+    </if>
+  </select>
+
+  <select id="checkVoteRecordExisting" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meeting_vote_records
+    WHERE meeting_vote_id = #{voteId} AND user_id = #{userId}
+  </select>
+
+  <insert id="insertVoteRecord">
+    INSERT INTO woorido.meeting_vote_records (
+      id, meeting_vote_id, user_id, choice, created_at
+    ) VALUES (
+      #{id}, #{voteId}, #{userId}, #{choice}, CURRENT_TIMESTAMP
+    )
+  </insert>
+
+  <select id="findMyVote" resultType="string">
+    SELECT choice
+    FROM woorido.meeting_vote_records
+    WHERE meeting_vote_id = #{voteId} AND user_id = #{userId}
+  </select>
+
+  <select id="findVoteCounts" resultType="java.util.Map">
+    SELECT 
+      (SELECT COUNT(*) FROM woorido.meeting_vote_records WHERE meeting_vote_id = #{voteId} AND choice = 'AGREE') as AGREE,
+      (SELECT COUNT(*) FROM woorido.meeting_vote_records WHERE meeting_vote_id = #{voteId} AND choice = 'DISAGREE') as DISAGREE,
+      (SELECT COUNT(*) FROM woorido.meeting_vote_records WHERE meeting_vote_id = #{voteId}) as TOTAL
+    FROM DUAL
+  </select>
+
+</mapper>
