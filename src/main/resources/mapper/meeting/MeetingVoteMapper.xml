@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.meeting.repository.MeetingVoteMapper">
+
+  <resultMap id="MeetingVoteMap" type="com.woorido.meeting.domain.MeetingVote">
+    <id property="id" column="ID"/>
+    <result property="meetingId" column="MEETING_ID"/>
+    <result property="requiredCount" column="REQUIRED_COUNT"/>
+    <result property="attendCount" column="ATTEND_COUNT"/>
+    <result property="absentCount" column="ABSENT_COUNT"/>
+    <result property="status" column="STATUS"/>
+    <result property="version" column="VERSION"/>
+    <result property="createdAt" column="CREATED_AT"/>
+    <result property="expiresAt" column="EXPIRES_AT"/>
+    <result property="closedAt" column="CLOSED_AT"/>
+  </resultMap>
+
+  <resultMap id="MeetingVoteRecordMap" type="com.woorido.meeting.domain.MeetingVoteRecord">
+    <id property="id" column="ID"/>
+    <result property="meetingVoteId" column="MEETING_VOTE_ID"/>
+    <result property="userId" column="USER_ID"/>
+    <result property="choice" column="CHOICE"/>
+    <result property="actualAttendance" column="ACTUAL_ATTENDANCE"/>
+    <result property="attendanceConfirmedAt" column="ATTENDANCE_CONFIRMED_AT"/>
+    <result property="createdAt" column="CREATED_AT"/>
+  </resultMap>
+
+  <select id="findByMeetingId" resultMap="MeetingVoteMap">
+        SELECT * FROM woorido.meeting_votes WHERE meeting_id = #{meetingId}
+  </select>
+
+  <insert id="insertVote">
+        INSERT INTO woorido.meeting_votes (
+            id, meeting_id, required_count, attend_count, absent_count, status, created_at, expires_at
+        ) VALUES (
+            #{id}, #{meetingId}, #{requiredCount}, #{attendCount}, #{absentCount}, #{status}, CURRENT_TIMESTAMP, #{expiresAt}
+        )
+  </insert>
+
+  <select id="findRecord" resultMap="MeetingVoteRecordMap">
+        SELECT * FROM woorido.meeting_vote_records 
+        WHERE meeting_vote_id = #{voteId} AND user_id = #{userId}
+  </select>
+
+  <insert id="insertRecord">
+        INSERT INTO woorido.meeting_vote_records (
+            id, meeting_vote_id, user_id, choice, actual_attendance, created_at
+        ) VALUES (
+            #{id}, #{meetingVoteId}, #{userId}, #{choice, jdbcType=VARCHAR}, 'PENDING', CURRENT_TIMESTAMP
+        )
+  </insert>
+
+  <update id="updateRecord">
+        UPDATE woorido.meeting_vote_records
+        SET choice = #{choice},
+            actual_attendance = #{actualAttendance},
+            attendance_confirmed_at = #{attendanceConfirmedAt}
+        WHERE id = #{id}
+  </update>
+
+</mapper>

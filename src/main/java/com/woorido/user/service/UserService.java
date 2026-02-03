@@ -38,10 +38,6 @@ public class UserService {
         // 2. 토큰에서 사용자 ID 추출
         String userId = jwtUtil.getUserIdFromToken(accessToken);
 
-        System.out.println("========== GET MY PROFILE ==========");
-        System.out.println("userId: " + userId);
-        System.out.println("=====================================");
-
         // 3. 사용자 정보 조회
         User user = userMapper.findById(userId);
         if (user == null) {
@@ -90,12 +86,6 @@ public class UserService {
         // 2. 토큰에서 사용자 ID 추출
         String userId = jwtUtil.getUserIdFromToken(accessToken);
 
-        System.out.println("========== UPDATE MY PROFILE ==========");
-        System.out.println("userId: " + userId);
-        System.out.println("nickname: " + request.getNickname());
-        System.out.println("phone: " + request.getPhone());
-        System.out.println("========================================");
-
         // 3. 사용자 존재 확인
         User user = userMapper.findById(userId);
         if (user == null) {
@@ -135,9 +125,6 @@ public class UserService {
      * - DB에서 중복 확인
      */
     public NicknameCheckResponse checkNicknameAvailability(String nickname) {
-        System.out.println("========== CHECK NICKNAME ==========");
-        System.out.println("nickname: " + nickname);
-        System.out.println("=====================================");
 
         // 1. 닉네임 길이 검증
         if (nickname == null || nickname.length() < 2 || nickname.length() > 20) {
