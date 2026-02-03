@@ -82,6 +82,7 @@ public class ChallengeService {
     validateRequest(request);
 
     // 4. 챌린지 생성
+    LocalDateTime now = LocalDateTime.now();
     String challengeId = UUID.randomUUID().toString();
     Challenge challenge = Challenge.builder()
         .id(challengeId)
@@ -117,6 +118,7 @@ public class ChallengeService {
         .privilegeStatus("ACTIVE")
         .totalSupportPaid(0L)
         .autoPayEnabled("Y")
+        .joinedAt(now)
         .build();
 
     challengeMemberMapper.insert(member);
@@ -127,7 +129,6 @@ public class ChallengeService {
     }
 
     // 7. 응답 생성
-    LocalDateTime now = LocalDateTime.now();
     return CreateChallengeResponse.builder()
         .challengeId(challengeId)
         .name(request.getName())
@@ -349,7 +350,7 @@ public class ChallengeService {
         }
       } catch (Exception e) {
         // 토큰 검증 실패시 비회원으로 처리
-        System.out.println("토큰 검증 실패 (비회원 조회): " + e.getMessage());
+        // 토큰 검증 실패시 비회원으로 처리
       }
     }
 
@@ -459,7 +460,6 @@ public class ChallengeService {
     // 1. 토큰 검증 및 사용자 ID 추출
     String token = accessToken.replace("Bearer ", "");
     String userId = jwtUtil.getUserIdFromToken(token);
-    System.out.println("userId: " + userId);
 
     // 2. 내 챌린지 목록 조회
     List<Map<String, Object>> myChallenges = challengeMapper.findMyChallenges(
@@ -524,7 +524,6 @@ public class ChallengeService {
     // 1. 토큰 검증 및 사용자 ID 추출
     String token = accessToken.replace("Bearer ", "");
     String userId = jwtUtil.getUserIdFromToken(token);
-    System.out.println("userId: " + userId);
 
     // 2. 챌린지 존재 확인
     Map<String, Object> accountData = challengeMapper.findChallengeAccount(challengeId);
@@ -626,7 +625,6 @@ public class ChallengeService {
     // 1. 토큰 검증 및 사용자 ID 추출
     String token = accessToken.replace("Bearer ", "");
     String userId = jwtUtil.getUserIdFromToken(token);
-    System.out.println("userId: " + userId);
 
     // 2. 챌린지 존재 확인
     Challenge challenge = challengeMapper.findById(challengeId);
@@ -865,7 +863,6 @@ public class ChallengeService {
     // 1. 토큰 검증 및 사용자 ID 추출 (Bearer 제거)
     String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
     String userId = jwtUtil.getUserIdFromToken(token);
-    System.out.println("userId: " + userId);
 
     // 2. 리더 권한 확인 (리더는 탈퇴 불가)
     int isLeader = challengeMapper.isLeader(challengeId, userId);

@@ -73,13 +73,9 @@ public class ChallengeController {
       MyChallengesResponse response = challengeService.getMyChallenges(authorization, request);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
-      e.printStackTrace();
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .body(ApiResponse.error("인증에 실패했습니다"));
     } catch (Exception e) {
-      System.out.println("에러 발생: " + e.getMessage());
-      e.printStackTrace();
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
@@ -124,16 +120,12 @@ public class ChallengeController {
       ChallengeAccountResponse response = challengeService.getChallengeAccount(challengeId, authorization);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (IllegalArgumentException e) {
-      System.out.println("에러 발생: " + e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND)
           .body(ApiResponse.error("챌린지를 찾을 수 없습니다"));
     } catch (SecurityException e) {
-      System.out.println("에러 발생: " + e.getMessage());
       return ResponseEntity.status(HttpStatus.FORBIDDEN)
           .body(ApiResponse.error("챌린지 멤버가 아닙니다"));
     } catch (Exception e) {
-      System.out.println("에러 발생: " + e.getMessage());
-      e.printStackTrace();
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
@@ -152,11 +144,9 @@ public class ChallengeController {
       JoinChallengeResponse response = challengeService.joinChallenge(challengeId, authorization);
       return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     } catch (IllegalArgumentException e) {
-      System.out.println("에러 발생: " + e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND)
           .body(ApiResponse.error("챌린지를 찾을 수 없습니다"));
     } catch (IllegalStateException e) {
-      System.out.println("에러 발생: " + e.getMessage());
       String message = e.getMessage();
       if ("CHALLENGE_002".equals(message))
         return ResponseEntity.badRequest().body(ApiResponse.error("이미 가입한 챌린지입니다"));
@@ -168,8 +158,6 @@ public class ChallengeController {
         return ResponseEntity.badRequest().body(ApiResponse.error("잔액이 부족합니다"));
       return ResponseEntity.badRequest().body(ApiResponse.error(message));
     } catch (Exception e) {
-      System.out.println("에러 발생: " + e.getMessage());
-      e.printStackTrace();
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
@@ -264,8 +252,6 @@ public class ChallengeController {
       LeaveChallengeResponse response = challengeService.leaveChallenge(challengeId, authorization);
       return ResponseEntity.ok(ApiResponse.success(response, "챌린지에서 탈퇴했습니다"));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
-
       String message = e.getMessage();
       if (message != null) {
         if (message.startsWith("CHALLENGE_001"))
@@ -293,8 +279,6 @@ public class ChallengeController {
       ChallengeMemberListResponse response = challengeService.getChallengeMembers(challengeId, authorization);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
-
       String message = e.getMessage();
       if (message != null) {
         if (message.startsWith("CHALLENGE_001"))
