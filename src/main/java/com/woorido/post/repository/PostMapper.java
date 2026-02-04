@@ -1,0 +1,26 @@
+package com.woorido.post.repository;
+
+import com.woorido.post.domain.Post;
+import java.util.List;
+import java.util.Map;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+@Mapper
+public interface PostMapper {
+  void insert(Post post);
+
+  // 상세 조회용 (작성자 정보 포함)
+  Map<String, Object> findByIdWithAuthor(@Param("id") String id);
+
+  void increaseViewCount(@Param("id") String id);
+
+  boolean isLiked(@Param("postId") String postId, @Param("userId") String userId);
+
+  List<Map<String, Object>> findAttachments(@Param("postId") String postId);
+
+  // 목록 조회용
+  List<Map<String, Object>> findAll(Map<String, Object> params);
+
+  int count(Map<String, Object> params);
+}
