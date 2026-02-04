@@ -14,4 +14,7 @@ public interface VoteQueryMapper {
 
   // 통합 카운트
   long countAllUnionByChallengeId(@Param("challengeId") String challengeId);
+  
+  Map<String, Object> findByIdBasic(@Param("voteId") String voteId);
+  
 }
