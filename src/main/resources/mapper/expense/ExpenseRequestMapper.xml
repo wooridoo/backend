@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.expense.repository.ExpenseRequestMapper">
+
+  <insert id="insert">
+    INSERT INTO woorido.expense_requests (
+      id, meeting_id, created_by, title, amount,
+      description, receipt_url, status, created_at
+    ) VALUES (
+      #{id}, #{meetingId}, #{createdBy}, #{title}, #{amount},
+      #{description, jdbcType=VARCHAR}, #{receiptUrl, jdbcType=VARCHAR}, #{status}, #{createdAt}
+    )
+  </insert>
+
+  <select id="findById" resultType="com.woorido.expense.domain.ExpenseRequest">
+    SELECT id, meeting_id as meetingId, created_by as createdBy, 
+           title, amount, description, receipt_url as receiptUrl,
+           status, created_at as createdAt, approved_at as approvedAt
+    FROM woorido.expense_requests 
+    WHERE id = #{id}
+  </select>
+
+</mapper>

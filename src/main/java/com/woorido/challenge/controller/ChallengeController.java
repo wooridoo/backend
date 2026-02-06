@@ -281,6 +281,7 @@ public class ChallengeController {
       ChallengeMemberListResponse response = challengeService.getChallengeMembers(challengeId, authorization);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
+      e.printStackTrace(); // Added for debugging
       String message = e.getMessage();
       if (message != null) {
         if (message.startsWith("CHALLENGE_001"))
@@ -413,8 +414,11 @@ public class ChallengeController {
 
     // Service 변경이 낫다. (Controller 복잡도 감소)
 
-    DelegateLeaderResponse response = challengeService.delegateLeaderWithToken(challengeId, token,
-        request.getTargetMemberId());
+    String targetId = request.getTargetUserId();
+    if (targetId == null) {
+      targetId = request.getTargetMemberId();
+    }
+    DelegateLeaderResponse response = challengeService.delegateLeaderWithToken(challengeId, token, targetId);
     return ResponseEntity.ok(response);
   }
 }

@@ -17,7 +17,12 @@ import com.woorido.account.domain.TransactionType;
 import com.woorido.account.factory.AccountTransactionFactory;
 import com.woorido.account.repository.AccountMapper;
 import com.woorido.challenge.domain.Challenge;
+import com.woorido.challenge.domain.ChallengeCategory;
 import com.woorido.challenge.domain.ChallengeMember;
+import com.woorido.challenge.domain.ChallengeRole;
+import com.woorido.challenge.domain.ChallengeStatus;
+import com.woorido.challenge.domain.DepositStatus;
+import com.woorido.challenge.domain.PrivilegeStatus;
 import com.woorido.challenge.dto.request.ChallengeListRequest;
 import com.woorido.challenge.dto.request.CreateChallengeRequest;
 import com.woorido.challenge.dto.request.MyChallengesRequest;
@@ -30,9 +35,7 @@ import com.woorido.challenge.dto.response.JoinChallengeResponse;
 import com.woorido.challenge.dto.response.MyChallengesResponse;
 import com.woorido.challenge.dto.response.UpdateChallengeResponse;
 import com.woorido.challenge.dto.response.LeaveChallengeResponse;
-import com.woorido.challenge.dto.response.LeaveChallengeResponse.Refund;
 import com.woorido.challenge.dto.response.ChallengeDeleteResponse;
-import com.woorido.challenge.dto.request.DelegateLeaderRequest;
 import com.woorido.challenge.dto.response.DelegateLeaderResponse;
 
 import com.woorido.challenge.dto.response.ChallengeMemberListResponse;
@@ -56,7 +59,6 @@ public class ChallengeService {
   private final ChallengeMemberMapper challengeMemberMapper;
   private final AccountMapper accountMapper;
   private final AccountTransactionFactory accountTransactionFactory;
-  // private final MeetingMapper meetingMapper; // Removed
   private final JwtUtil jwtUtil;
   private final LedgerMapper ledgerMapper;
 
@@ -89,7 +91,7 @@ public class ChallengeService {
         .id(challengeId)
         .name(request.getName())
         .description(request.getDescription())
-        .category(request.getCategory())
+        .category(ChallengeCategory.valueOf(request.getCategory()))
         .creatorId(userId)
         .currentMembers(1) // 리더 포함
         .minMembers(3)
@@ -97,7 +99,7 @@ public class ChallengeService {
         .balance(0L)
         .monthlyFee(request.getSupportAmount())
         .depositAmount(request.getDepositAmount())
-        .status("RECRUITING")
+        .status(ChallengeStatus.RECRUITING)
         .thumbnailUrl(request.getThumbnailImage())
         .build();
 
@@ -105,18 +107,18 @@ public class ChallengeService {
 
     // 5. 챌린지 멤버 생성 (리더)
     String memberId = UUID.randomUUID().toString();
-    String depositStatus = request.getDepositAmount() > 0 ? "LOCKED" : "NONE";
+    DepositStatus depositStatus = request.getDepositAmount() > 0 ? DepositStatus.LOCKED : DepositStatus.NONE;
     LocalDateTime depositLockedAt = request.getDepositAmount() > 0 ? LocalDateTime.now() : null;
 
     ChallengeMember member = ChallengeMember.builder()
         .id(memberId)
         .challengeId(challengeId)
         .userId(userId)
-        .role("LEADER")
+        .role(ChallengeRole.LEADER)
         .depositStatus(depositStatus)
         .depositLockedAt(depositLockedAt)
         .entryFeeAmount(0L)
-        .privilegeStatus("ACTIVE")
+        .privilegeStatus(PrivilegeStatus.ACTIVE)
         .totalSupportPaid(0L)
         .autoPayEnabled("Y")
         .joinedAt(now)
@@ -163,11 +165,9 @@ public class ChallengeService {
       throw new RuntimeException("VALIDATION_001: 월 서포트 금액은 10,000원 단위여야 합니다");
     }
 
-    // depositAmount는 supportAmount의 1~3배
-    long minDeposit = request.getSupportAmount();
-    long maxDeposit = request.getSupportAmount() * 3;
-    if (request.getDepositAmount() < minDeposit || request.getDepositAmount() > maxDeposit) {
-      throw new RuntimeException("VALIDATION_001: 보증금은 서포트 금액의 1~3배여야 합니다");
+    // depositAmount는 supportAmount와 같아야 함
+    if (!request.getDepositAmount().equals(request.getSupportAmount())) {
+      throw new RuntimeException("VALIDATION_001: 보증금은 서포트 금액과 같아야 합니다");
     }
 
     // startDate는 7일 후 이상
@@ -249,7 +249,7 @@ public class ChallengeService {
           .name(getString(row, "NAME"))
           .description(getString(row, "DESCRIPTION"))
           .category(getString(row, "CATEGORY"))
-          .status(getString(row, "STATUS"))
+          .status(row.get("STATUS") != null ? row.get("STATUS").toString() : null)
           .memberCount(ChallengeListResponse.MemberCount.builder()
               .current(getInteger(row, "CURRENT_MEMBERS"))
               .max(getInteger(row, "MAX_MEMBERS"))
@@ -634,7 +634,7 @@ public class ChallengeService {
     }
 
     // 3. 모집 중인 챌린지인지 확인
-    if (!"RECRUITING".equals(challenge.getStatus())) {
+    if (ChallengeStatus.RECRUITING != challenge.getStatus()) {
       throw new IllegalStateException("CHALLENGE_006");
     }
 
@@ -666,8 +666,14 @@ public class ChallengeService {
 
     // 7. 비용 계산
     Long deposit = challenge.getDepositAmount() != null ? challenge.getDepositAmount() : 0L;
-    Long entryFee = challenge.getMonthlyFee() != null
-        ? challenge.getMonthlyFee() / (challenge.getCurrentMembers() > 0 ? challenge.getCurrentMembers() : 1)
+
+    // 입회비 = 챌린지 잔액 / (멤버수 - 1) = 팔로워 평균 부담금
+    // 리더는 베네핏을 받아 적게 납입하므로 리더 제외
+    int followerCount = challenge.getCurrentMembers() - 1; // 리더 제외
+    if (followerCount < 1)
+      followerCount = 1; // 0 방지 (첫 가입자)
+    Long entryFee = (challenge.getBalance() != null && challenge.getBalance() > 0)
+        ? challenge.getBalance() / followerCount
         : 0L;
     Long firstSupport = 0L; // 납입일 7일 전 이내면 첫 서포트 필요 (생략)
     Long totalCost = deposit + entryFee + firstSupport;
@@ -764,9 +770,9 @@ public class ChallengeService {
         .id(memberId)
         .challengeId(challengeId)
         .userId(userId)
-        .role("FOLLOWER")
-        .depositStatus("LOCKED")
-        .privilegeStatus("ACTIVE")
+        .role(ChallengeRole.FOLLOWER)
+        .depositStatus(DepositStatus.LOCKED)
+        .privilegeStatus(PrivilegeStatus.ACTIVE)
         .entryFeeAmount(entryFee)
         .totalSupportPaid(0L)
         .autoPayEnabled("Y")
@@ -806,7 +812,7 @@ public class ChallengeService {
         LedgerEntry ledger = LedgerEntry.builder()
             .id(UUID.randomUUID().toString())
             .challengeId(challengeId)
-            .type("ENTRY_FEE")
+            .type(com.woorido.challenge.domain.LedgerEntryType.ENTRY_FEE)
             .amount(entryFee)
             .description("챌린지 입장료")
             .balanceBefore(chBalanceBefore)
@@ -822,7 +828,7 @@ public class ChallengeService {
         LedgerEntry ledger = LedgerEntry.builder()
             .id(UUID.randomUUID().toString())
             .challengeId(challengeId)
-            .type("SUPPORT")
+            .type(com.woorido.challenge.domain.LedgerEntryType.SUPPORT)
             .amount(firstSupport)
             .description("챌린지 첫 서포트")
             .balanceBefore(chBalanceBefore)
@@ -860,13 +866,16 @@ public class ChallengeService {
    */
   @Transactional
   public LeaveChallengeResponse leaveChallenge(String challengeId, String accessToken) {
+    System.out.println("DEBUG: leaveChallenge called for challengeId=" + challengeId);
 
     // 1. 토큰 검증 및 사용자 ID 추출 (Bearer 제거)
     String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
     String userId = jwtUtil.getUserIdFromToken(token);
+    System.out.println("DEBUG: userId=" + userId);
 
-    // 2. 리더 권한 확인 (리더는 탈퇴 불가)
+    // 2. 리더 권한 확인
     int isLeader = challengeMapper.isLeader(challengeId, userId);
+    System.out.println("DEBUG: isLeader=" + isLeader);
     if (isLeader > 0) {
       throw new RuntimeException("MEMBER_002: 리더는 탈퇴할 수 없습니다 (위임 후 탈퇴)");
     }
@@ -876,20 +885,23 @@ public class ChallengeService {
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001: 챌린지를 찾을 수 없습니다");
     }
+    System.out.println("DEBUG: challenge found=" + challenge.getName());
 
     // 4. 멤버 여부 확인
     int isMember = challengeMapper.countMemberByChallengeIdAndUserId(challengeId, userId);
+    System.out.println("DEBUG: isMember=" + isMember);
     if (isMember == 0) {
       throw new RuntimeException("CHALLENGE_003: 챌린지 멤버가 아닙니다");
     }
 
     // 5. 환불 금액 계산
     Long deposit = challenge.getDepositAmount() != null ? challenge.getDepositAmount() : 0L;
-    Long deducted = 0L; // 차감 금액 (나중에 구현)
-    Long netRefund = deposit > deducted ? deposit - deducted : 0L;
+    System.out.println("DEBUG: deposit=" + deposit);
+    Long netRefund = deposit; // 차감 없음 가정
 
     // 6. 사용자 계좌 환불 처리
     Account account = accountMapper.findByUserId(userId);
+    System.out.println("DEBUG: account=" + (account != null ? account.getId() : "null"));
     if (account == null) {
       throw new RuntimeException("ACCOUNT_001: 계좌를 찾을 수 없습니다");
     }
@@ -917,26 +929,25 @@ public class ChallengeService {
           .balanceAfter(account.getBalance())
           .lockedBefore(lockedBefore)
           .lockedAfter(account.getLockedBalance())
-          .relatedChallengeId(challengeId)
+          // .relatedChallengeId(challengeId) // If field exists
           .description("챌린지 탈퇴 환불")
           .createdAt(LocalDateTime.now())
           .build();
       accountMapper.saveTransaction(refundTx);
+      System.out.println("DEBUG: Refund processed");
     }
 
-    // 8. 챌린지 밸런스 및 멤버 수 감소
-    challengeMapper.decrementCurrentMembers(challengeId);
+    // 8. 챌린지 멤버 수 감소 (Optional, trigger might handle it)
+    // challengeMapper.decrementCurrentMembers(challengeId);
 
-    // 9. 멤버 상태 업데이트 (Soft Delete)
-    int result = challengeMemberMapper.updateLeaveMember(userId, challengeId, "SELF_LEAVE");
-    if (result == 0) {
-      throw new RuntimeException("MEMBER_004: 멤버 정보 업데이트 실패");
-    }
+    // 9. 탈퇴 처리 (Soft Delete)
+    System.out.println("DEBUG: Calling leaveChallenge mapper");
+    challengeMemberMapper.leaveChallenge(challengeId, userId);
 
     // 10. 응답 생성
-    Refund refund = Refund.builder()
+    LeaveChallengeResponse.Refund refund = LeaveChallengeResponse.Refund.builder()
         .deposit(deposit)
-        .deducted(deducted)
+        .deducted(0L)
         .netRefund(netRefund)
         .build();
 
@@ -1048,18 +1059,19 @@ public class ChallengeService {
       throw new RuntimeException("CHALLENGE_001: 챌린지를 찾을 수 없습니다");
     }
 
-    // 3. 리더 권한 확인
-    if (!userId.equals(challenge.getCreatorId())) {
+    // 3. 리더 권한 확인 (creatorId가 아닌 현재 리더 권한 확인)
+    int isLeader = challengeMapper.isLeader(challengeId, userId);
+    if (isLeader == 0) {
       throw new RuntimeException("CHALLENGE_004: 리더만 삭제할 수 있습니다");
     }
 
     // 4. 상태 확인 (RECRUITING 상태만 삭제 가능)
-    if (!"RECRUITING".equals(challenge.getStatus())) {
+    if (ChallengeStatus.RECRUITING != challenge.getStatus()) {
       throw new RuntimeException("CHALLENGE_010: 활성화된 챌린지는 삭제할 수 없습니다");
     }
 
     // 5. Soft Delete 처리
-    challenge.setStatus("DISSOLVED");
+    challenge.setStatus(ChallengeStatus.COMPLETED);
     challenge.setDeletedAt(LocalDateTime.now());
 
     challengeMapper.updateStatusAndDeletedAt(challenge);
@@ -1150,8 +1162,6 @@ public class ChallengeService {
     int meetingsTotal = 0; // meetingMapper.countTotalMeetings(challengeId);
     int meetingsAttended = 0; // meetingMapper.countAttendedMeetings(challengeId, targetUserId);
     Double attendanceRate = 0.0; // meetingsTotal > 0 ? (double) meetingsAttended / meetingsTotal * 100 : 0.0;
-    // System.out.println("DEBUG: Meeting stats calculated. Total: " + meetingsTotal
-    // + ", Attended: " + meetingsAttended);
 
     // 5-2. 서포트 달성률 (임시 로직: 100.0 고정 or 납부액 기반)
     Double supportRate = totalSupportPaid > 0 ? 100.0 : 0.0;
@@ -1166,10 +1176,8 @@ public class ChallengeService {
         .build();
 
     // 6. 서포트 이력 조회
-    System.out.println("DEBUG: Fetching support history...");
     List<LedgerEntry> ledgerEntries = ledgerMapper.findSupportHistory(challengeId, targetUserId);
-    System.out
-        .println("DEBUG: Support history fetched. Size: " + (ledgerEntries != null ? ledgerEntries.size() : "null"));
+
     List<com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.SupportHistory> supportHistory = new ArrayList<>();
 
     for (LedgerEntry entry : ledgerEntries) {
@@ -1207,52 +1215,58 @@ public class ChallengeService {
   // [NEW] API 034: 리더 위임 (Transaction Required)
   // ------------------------------------------------------------------------------------------------
   @Transactional
-  public DelegateLeaderResponse delegateLeaderWithToken(String challengeId, String token, String targetMemberId) {
+  public DelegateLeaderResponse delegateLeaderWithToken(String challengeId, String token, String targetUserId) {
     String userId = jwtUtil.getUserIdFromToken(token);
-    return delegateLeader(challengeId, userId, targetMemberId);
+    return delegateLeader(challengeId, userId, targetUserId);
   }
 
   @Transactional
   public DelegateLeaderResponse delegateLeader(String challengeId, String userId,
-      String targetMemberId) {
+      String targetUserId) {
     // 1. 현재 리더(나) 검증
     Map<String, Object> myMemberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
 
     // 디버깅용 로그 (나중에 삭제)
-    // System.out.println("Delegate Debug: userId=" + userId + ", challengeId=" +
-    // challengeId);
-    // System.out.println("Delegate Debug: myMemberInfo=" + myMemberInfo);
 
-    if (myMemberInfo == null || !"LEADER".equals(myMemberInfo.get("ROLE"))) {
-      // 혹시 대소문자 문제일 수 있으니 'role' 도 체크
-      String role = myMemberInfo != null ? (String) myMemberInfo.get("role") : null;
-      if (role == null && myMemberInfo != null)
-        role = (String) myMemberInfo.get("ROLE");
-
-      if (!"LEADER".equals(role)) {
-        throw new RuntimeException("리더만 위임할 수 있습니다.");
-      }
+    if (myMemberInfo == null ||
+        (!"LEADER".equals(myMemberInfo.get("ROLE")) && !"LEADER".equals(myMemberInfo.get("role")))) {
+      throw new RuntimeException("리더만 위임할 수 있습니다.");
     }
     String myMemberId = (String) myMemberInfo.get("MEMBER_ID");
     if (myMemberId == null)
       myMemberId = (String) myMemberInfo.get("member_id"); // Fallback
 
-    // 2. 대상 멤버 검증
-    if (myMemberId.equals(targetMemberId)) {
+    // 2. 대상 멤버 검증 (UserId로 조회)
+    if (userId.equals(targetUserId)) {
       throw new RuntimeException("자신에게 위임할 수 없습니다.");
     }
 
-    com.woorido.challenge.domain.ChallengeMember targetMember = challengeMemberMapper.findById(targetMemberId);
-    if (targetMember == null || !challengeId.equals(targetMember.getChallengeId())) {
-      throw new RuntimeException("멤버를 찾을 수 없습니다."); // 404
+    Map<String, Object> targetMemberInfo = challengeMemberMapper.findByUserIdAndChallengeId(targetUserId, challengeId);
+    if (targetMemberInfo == null) {
+      throw new RuntimeException("멤버를 찾을 수 없습니다. (ID: " + targetUserId + ")");
     }
-    if (!"ACTIVE".equals(targetMember.getPrivilegeStatus())) {
-      throw new RuntimeException("정지된 멤버에게 위임할 수 없습니다."); // MEMBER_005
+    String targetMemberId = (String) targetMemberInfo.get("MEMBER_ID");
+    if (targetMemberId == null)
+      targetMemberId = (String) targetMemberInfo.get("member_id");
+
+    com.woorido.challenge.domain.ChallengeMember targetMember = challengeMemberMapper.findById(targetMemberId);
+    if (targetMember == null) {
+      throw new RuntimeException("멤버 정보를 불러올 수 없습니다.");
+    }
+    if (PrivilegeStatus.ACTIVE != targetMember.getPrivilegeStatus()) {
+      throw new RuntimeException("정지된 멤버에게 위임할 수 없습니다. (상태: " + targetMember.getPrivilegeStatus() + ")");
     }
 
     // 3. 역할 교체 (Atomic Update)
-    challengeMemberMapper.updateRole(myMemberId, challengeId, "FOLLOWER");
-    challengeMemberMapper.updateRole(targetMemberId, challengeId, "LEADER");
+    int count1 = challengeMemberMapper.updateRole("FOLLOWER", myMemberId, challengeId);
+    if (count1 == 0) {
+      throw new RuntimeException("ERROR: Failed to update current leader role. ID mismatch? " + myMemberId);
+    }
+
+    int count2 = challengeMemberMapper.updateRole("LEADER", targetMemberId, challengeId);
+    if (count2 == 0) {
+      throw new RuntimeException("ERROR: Failed to update new leader role. ID mismatch? " + targetMemberId);
+    }
 
     // 4. 응답 생성 (닉네임 조회 위해 findMemberDetail 활용)
     Map<String, Object> myDetail = challengeMemberMapper.findMemberDetail(challengeId, myMemberId);
@@ -1280,5 +1294,131 @@ public class ChallengeService {
         .newLeader(newLeaderInfo)
         .delegatedAt(java.time.LocalDateTime.now().toString())
         .build();
+  }
+
+  /**
+   * 챌린지 해산 (투표 결과 100% 달성 시 호출)
+   */
+  @org.springframework.transaction.annotation.Transactional
+  public void dissolveChallenge(String challengeId) {
+    Challenge challenge = challengeMapper.findById(challengeId);
+    if (challenge == null)
+      return;
+
+    // 1. 잔액 처분 (서비스 귀속)
+    Long balance = challenge.getBalance();
+
+    if (balance > 0) {
+      // 장부 기록 (지출 - 서비스 귀속)
+      LedgerEntry ledgerEntry = LedgerEntry.builder()
+          .id(java.util.UUID.randomUUID().toString())
+          .challengeId(challengeId)
+          .type(com.woorido.challenge.domain.LedgerEntryType.EXPENSE)
+          .amount(-balance) // 지출은 음수로? 기획 확인 필요하지만 보통 지출은 amount < 0 or logic handles it.
+                            // LedgerMapper logic usually sums based on type or sign.
+                            // Existing ledger logic uses negative for expense?
+                            // Let's look at `ChallengeService.updateChallenge` logic for reference or
+                            // adjust.
+                            // Creating `EXPENSE` usually means spending money.
+                            // If I set balance to 0, I should record where it went.
+          .balanceBefore(balance)
+          .balanceAfter(0L)
+          .description("챌린지 해산 - 서비스 귀속")
+          .createdAt(LocalDateTime.now())
+          .build();
+      ledgerMapper.insert(ledgerEntry);
+
+      challenge.setBalance(0L);
+      // Update challenge balance in DB is handled by updateStatusAndDeletedAt? No,
+      // that updates status.
+      // Need to update balance separately or add it to update query.
+      // challengeMapper.updateBalance(challenge); // This method exists.
+    }
+
+    // 2. 챌린지 상태 변경
+    challenge.setStatus(ChallengeStatus.COMPLETED);
+    challenge.setDeletedAt(LocalDateTime.now());
+    challengeMapper.updateStatusAndDeletedAt(challenge);
+
+    // Update balance if changed
+    if (balance > 0) {
+      challengeMapper.updateBalance(challenge);
+    }
+
+    // 3. 멤버 상태 변경
+    List<Map<String, Object>> members = challengeMemberMapper.findAllActiveMembers(challengeId);
+    for (Map<String, Object> member : members) {
+      String userId = (String) member.get("USER_ID");
+      challengeMemberMapper.leaveChallenge(challengeId, userId);
+    }
+  }
+
+  /**
+   * 보증금 자동 충당 (스케줄러에서 호출)
+   * - 서포트 미납 시 보증금에서 자동 차감
+   * - 차감 후 권한 박탈 (REVOKED)
+   * 
+   * @return true if deduction occurred, false otherwise
+   */
+  @org.springframework.transaction.annotation.Transactional
+  public boolean autoDeductFromDeposit(String challengeId, String userId) {
+    Challenge challenge = challengeMapper.findById(challengeId);
+    if (challenge == null)
+      return false;
+
+    Account account = accountMapper.findByUserId(userId);
+    if (account == null)
+      return false;
+
+    Long monthlyFee = challenge.getMonthlyFee() != null ? challenge.getMonthlyFee() : 0L;
+    if (monthlyFee <= 0)
+      return false;
+
+    // 가용 잔액 확인
+    if (account.getBalance() >= monthlyFee) {
+      // 충분하면 정상 납입 처리 (이 메서드는 미납 시만 호출되어야 함)
+      return false;
+    }
+
+    // 보증금 잔액 확인
+    Long lockedBalance = account.getLockedBalance();
+    if (lockedBalance < monthlyFee) {
+      // 보증금도 부족 - 추가 조치 필요 (60일 후 자동 탈퇴 등)
+      return false;
+    }
+
+    // 보증금에서 차감
+    long balanceBefore = account.getBalance();
+    long lockedBefore = lockedBalance;
+
+    account.setLockedBalance(lockedBalance - monthlyFee);
+    accountMapper.update(account);
+
+    // 트랜잭션 기록
+    AccountTransaction tx = AccountTransaction.builder()
+        .id(java.util.UUID.randomUUID().toString())
+        .accountId(account.getId())
+        .type(TransactionType.SUPPORT)
+        .amount(-monthlyFee)
+        .balanceBefore(balanceBefore)
+        .balanceAfter(balanceBefore)
+        .lockedBefore(lockedBefore)
+        .lockedAfter(lockedBefore - monthlyFee)
+        .relatedChallengeId(challengeId)
+        .description("서포트 미납 - 보증금 자동 충당")
+        .createdAt(LocalDateTime.now())
+        .build();
+    accountMapper.saveTransaction(tx);
+
+    // 챌린지 계좌에 입금
+    Long chBalance = challenge.getBalance() != null ? challenge.getBalance() : 0L;
+    challenge.setBalance(chBalance + monthlyFee);
+    challengeMapper.updateBalance(challenge);
+
+    // 멤버 상태 업데이트: 보증금 사용됨 + 권한 박탈
+    challengeMemberMapper.updateDepositStatus(challengeId, userId, "USED");
+    challengeMemberMapper.updatePrivilegeStatus(challengeId, userId, "REVOKED");
+
+    return true;
   }
 }

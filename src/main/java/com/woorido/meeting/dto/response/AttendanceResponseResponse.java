@@ -1,7 +1,5 @@
 package com.woorido.meeting.dto.response;
 
-import java.util.Map;
-
 import lombok.Builder;
 import lombok.Getter;
 

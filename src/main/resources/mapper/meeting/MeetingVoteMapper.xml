@@ -52,9 +52,9 @@
 
   <update id="updateRecord">
         UPDATE woorido.meeting_vote_records
-        SET choice = #{choice},
-            actual_attendance = #{actualAttendance},
-            attendance_confirmed_at = #{attendanceConfirmedAt}
+        SET choice = #{choice, jdbcType=VARCHAR},
+            actual_attendance = #{actualAttendance, jdbcType=VARCHAR},
+            attendance_confirmed_at = #{attendanceConfirmedAt, jdbcType=TIMESTAMP}
         WHERE id = #{id}
   </update>
 

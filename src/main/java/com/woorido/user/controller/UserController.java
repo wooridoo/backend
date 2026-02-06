@@ -15,7 +15,10 @@ import com.woorido.user.dto.request.UserUpdateRequest;
 import com.woorido.user.dto.response.NicknameCheckResponse;
 import com.woorido.user.dto.response.UserProfileResponse;
 import com.woorido.user.dto.response.UserUpdateResponse;
+import com.woorido.user.dto.response.UserWithdrawResponse;
 import com.woorido.user.service.UserService;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -93,6 +96,36 @@ public class UserController {
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("서버 오류가 발생했습니다"));
+        }
+    }
+
+    /**
+     * 회원 탈퇴 API
+     * DELETE /users/me
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<UserWithdrawResponse>> withdraw(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody com.woorido.user.dto.request.UserWithdrawRequest request) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                throw new RuntimeException("AUTH_001:인증이 필요합니다");
+            }
+            String accessToken = authHeader.substring(7);
+
+            UserWithdrawResponse response = userService.withdrawUser(accessToken, request);
+            return ResponseEntity.ok(ApiResponse.success(response, "탈퇴 처리되었습니다. 30일 내 재가입 시 데이터가 복구됩니다."));
+
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            if (message != null) {
+                if (message.startsWith("AUTH_001"))
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+                if (message.startsWith("USER_003") || message.startsWith("USER_008") || message.startsWith("USER_009"))
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
         }
     }
 

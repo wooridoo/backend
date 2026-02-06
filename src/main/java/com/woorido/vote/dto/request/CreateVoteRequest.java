@@ -19,5 +19,8 @@ public class CreateVoteRequest {
   private String title;
   private String description;
   private String targetId; // API 043 spec says Long, but we use String internally. Input will be parsed.
+  private String meetingId; // 지출 투표 시 관련 모임 ID
+  private Long amount;
+  private String receiptUrl;
   private LocalDateTime deadline;
 }

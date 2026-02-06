@@ -24,18 +24,18 @@ public class User {
     private String phone;
     private String profileImageUrl;
     private LocalDate birthDate;
-    private String gender;
+    private UserGender gender;
     private String bio;
     private String isVerified;
     private String verificationToken;
     private LocalDateTime verificationTokenExpires;
-    private String socialProvider;
+    private SocialProvider socialProvider;
     private String socialId;
     private String passwordResetToken;
     private LocalDateTime passwordResetExpires;
     private Integer failedLoginAttempts;
     private LocalDateTime lockedUntil;
-    private String accountStatus;
+    private AccountStatus accountStatus;
     private LocalDateTime suspendedAt;
     private LocalDateTime suspendedUntil;
     private String suspensionReason;
@@ -49,6 +49,6 @@ public class User {
 
     // accountStatus의 별칭 메서드 (SignupResponse 호환)
     public String getStatus() {
-        return this.accountStatus;
+        return this.accountStatus != null ? this.accountStatus.name() : null;
     }
 }

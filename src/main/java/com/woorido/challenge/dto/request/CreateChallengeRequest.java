@@ -37,11 +37,6 @@ public class CreateChallengeRequest {
   @NotNull(message = "보증금은 필수입니다")
   private Long depositAmount;
 
-  @NotNull(message = "납입일은 필수입니다")
-  @Min(value = 1, message = "납입일은 1~28 사이여야 합니다")
-  @Max(value = 28, message = "납입일은 1~28 사이여야 합니다")
-  private Integer supportDay;
-
   @NotBlank(message = "시작일은 필수입니다")
   @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "시작일 형식이 올바르지 않습니다 (YYYY-MM-DD)")
   private String startDate;

@@ -19,4 +19,7 @@ public interface GeneralVoteMapper {
 
   // 집계 조회
   Map<String, Object> findVoteCounts(String voteId);
+
+  // 투표 상태 업데이트
+  int updateStatus(@Param("voteId") String voteId, @Param("status") String status);
 }

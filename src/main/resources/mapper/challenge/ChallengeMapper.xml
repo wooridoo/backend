@@ -218,9 +218,9 @@
             c.deposit_amount AS locked_deposits,
             c.monthly_fee,
             c.current_members,
-            (SELECT NVL(SUM(CASE WHEN le.type = 'INCOME' THEN le.amount ELSE 0 END), 0)
+            (SELECT NVL(SUM(CASE WHEN le.type IN ('SUPPORT', 'ENTRY_FEE') THEN le.amount ELSE 0 END), 0)
              FROM woorido.ledger_entries le WHERE le.challenge_id = c.id) AS total_income,
-            (SELECT NVL(SUM(CASE WHEN le.type = 'EXPENSE' THEN le.amount ELSE 0 END), 0)
+            (SELECT NVL(SUM(CASE WHEN le.type IN ('EXPENSE', 'REFUND') THEN le.amount ELSE 0 END), 0)
              FROM woorido.ledger_entries le WHERE le.challenge_id = c.id) AS total_expense
         FROM woorido.challenges c
         WHERE c.id = #{challengeId}

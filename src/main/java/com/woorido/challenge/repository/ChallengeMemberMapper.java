@@ -47,6 +47,19 @@ public interface ChallengeMemberMapper {
         List<Map<String, Object>> findAllActiveMembers(@Param("challengeId") String challengeId);
 
         // 멤버 역할 변경 (리더 위임 등)
-        int updateRole(@Param("memberId") String memberId, @Param("challengeId") String challengeId,
-                        @Param("newRole") String newRole);
+        int updateRole(@Param("newRole") String newRole, @Param("memberId") String memberId,
+                        @Param("challengeId") String challengeId);
+
+        void leaveChallenge(@Param("challengeId") String challengeId, @Param("userId") String userId);
+
+        // 멤버 권한 상태 조회 (ACTIVE, REVOKED)
+        String getPrivilegeStatus(@Param("challengeId") String challengeId, @Param("userId") String userId);
+
+        // 멤버 권한 상태 업데이트
+        int updatePrivilegeStatus(@Param("challengeId") String challengeId, @Param("userId") String userId,
+                        @Param("status") String status);
+
+        // 보증금 상태 업데이트
+        int updateDepositStatus(@Param("challengeId") String challengeId, @Param("userId") String userId,
+                        @Param("depositStatus") String depositStatus);
 }

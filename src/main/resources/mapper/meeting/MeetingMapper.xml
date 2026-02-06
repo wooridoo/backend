@@ -10,29 +10,22 @@
       description,
       location,
       location_detail,
-      agenda,
-      scheduled_at,
       meeting_date,
       status,
-      beneficiary_id,
-      benefit_amount,
       created_by,
       created_at,
       updated_at
     ) VALUES (
       #{id},
       #{challengeId},
-      #{title}, #{description,jdbcType=VARCHAR}, #{location,jdbcType=VARCHAR}, #{locationDetail,jdbcType=VARCHAR}, #{agenda,jdbcType=VARCHAR},
-      #{scheduledAt},
-      #{scheduledAt},
-      #{status}, #{beneficiaryId,jdbcType=VARCHAR}, #{benefitAmount,jdbcType=NUMERIC},
+      #{title}, #{description,jdbcType=VARCHAR}, #{location,jdbcType=VARCHAR}, #{locationDetail,jdbcType=VARCHAR},
+      #{meetingDate},
+      #{status},
       #{createdBy},
       #{createdAt},
       #{updatedAt}
     )
   </insert>
-
-
 
   <select id="findAllByChallengeIdWithFilter" resultType="java.util.Map">
     SELECT * FROM (
@@ -42,13 +35,10 @@
             m.title as TITLE,
             m.description as DESCRIPTION,
             m.status as STATUS,
-            m.scheduled_at as SCHEDULED_AT,
+            m.meeting_date as MEETING_DATE,
             m.location as LOCATION,
             m.location_detail as LOCATION_DETAIL,
-            m.agenda as AGENDA,
             m.created_at as CREATED_AT,
-            m.beneficiary_id as BENEFICIARY_ID,
-            (SELECT u.nickname FROM woorido.users u WHERE u.id = m.beneficiary_id) as BENEFICIARY_NICKNAME,
             (SELECT COUNT(*) FROM woorido.meeting_votes mv 
              JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id 
              WHERE mv.meeting_id = m.id AND mvr.choice = 'AGREE') as CONFIRMED_COUNT,
@@ -58,7 +48,7 @@
     <if test="status != null and !'N'.equals(status)">
             AND m.status = #{status}
     </if>
-        ORDER BY m.scheduled_at DESC
+        ORDER BY m.meeting_date DESC
       ) A WHERE ROWNUM &lt;= (#{offset} + #{limit})
     ) WHERE RNUM &gt; #{offset}
   </select>
@@ -79,16 +69,12 @@
         m.title as TITLE,
         m.description as DESCRIPTION,
         m.status as STATUS,
-        m.scheduled_at as SCHEDULED_AT,
+        m.meeting_date as MEETING_DATE,
         m.location as LOCATION,
         m.location_detail as LOCATION_DETAIL,
-        m.agenda as AGENDA,
-        m.benefit_amount as BENEFIT_AMOUNT,
         m.created_at as CREATED_AT,
-        m.beneficiary_id as BENEFICIARY_ID,
-        (SELECT u.nickname FROM woorido.users u WHERE u.id = m.beneficiary_id) as BENEFICIARY_NICKNAME,
         m.created_by as CREATOR_ID,
-        (SELECT u.nickname FROM woorido.users u JOIN woorido.challenge_members cm ON u.id = cm.user_id WHERE cm.id = m.created_by) as CREATOR_NICKNAME,
+        (SELECT u.nickname FROM woorido.users u WHERE u.id = m.created_by) as CREATOR_NICKNAME,
         (SELECT COUNT(*) FROM woorido.meeting_votes mv JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id WHERE mv.meeting_id = m.id AND mvr.choice = 'AGREE') as CONFIRMED_COUNT,
         (SELECT COUNT(*) FROM woorido.meeting_votes mv JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id WHERE mv.meeting_id = m.id AND mvr.choice = 'DISAGREE') as DECLINED_COUNT,
         (SELECT COUNT(*) FROM woorido.meeting_votes mv JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id WHERE mv.meeting_id = m.id AND mvr.choice IS NULL) as PENDING_COUNT,
@@ -97,33 +83,43 @@
     WHERE m.id = #{meetingId}
   </select>
 
-
-
   <update id="update" parameterType="com.woorido.meeting.domain.Meeting">
     UPDATE woorido.meetings
-    SET
-      title = #{title},
-      description = #{description,jdbcType=VARCHAR},
-      location = #{location,jdbcType=VARCHAR},
-      location_detail = #{locationDetail,jdbcType=VARCHAR},
-      agenda = #{agenda,jdbcType=VARCHAR},
-      scheduled_at = #{scheduledAt},
-      meeting_date = #{scheduledAt},
-      updated_at = #{updatedAt}
+    <set>
+      <if test="title != null">title = #{title},</if>
+      <if test="description != null">description = #{description},</if>
+      <if test="location != null">location = #{location},</if>
+      <if test="locationDetail != null">location_detail = #{locationDetail},</if>
+      <if test="meetingDate != null">meeting_date = #{meetingDate},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt}</if>
+    </set>
     WHERE id = #{id}
   </update>
-
-  <!-- Deprecated or moved to MeetingVoteMapper -->
-  <!-- insertAttendance and updateAttendance removed -->
 
   <update id="complete" parameterType="com.woorido.meeting.domain.Meeting">
     UPDATE woorido.meetings
     SET
       status = 'COMPLETED',
-      notes = #{notes,jdbcType=CLOB},
       completed_at = #{completedAt},
       updated_at = #{updatedAt}
     WHERE id = #{id}
   </update>
+
+  <select id="countAttendees" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id
+    WHERE mv.meeting_id = #{meetingId}
+      AND mvr.choice = 'AGREE'
+  </select>
+
+  <select id="isAttendee" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id
+    WHERE mv.meeting_id = #{meetingId}
+      AND mvr.user_id = #{userId}
+      AND mvr.choice = 'AGREE'
+  </select>
 
 </mapper>

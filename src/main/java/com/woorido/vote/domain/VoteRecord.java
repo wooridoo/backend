@@ -23,6 +23,7 @@ public class VoteRecord {
   private LocalDateTime votedAt;
 
   public enum VoteChoice {
-    AGREE, DISAGREE, ABSTAIN
+    AGREE, DISAGREE, ABSTAIN,
+    APPROVE, REJECT // Expense/General Vote용
   }
 }

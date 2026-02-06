@@ -27,7 +27,7 @@
         joined_at as joinedAt,
         privilege_status as privilegeStatus
     FROM woorido.challenge_members
-    WHERE id = #{id}
+    WHERE id = #{id, jdbcType=VARCHAR}
   </select>
 
   <select id="findByUserIdAndChallengeId" resultType="java.util.Map">
@@ -39,8 +39,8 @@
         joined_at as JOINED_AT,
         privilege_status as STATUS
     FROM woorido.challenge_members
-    WHERE user_id = #{userId}
-    AND challenge_id = #{challengeId}
+    WHERE user_id = #{userId, jdbcType=VARCHAR}
+    AND challenge_id = #{challengeId, jdbcType=VARCHAR}
   </select>
 
   <select id="countByChallengeId" resultType="int">
@@ -63,7 +63,7 @@
     ORDER BY cm.joined_at ASC
   </select>
 
-  <select id="findMembers" resultType="java.util.Map">
+  <select id="findMembersWithUserInfo" resultType="java.util.Map">
     SELECT 
         cm.id as MEMBER_ID,
         cm.user_id as USER_ID,
@@ -71,16 +71,11 @@
         cm.role as ROLE,
         cm.joined_at as JOINED_AT,
         cm.privilege_status as STATUS,
-        cm.deposit_status as DEPOSIT_STATUS
+        cm.deposit_status as DEPOSIT_STATUS,
+        u.profile_image_url as PROFILE_IMAGE
     FROM woorido.challenge_members cm
     JOIN woorido.users u ON cm.user_id = u.id
     WHERE cm.challenge_id = #{challengeId}
-    <if test="status != null">
-        AND cm.privilege_status = #{status}
-    </if>
-    <if test="nickname != null">
-        AND u.nickname LIKE '%' || #{nickname} || '%'
-    </if>
     ORDER BY 
         CASE WHEN cm.role = 'LEADER' THEN 1 ELSE 2 END,
         cm.joined_at ASC
@@ -117,14 +112,33 @@
     SET privilege_status = 'LEFT',
         left_at = CURRENT_TIMESTAMP,
         deposit_status = 'RELEASED'
-    WHERE challenge_id = #{challengeId} AND user_id = #{userId}
+    WHERE challenge_id = #{challengeId, jdbcType=VARCHAR} AND user_id = #{userId, jdbcType=VARCHAR}
   </update>
 
   <update id="updateRole">
     UPDATE woorido.challenge_members
-    SET role = #{newRole}
-    WHERE id = #{memberId}
-      AND challenge_id = #{challengeId}
+    SET role = #{newRole, jdbcType=VARCHAR}
+    WHERE id = #{memberId, jdbcType=VARCHAR}
+      AND challenge_id = #{challengeId, jdbcType=VARCHAR}
+  </update>
+
+  <select id="getPrivilegeStatus" resultType="String">
+    SELECT privilege_status
+    FROM woorido.challenge_members
+    WHERE challenge_id = #{challengeId} AND user_id = #{userId}
+  </select>
+
+  <update id="updatePrivilegeStatus">
+    UPDATE woorido.challenge_members
+    SET privilege_status = #{status},
+        privilege_revoked_at = CASE WHEN #{status} = 'REVOKED' THEN SYSTIMESTAMP ELSE NULL END
+    WHERE challenge_id = #{challengeId} AND user_id = #{userId}
+  </update>
+
+  <update id="updateDepositStatus">
+    UPDATE woorido.challenge_members
+    SET deposit_status = #{depositStatus}
+    WHERE challenge_id = #{challengeId} AND user_id = #{userId}
   </update>
 
 </mapper>

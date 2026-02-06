@@ -14,8 +14,8 @@ import lombok.Setter;
 public class CreateMeetingRequest {
   private String title;
   private String description;
-  private String scheduledAt;
+  private String meetingDate; // scheduledAt -> meetingDate
   private String location;
   private String locationDetail;
-  private String agenda;
+  // private String agenda; // 제거
 }

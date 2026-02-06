@@ -34,4 +34,10 @@ public interface MeetingMapper {
 
         // 모임 완료 처리
         void complete(Meeting meeting);
+
+        // 모임 참석자 수 조회
+        int countAttendees(@Param("meetingId") String meetingId);
+
+        // 모임 참석 여부 확인
+        int isAttendee(@Param("meetingId") String meetingId, @Param("userId") String userId);
 }

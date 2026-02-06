@@ -13,10 +13,9 @@ public class CreateMeetingResponse {
   private String meetingId;
   private String title;
   private String status;
-  private String scheduledAt;
-
-  private MeetingDetailResponse.BeneficiaryInfo beneficiary;
-
+  private String meetingDate; // scheduledAt -> meetingDate
+  private String location;
+  private String locationDetail;
   private String createdAt;
   private String message;
 }
