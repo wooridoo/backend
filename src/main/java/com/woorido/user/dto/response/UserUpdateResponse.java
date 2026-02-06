@@ -9,7 +9,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class UserUpdateResponse {
 
-    private Long userId;
+    private String userId;
     private String nickname;
     private String phone;
     private String profileImage;

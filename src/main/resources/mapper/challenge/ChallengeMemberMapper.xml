@@ -141,4 +141,17 @@
     WHERE challenge_id = #{challengeId} AND user_id = #{userId}
   </update>
 
+  <select id="findAllByChallengeId" resultType="com.woorido.challenge.domain.ChallengeMember">
+    SELECT 
+        id,
+        challenge_id as challengeId,
+        user_id as userId,
+        role,
+        joined_at as joinedAt,
+        privilege_status as privilegeStatus,
+        last_support_paid_at as lastSupportPaidAt
+    FROM woorido.challenge_members
+    WHERE challenge_id = #{challengeId}
+  </select>
+
 </mapper>

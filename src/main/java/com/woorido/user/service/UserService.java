@@ -49,8 +49,7 @@ public class UserService {
 
         // 4. 응답 생성
         return UserProfileResponse.builder()
-                .userId(user.getId() != null ? Long.parseLong(user.getId().replaceAll("[^0-9]", "").substring(0,
-                        Math.min(10, user.getId().replaceAll("[^0-9]", "").length()))) : 1L)
+                .userId(user.getId())
                 .email(user.getEmail())
                 .nickname(user.getNickname())
                 .phone(user.getPhone())
@@ -59,7 +58,7 @@ public class UserService {
                 .status(user.getAccountStatus().name())
                 .brix(85.5) // TODO: 실제 brix 계산 로직 필요
                 .account(UserProfileResponse.AccountInfo.builder()
-                        .accountId(1L) // TODO: 실제 계정 정보 연동 필요
+                        .accountId("1") // TODO: 실제 계정 정보 연동 필요
                         .balance(500000L)
                         .availableBalance(450000L)
                         .lockedBalance(50000L)
@@ -111,10 +110,7 @@ public class UserService {
 
         // 7. 응답 생성
         return UserUpdateResponse.builder()
-                .userId(updatedUser.getId() != null
-                        ? Long.parseLong(updatedUser.getId().replaceAll("[^0-9]", "").substring(0,
-                                Math.min(10, updatedUser.getId().replaceAll("[^0-9]", "").length())))
-                        : 1L)
+                .userId(updatedUser.getId())
                 .nickname(updatedUser.getNickname())
                 .phone(updatedUser.getPhone())
                 .profileImage(updatedUser.getProfileImageUrl())
@@ -147,8 +143,7 @@ public class UserService {
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         return UserWithdrawResponse.builder()
-                .userId(user.getId() != null ? Long.parseLong(user.getId().replaceAll("[^0-9]", "").substring(0,
-                        Math.min(10, user.getId().replaceAll("[^0-9]", "").length()))) : 1L)
+                .userId(user.getId())
                 .status("WITHDRAWN")
                 .withdrawnAt(now.format(DATETIME_FORMATTER))
                 .dataDeletedAt(now.plusDays(30).format(DATETIME_FORMATTER))

@@ -554,20 +554,29 @@ public class ChallengeService {
     }
 
     // 5. 잔액 정보 추출
-    Long balance = accountData.get("BALANCE") != null ? ((Number) accountData.get("BALANCE")).longValue() : 0L;
-    Long lockedDeposits = accountData.get("LOCKED_DEPOSITS") != null
-        ? ((Number) accountData.get("LOCKED_DEPOSITS")).longValue()
-        : 0L;
-    Long totalIncome = accountData.get("TOTAL_INCOME") != null ? ((Number) accountData.get("TOTAL_INCOME")).longValue()
-        : 0L;
-    Long totalExpense = accountData.get("TOTAL_EXPENSE") != null
-        ? ((Number) accountData.get("TOTAL_EXPENSE")).longValue()
-        : 0L;
-    Long monthlyFee = accountData.get("MONTHLY_FEE") != null ? ((Number) accountData.get("MONTHLY_FEE")).longValue()
-        : 0L;
-    Integer currentMembers = accountData.get("CURRENT_MEMBERS") != null
-        ? ((Number) accountData.get("CURRENT_MEMBERS")).intValue()
-        : 0;
+    Long balance = getLong(accountData, "BALANCE");
+    if (balance == null)
+      balance = 0L;
+
+    Long lockedDeposits = getLong(accountData, "LOCKED_DEPOSITS");
+    if (lockedDeposits == null)
+      lockedDeposits = 0L;
+
+    Long totalIncome = getLong(accountData, "TOTAL_INCOME");
+    if (totalIncome == null)
+      totalIncome = 0L;
+
+    Long totalExpense = getLong(accountData, "TOTAL_EXPENSE");
+    if (totalExpense == null)
+      totalExpense = 0L;
+
+    Long monthlyFee = getLong(accountData, "MONTHLY_FEE");
+    if (monthlyFee == null)
+      monthlyFee = 0L;
+
+    Integer currentMembers = getInteger(accountData, "CURRENT_MEMBERS");
+    if (currentMembers == null)
+      currentMembers = 0;
 
     // 6. Stats 계산
     ChallengeAccountResponse.Stats stats = ChallengeAccountResponse.Stats.builder()

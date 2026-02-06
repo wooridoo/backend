@@ -9,7 +9,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class UserProfileResponse {
 
-    private Long userId;
+    private String userId;
     private String email;
     private String nickname;
     private String phone;
@@ -26,7 +26,7 @@ public class UserProfileResponse {
     @Builder
     @AllArgsConstructor
     public static class AccountInfo {
-        private Long accountId;
+        private String accountId;
         private Long balance;
         private Long availableBalance;
         private Long lockedBalance;

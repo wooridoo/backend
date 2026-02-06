@@ -6,7 +6,7 @@ import lombok.Getter;
 @Getter
 @Builder
 public class UserWithdrawResponse {
-    private Long userId;
+    private String userId;
     private String status; // WITHDRAWN
     private String withdrawnAt;
     private String dataDeletedAt;
