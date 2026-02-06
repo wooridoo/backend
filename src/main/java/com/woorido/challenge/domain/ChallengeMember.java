@@ -17,18 +17,18 @@ public class ChallengeMember {
     private String id; // 멤버십 ID (UUID)
     private String challengeId;
     private String userId;
-    private String role; // LEADER, FOLLOWER
-    private String depositStatus; // NONE, LOCKED, RELEASED, SEIZED
+    private ChallengeRole role; // LEADER, FOLLOWER
+    private DepositStatus depositStatus; // NONE, LOCKED, USED, UNLOCKED
     private LocalDateTime depositLockedAt;
     private LocalDateTime depositUnlockedAt;
     private Long entryFeeAmount;
     private LocalDateTime entryFeePaidAt;
-    private String privilegeStatus; // ACTIVE, REVOKED
+    private PrivilegeStatus privilegeStatus; // ACTIVE, REVOKED
     private LocalDateTime privilegeRevokedAt;
     private LocalDateTime lastSupportPaidAt;
     private Long totalSupportPaid;
     private String autoPayEnabled;
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
-    private String leaveReason;
+    private LeaveReason leaveReason;
 }

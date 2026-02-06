@@ -114,4 +114,12 @@
         SELECT COUNT(*) FROM woorido.users WHERE nickname = #{nickname}
     </select>
 
+    <!-- 사용자 상태 업데이트 (탈퇴 등) -->
+    <update id="updateAccountStatus">
+        UPDATE woorido.users
+        SET account_status = #{status, jdbcType=VARCHAR},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id, jdbcType=VARCHAR}
+    </update>
+
 </mapper>

@@ -18,7 +18,7 @@
       CASE WHEN m.status = 'VOTE' THEN TO_CHAR(m.location) ELSE 'MEETING_ATTENDANCE' END as type, 
       m.title as title, 
       m.description as description, 
-      CASE WHEN m.status = 'VOTE' THEN TO_CHAR(m.agenda) ELSE m.id END as targetId, 
+      CASE WHEN m.status = 'VOTE' THEN NULL ELSE m.id END as targetId, 
       mv.meeting_id as meetingId, 
       mv.status, 
       m.created_by as createdBy, 

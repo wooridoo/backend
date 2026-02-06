@@ -12,7 +12,9 @@ import lombok.NoArgsConstructor;
 public class UpdateMeetingResponse {
   private String meetingId;
   private String title;
-  private String scheduledAt;
+  private String meetingDate; // scheduledAt -> meetingDate
+  private String location;
+  private String locationDetail;
   private String updatedAt;
   private String message;
 }

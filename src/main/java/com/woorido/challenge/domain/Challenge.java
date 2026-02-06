@@ -17,7 +17,7 @@ public class Challenge {
     private String id; // UUID
     private String name;
     private String description;
-    private String category;
+    private ChallengeCategory category;
     private String creatorId; // 리더 ID
     private LocalDateTime leaderLastActiveAt;
     private Double leaderBenefitRate; // NUMBER(5,4)
@@ -27,7 +27,7 @@ public class Challenge {
     private Long balance; // 챌린지 금고 잔액
     private Long monthlyFee; // 월 서포트 금액
     private Long depositAmount; // 보증금
-    private String status;
+    private ChallengeStatus status;
     private LocalDateTime activatedAt;
     private String isVerified;
     private LocalDateTime verifiedAt;

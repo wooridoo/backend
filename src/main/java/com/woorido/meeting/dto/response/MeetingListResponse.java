@@ -25,10 +25,10 @@ public class MeetingListResponse {
     private String title;
     private String description;
     private String status;
-    private String scheduledAt;
+    private String meetingDate; // scheduledAt -> meetingDate
     private String location;
     private AttendanceInfo attendance;
-    private BeneficiaryInfo beneficiary; // 베네핏 수령자
+    // private BeneficiaryInfo beneficiary; // Removed
     private String createdAt;
   }
 
@@ -38,16 +38,7 @@ public class MeetingListResponse {
   @NoArgsConstructor
   public static class AttendanceInfo {
     private Integer confirmed;
-    private Integer total; // 전체 멤버 수 or 대상자 수
-  }
-
-  @Getter
-  @Builder
-  @AllArgsConstructor
-  @NoArgsConstructor
-  public static class BeneficiaryInfo {
-    private String userId;
-    private String nickname;
+    private Integer total;
   }
 
   @Getter

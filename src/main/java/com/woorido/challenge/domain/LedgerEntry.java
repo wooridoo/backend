@@ -16,7 +16,7 @@ import lombok.Setter;
 public class LedgerEntry {
     private String id; // UUID
     private String challengeId;
-    private String type; // SUPPORT, ENTRY_FEE, EXPENSE, REFUND
+    private LedgerEntryType type; // SUPPORT, ENTRY_FEE, EXPENSE, REFUND
     private Long amount;
     private Long balanceBefore;
     private Long balanceAfter;

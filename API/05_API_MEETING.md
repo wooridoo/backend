@@ -60,15 +60,11 @@ curl -X GET "https://api.woorido.com/api/v1/challenges/1/meetings?status=SCHEDUL
         "title": "1월 정기모임",
         "description": "신년 계획 공유",
         "status": "COMPLETED",
-        "scheduledAt": "2026-01-15T14:00:00Z",
+        "meetingDate": "2026-01-15T14:00:00Z",
         "location": "강남역 스타벅스",
         "attendance": {
           "confirmed": 8,
           "total": 10
-        },
-        "beneficiary": {
-          "userId": 3,
-          "nickname": "박영수"
         },
         "createdAt": "2026-01-01T10:00:00Z"
       }
@@ -124,10 +120,9 @@ curl -X GET https://api.woorido.com/api/v1/meetings/1 \
     "title": "1월 정기모임",
     "description": "신년 계획 공유 및 독서 목표 설정",
     "status": "SCHEDULED",
-    "scheduledAt": "2026-01-15T14:00:00Z",
+    "meetingDate": "2026-01-15T14:00:00Z",
     "location": "강남역 스타벅스",
-    "locationDetail": "2층 세미나룸",
-    "agenda": "1. 신년 인사\n2. 독서 목표 공유\n3. 다음 모임 일정",
+    "locationDetail": "2층 창가 자리",
     "attendance": {
       "confirmed": 8,
       "declined": 1,
@@ -138,12 +133,6 @@ curl -X GET https://api.woorido.com/api/v1/meetings/1 \
       "status": "CONFIRMED",
       "respondedAt": "2026-01-10T10:00:00Z"
     },
-    "beneficiary": {
-      "userId": 3,
-      "nickname": "박영수",
-      "order": 3
-    },
-    "benefitAmount": 500000,
     "createdBy": {
       "userId": 1,
       "nickname": "홍길동"
@@ -179,10 +168,9 @@ curl -X POST https://api.woorido.com/api/v1/challenges/1/meetings \
   -d '{
     "title": "2월 정기모임",
     "description": "2월 독서 결산 및 공유",
-    "scheduledAt": "2026-02-15T14:00:00Z",
+    "meetingDate": "2026-02-15T14:00:00Z",
     "location": "강남역 스타벅스",
-    "locationDetail": "2층 세미나룸",
-    "agenda": "1. 2월 독서 결산\n2. 베스트 도서 선정\n3. 3월 계획"
+    "locationDetail": "2층 회의실"
   }'
 ```
 
@@ -196,10 +184,9 @@ curl -X POST https://api.woorido.com/api/v1/challenges/1/meetings \
 |------|------|------|----------|------|
 | title | String | Y | 최대 100자 | 모임 제목 |
 | description | String | N | 최대 500자 | 모임 설명 |
-| scheduledAt | String | Y | ISO 8601, 최소 24시간 후 | 예정 일시 |
+| meetingDate | String | Y | ISO 8601, 최소 24시간 후 | 예정 일시 |
 | location | String | Y | 최대 200자 | 장소 |
 | locationDetail | String | N | 최대 200자 | 상세 위치 |
-| agenda | String | N | 최대 1000자 | 안건 |
 
 ### Response
 
@@ -211,12 +198,9 @@ curl -X POST https://api.woorido.com/api/v1/challenges/1/meetings \
     "meetingId": 2,
     "title": "2월 정기모임",
     "status": "SCHEDULED",
-    "scheduledAt": "2026-02-15T14:00:00Z",
-    "beneficiary": {
-      "userId": 4,
-      "nickname": "최민수",
-      "order": 4
-    },
+    "meetingDate": "2026-02-15T14:00:00Z",
+    "location": "강남역 스타벅스",
+    "locationDetail": "2층 회의실",
     "createdAt": "2026-01-14T10:30:00Z"
   },
   "message": "모임이 생성되었습니다",
@@ -225,7 +209,6 @@ curl -X POST https://api.woorido.com/api/v1/challenges/1/meetings \
 ```
 
 ### 비즈니스 규칙
-- 베네핏 수령자는 순번에 따라 자동 지정
 - 모임 생성 시 참석 투표가 자동 시작
 
 ### Errors
@@ -253,7 +236,8 @@ curl -X PUT https://api.woorido.com/api/v1/meetings/2 \
   -H "Content-Type: application/json" \
   -d '{
     "title": "2월 정기모임 (수정)",
-    "scheduledAt": "2026-02-16T14:00:00Z"
+    "meetingDate": "2026-02-16T14:00:00Z",
+    "locationDetail": "3층 회의실"
   }'
 ```
 
@@ -262,10 +246,9 @@ curl -X PUT https://api.woorido.com/api/v1/meetings/2 \
 |------|------|------|------|
 | title | String | N | 모임 제목 |
 | description | String | N | 모임 설명 |
-| scheduledAt | String | N | 예정 일시 |
+| meetingDate | String | N | 예정 일시 |
 | location | String | N | 장소 |
 | locationDetail | String | N | 상세 위치 |
-| agenda | String | N | 안건 |
 
 ### Response
 
@@ -276,7 +259,9 @@ curl -X PUT https://api.woorido.com/api/v1/meetings/2 \
   "data": {
     "meetingId": 2,
     "title": "2월 정기모임 (수정)",
-    "scheduledAt": "2026-02-16T14:00:00Z",
+    "meetingDate": "2026-02-16T14:00:00Z",
+    "location": "강남역 스타벅스",
+    "locationDetail": "3층 회의실",
     "updatedAt": "2026-01-14T10:30:00Z"
   },
   "message": "모임 정보가 수정되었습니다",
@@ -316,7 +301,6 @@ curl -X POST https://api.woorido.com/api/v1/meetings/2/attendance \
 | 필드 | 타입 | 필수 | 제약조건 | 설명 |
 |------|------|------|----------|------|
 | status | String | Y | CONFIRMED / DECLINED | 참석 여부 |
-| reason | String | N | 최대 200자 | 불참 사유 (불참 시) |
 
 ### Response
 
@@ -366,8 +350,7 @@ curl -X POST https://api.woorido.com/api/v1/meetings/1/complete \
   -H "Authorization: Bearer {accessToken}" \
   -H "Content-Type: application/json" \
   -d '{
-    "actualAttendees": [1, 2, 3, 4, 5, 6, 7, 8],
-    "notes": "성공적인 모임이었습니다."
+    "actualAttendees": [1, 2, 3, 4, 5, 6, 7, 8]
   }'
 ```
 
@@ -375,7 +358,6 @@ curl -X POST https://api.woorido.com/api/v1/meetings/1/complete \
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
 | actualAttendees | Long[] | Y | 실제 참석자 userId 배열 |
-| notes | String | N | 모임 메모 |
 
 ### Response
 
@@ -391,14 +373,6 @@ curl -X POST https://api.woorido.com/api/v1/meetings/1/complete \
       "total": 10,
       "rate": 80.0
     },
-    "benefit": {
-      "beneficiary": {
-        "userId": 3,
-        "nickname": "박영수"
-      },
-      "amount": 500000,
-      "transferredAt": "2026-01-14T10:30:00Z"
-    },
     "completedAt": "2026-01-14T10:30:00Z"
   },
   "message": "모임이 완료 처리되었습니다",
@@ -410,7 +384,6 @@ curl -X POST https://api.woorido.com/api/v1/meetings/1/complete \
 | HTTP | 코드 | 메시지 |
 |------|------|--------|
 | 400 | MEETING_005 | 이미 완료된 모임입니다 |
-| 400 | ACCOUNT_004 | 챌린지 잔액이 부족합니다 |
 | 403 | CHALLENGE_004 | 리더만 완료 처리할 수 있습니다 |
 | 404 | MEETING_001 | 모임을 찾을 수 없습니다 |
 

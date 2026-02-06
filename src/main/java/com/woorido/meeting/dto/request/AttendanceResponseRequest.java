@@ -8,6 +8,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class AttendanceResponseRequest {
-  private String status; // CONFIRMED, DECLINED
+  private String choice; // AGREE, DISAGREE
+  private String status; // Deprecated backward compatibility
   private String reason; // Optional
 }

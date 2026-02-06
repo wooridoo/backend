@@ -2,6 +2,7 @@ package com.woorido.user.service;
 
 import java.time.format.DateTimeFormatter;
 
+import org.springframework.security.crypto.password.PasswordEncoder; // Add import
 import org.springframework.stereotype.Service;
 
 import com.woorido.common.entity.User;
@@ -11,6 +12,7 @@ import com.woorido.user.dto.request.UserUpdateRequest;
 import com.woorido.user.dto.response.NicknameCheckResponse;
 import com.woorido.user.dto.response.UserProfileResponse;
 import com.woorido.user.dto.response.UserUpdateResponse;
+import com.woorido.user.dto.response.UserWithdrawResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +22,7 @@ public class UserService {
 
     private final UserMapper userMapper;
     private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_DATE;
     private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
@@ -53,7 +56,7 @@ public class UserService {
                 .phone(user.getPhone())
                 .birthDate(user.getBirthDate() != null ? user.getBirthDate().format(DATE_FORMATTER) : null)
                 .profileImage(user.getProfileImageUrl())
-                .status(user.getAccountStatus())
+                .status(user.getAccountStatus().name())
                 .brix(85.5) // TODO: 실제 brix 계산 로직 필요
                 .account(UserProfileResponse.AccountInfo.builder()
                         .accountId(1L) // TODO: 실제 계정 정보 연동 필요
@@ -116,6 +119,39 @@ public class UserService {
                 .phone(updatedUser.getPhone())
                 .profileImage(updatedUser.getProfileImageUrl())
                 .updatedAt(java.time.LocalDateTime.now().format(DATETIME_FORMATTER))
+                .build();
+    }
+
+    /**
+     * 회원 탈퇴 (API 012)
+     */
+    public UserWithdrawResponse withdrawUser(String accessToken,
+            com.woorido.user.dto.request.UserWithdrawRequest request) {
+        // 1. 토큰 유효성 검증
+        if (!jwtUtil.validateToken(accessToken)) {
+            throw new RuntimeException("AUTH_001:인증이 필요합니다");
+        }
+        String userId = jwtUtil.getUserIdFromToken(accessToken);
+        User user = userMapper.findById(userId);
+
+        // 2. 비밀번호 확인
+        if (request.getPassword() != null) {
+            if (user.getPasswordHash() != null
+                    && !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+                throw new RuntimeException("USER_003:비밀번호가 일치하지 않습니다");
+            }
+        }
+
+        // 3. 사용자 상태 업데이트 (Soft Delete)
+        userMapper.updateAccountStatus(userId, "WITHDRAWN");
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        return UserWithdrawResponse.builder()
+                .userId(user.getId() != null ? Long.parseLong(user.getId().replaceAll("[^0-9]", "").substring(0,
+                        Math.min(10, user.getId().replaceAll("[^0-9]", "").length()))) : 1L)
+                .status("WITHDRAWN")
+                .withdrawnAt(now.format(DATETIME_FORMATTER))
+                .dataDeletedAt(now.plusDays(30).format(DATETIME_FORMATTER))
                 .build();
     }
 

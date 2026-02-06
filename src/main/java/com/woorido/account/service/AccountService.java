@@ -38,6 +38,7 @@ import com.woorido.account.dto.request.SupportRequest;
 import com.woorido.account.dto.response.SupportResponse;
 import com.woorido.challenge.domain.Challenge;
 import com.woorido.challenge.domain.LedgerEntry;
+import com.woorido.challenge.domain.LedgerEntryType;
 import com.woorido.challenge.repository.ChallengeMapper;
 import com.woorido.challenge.repository.LedgerEntryMapper;
 
@@ -477,7 +478,7 @@ public class AccountService {
         LedgerEntry ledger = LedgerEntry.builder()
                 .id(java.util.UUID.randomUUID().toString())
                 .challengeId(challenge.getId())
-                .type("SUPPORT") // or TransactionType.SUPPORT if mapped but LedgerEntry uses String in DDL
+                .type(LedgerEntryType.SUPPORT)
                 .amount(amount)
                 .balanceBefore(challengeBalanceBefore)
                 .balanceAfter(newChallengeBalance)

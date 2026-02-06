@@ -1,7 +1,5 @@
 package com.woorido.meeting.dto.response;
 
-import java.util.Map;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,16 +16,16 @@ public class MeetingDetailResponse {
   private String title;
   private String description;
   private String status;
-  private String scheduledAt;
+  private String meetingDate; // scheduledAt -> meetingDate
   private String location;
   private String locationDetail;
-  private String agenda;
+  // private String agenda; // Removed
 
   private AttendanceSummary attendance;
   private MyAttendance myAttendance;
-  private BeneficiaryInfo beneficiary;
+  // private BeneficiaryInfo beneficiary; // Removed
 
-  private Long benefitAmount;
+  // private Long benefitAmount; // Removed
   private CreatorInfo createdBy;
   private String createdAt;
 
@@ -37,9 +35,7 @@ public class MeetingDetailResponse {
   @AllArgsConstructor
   public static class AttendanceSummary {
     private int confirmed;
-    private int declind; // typo in API spec 'declined' but let's stick to standard English if possible,
-                         // but spec says 'declined' in example. Wait, existing MeetingListResponse used
-                         // map?
+    private int declind;
     private int pending;
     private int total;
   }
@@ -51,16 +47,6 @@ public class MeetingDetailResponse {
   public static class MyAttendance {
     private String status; // "CONFIRMED", "PENDING", "DECLINED"
     private String respondedAt;
-  }
-
-  @Getter
-  @Builder
-  @NoArgsConstructor
-  @AllArgsConstructor
-  public static class BeneficiaryInfo {
-    private String userId;
-    private String nickname;
-    private int order; // 순번
   }
 
   @Getter

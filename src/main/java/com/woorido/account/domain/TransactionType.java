@@ -7,6 +7,5 @@ public enum TransactionType {
     UNLOCK, // 보증금 해제
     SUPPORT, // 서포트 납입
     ENTRY_FEE, // 입회비
-    REFUND, // 환불
-    BENEFIT // 베네핏 지급
+    REFUND // 환불
 }

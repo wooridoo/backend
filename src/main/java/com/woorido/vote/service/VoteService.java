@@ -16,12 +16,11 @@ import lombok.RequiredArgsConstructor;
 import com.woorido.vote.repository.ExpenseVoteMapper;
 import com.woorido.vote.repository.GeneralVoteMapper;
 import com.woorido.vote.repository.VoteQueryMapper;
+import com.woorido.vote.domain.GeneralVoteType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -31,6 +30,20 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class VoteService {
 
+  /*
+   * import added automatically via fully qualified name if needed, or I'll trust
+   * existing imports
+   */
+  /*
+   * ChallengeService dependency will be added via separate chunk if I can't do it
+   * here easily
+   */
+  /*
+   * Wait, replace_file_content can replace block. Ideally I target the class
+   * definition or dependency list.
+   */
+  /* lines 30-40 */
+
   private final VoteMapper voteMapper;
   private final ExpenseVoteMapper expenseVoteMapper;
   private final GeneralVoteMapper generalVoteMapper;
@@ -38,13 +51,12 @@ public class VoteService {
   private final ChallengeMapper challengeMapper;
   private final UserMapper userMapper;
   private final com.woorido.meeting.repository.MeetingMapper meetingMapper;
-  private final com.woorido.common.util.JwtUtil jwtUtil;
+  private final com.woorido.challenge.service.ChallengeService challengeService;
+  private final com.woorido.challenge.repository.ChallengeMemberMapper challengeMemberMapper;
+  private final com.woorido.expense.repository.ExpenseRequestMapper expenseRequestMapper;
 
   // ... (existing getVoteList, getVoteDetail) ...
 
-  /**
-   * API 043: 투표 생성
-   */
   /**
    * API 043: 투표 생성
    */
@@ -62,7 +74,12 @@ public class VoteService {
 
     Challenge challenge = challengeMapper.findById(challengeId);
     int currentMembers = challenge != null ? challenge.getCurrentMembers() : 0;
-    int requiredCount = (int) Math.ceil(currentMembers * 0.7);
+    int requiredCount;
+    if (VoteType.DISSOLVE == request.getType()) {
+      requiredCount = currentMembers;
+    } else {
+      requiredCount = (int) Math.ceil(currentMembers * 0.7);
+    }
     if (requiredCount < 1)
       requiredCount = 1;
 
@@ -84,9 +101,8 @@ public class VoteService {
           .title(request.getTitle())
           .description(request.getDescription())
           .location(type.name())
-          .agenda(request.getTargetId())
           .status("VOTE")
-          .scheduledAt(request.getDeadline())
+          .meetingDate(request.getDeadline())
           .createdBy(userId)
           .createdAt(now)
           .updatedAt(now)
@@ -107,16 +123,35 @@ public class VoteService {
       voteMapper.insert(vote);
 
     } else if (type == VoteType.EXPENSE) {
-      // ExpenseVote 로직
-      com.woorido.vote.domain.ExpenseVote expenseVote = com.woorido.vote.domain.ExpenseVote.builder()
-          .id(voteId)
-          .challengeId(challengeId)
+      // ExpenseVote 로직 (2-tier: expense_requests -> expense_votes)
+      // 1. expense_requests 생성
+      String expenseRequestId = java.util.UUID.randomUUID().toString();
+      com.woorido.expense.domain.ExpenseRequest expenseRequest = com.woorido.expense.domain.ExpenseRequest.builder()
+          .id(expenseRequestId)
+          .meetingId(request.getMeetingId())
           .createdBy(userId)
           .title(request.getTitle())
+          .amount(request.getAmount() != null ? request.getAmount() : 0L)
           .description(request.getDescription())
-          .targetId(request.getTargetId())
+          .status("VOTING")
+          .createdAt(now)
+          .build();
+      expenseRequestMapper.insert(expenseRequest);
+
+      // 2. expense_votes 생성 (expense_request_id 참조)
+      // eligible_count: 모임 참석자 수 (meeting_id가 있는 경우)
+      int eligibleCount = currentMembers;
+      if (request.getMeetingId() != null && !request.getMeetingId().isEmpty()) {
+        eligibleCount = meetingMapper.countAttendees(request.getMeetingId());
+        if (eligibleCount == 0)
+          eligibleCount = currentMembers; // 참석자 없으면 전체 멤버로
+      }
+      com.woorido.vote.domain.ExpenseVote expenseVote = com.woorido.vote.domain.ExpenseVote.builder()
+          .id(voteId)
+          .expenseRequestId(expenseRequestId)
+          .eligibleCount(eligibleCount)
           .requiredCount(requiredCount)
-          .status("IN_PROGRESS")
+          .status(VoteStatus.PENDING)
           .createdAt(now)
           .expiresAt(request.getDeadline())
           .build();
@@ -128,13 +163,13 @@ public class VoteService {
           .id(voteId)
           .challengeId(challengeId)
           .createdBy(userId)
-          .type(type.name())
+          .type(GeneralVoteType.valueOf(type.name()))
           .title(request.getTitle())
           .description(request.getDescription())
           .targetUserId(request.getTargetId()) // GeneralVote에서는 targetId가 targetUserId
           .requiredCount(requiredCount)
           .eligibleCount(currentMembers)
-          .status("IN_PROGRESS")
+          .status(VoteStatus.PENDING)
           .createdAt(now)
           .expiresAt(request.getDeadline())
           .build();
@@ -145,7 +180,7 @@ public class VoteService {
         .voteId(voteId)
         .type(type)
         .title(request.getTitle())
-        .status(VoteStatus.IN_PROGRESS)
+        .status(VoteStatus.PENDING)
         .createdBy(VoteDto.CreatorDto.builder().userId(userId).nickname(nickname).build())
         .voteCount(VoteDto.VoteCountDto.builder().agree(0).disagree(0).total(0).build())
         .deadline(request.getDeadline())
@@ -210,8 +245,6 @@ public class VoteService {
     String title = null;
     String description = null;
     String status = null;
-    java.sql.Timestamp createdAt = null;
-    java.sql.Timestamp deadline = null;
 
     VoteType type = VoteType.valueOf(typeStr);
 
@@ -239,15 +272,16 @@ public class VoteService {
 
     } else if (type == VoteType.EXPENSE) {
       com.woorido.vote.domain.ExpenseVote vote = expenseVoteMapper.findById(voteId);
-      creatorId = vote.getCreatedBy();
-      title = vote.getTitle();
-      description = vote.getDescription();
-      status = vote.getStatus();
+      com.woorido.expense.domain.ExpenseRequest request = expenseRequestMapper.findById(vote.getExpenseRequestId());
+
+      if (request != null) {
+        creatorId = request.getCreatedBy();
+        title = request.getTitle();
+        description = request.getDescription();
+      }
+      status = vote.getStatus().name();
 
       myVote = expenseVoteMapper.checkRecordExisting(voteId, userId) > 0 ? "VOTED" : null;
-      // 실제 어떤 걸 찍었는지는 checkRecordExisting으론 모름. findMyRecord가 필요할 수 있음.
-      // 일단은 null or 'some choice'
-      // 상세 구현 생략 (기존 findMyVote 로직이 없어서 새로 만들어야 함)
 
       Map<String, Object> c = expenseVoteMapper.findVoteCounts(voteId);
       voteCount = VoteDto.VoteCountDto.builder()
@@ -260,7 +294,7 @@ public class VoteService {
       creatorId = vote.getCreatedBy();
       title = vote.getTitle();
       description = vote.getDescription();
-      status = vote.getStatus();
+      status = vote.getStatus().name();
 
       Map<String, Object> c = generalVoteMapper.findVoteCounts(voteId);
       voteCount = VoteDto.VoteCountDto.builder()
@@ -394,6 +428,12 @@ public class VoteService {
 
     // 4. 타입별 처리
     if (type == VoteType.MEETING_ATTENDANCE) {
+      // 권한 박탈 상태 체크 (보증금 소진 시 정기 모임 투표 불가)
+      String privilegeStatus = challengeMemberMapper.getPrivilegeStatus(challengeId, userId);
+      if ("REVOKED".equals(privilegeStatus)) {
+        throw new RuntimeException("VOTE_008: 보증금 미충전으로 투표 권한이 박탈되었습니다. 충전 후 다시 시도해주세요.");
+      }
+
       if (voteMapper.checkVoteRecordExisting(voteId, userId) > 0) {
         throw new RuntimeException("VOTE_006: 이미 투표하셨습니다");
       }
@@ -407,6 +447,20 @@ public class VoteService {
       if (expenseVoteMapper.checkRecordExisting(voteId, userId) > 0) {
         throw new RuntimeException("VOTE_006: 이미 투표하셨습니다");
       }
+
+      // 모임 참석자만 투표 가능 체크 (expense_request를 통해 meeting_id 조회)
+      com.woorido.vote.domain.ExpenseVote expenseVote = expenseVoteMapper.findById(voteId);
+      if (expenseVote != null && expenseVote.getExpenseRequestId() != null) {
+        com.woorido.expense.domain.ExpenseRequest expenseRequest = expenseRequestMapper
+            .findById(expenseVote.getExpenseRequestId());
+        if (expenseRequest != null && expenseRequest.getMeetingId() != null) {
+          int isAttendee = meetingMapper.isAttendee(expenseRequest.getMeetingId(), userId);
+          if (isAttendee == 0) {
+            throw new RuntimeException("VOTE_007: 해당 모임 참석자만 투표할 수 있습니다");
+          }
+        }
+      }
+
       String dbChoice = "AGREE".equals(request.getChoice()) ? "APPROVE" : "REJECT";
 
       com.woorido.vote.domain.ExpenseVoteRecord record = com.woorido.vote.domain.ExpenseVoteRecord.builder()
@@ -437,6 +491,22 @@ public class VoteService {
       generalVoteMapper.insertRecord(record);
 
       Map<String, Object> counts = generalVoteMapper.findVoteCounts(voteId);
+
+      // Challenge Dissolve Logic
+      if (type == VoteType.DISSOLVE) {
+        int disagree = ((Number) counts.get("DISAGREE")).intValue();
+        int agree = ((Number) counts.get("AGREE")).intValue();
+        com.woorido.vote.domain.GeneralVote gVote = generalVoteMapper.findById(voteId);
+        int required = gVote.getRequiredCount();
+
+        if (disagree > 0) {
+          generalVoteMapper.updateStatus(voteId, "REJECTED");
+        } else if (agree >= required) {
+          generalVoteMapper.updateStatus(voteId, "APPROVED");
+          challengeService.dissolveChallenge(challengeId);
+        }
+      }
+
       return buildCastResponse(voteId, request.getChoice(), counts);
     }
   }

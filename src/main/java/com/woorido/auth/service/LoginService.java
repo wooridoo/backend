@@ -74,7 +74,7 @@ public class LoginService {
                         .email(user.getEmail())
                         .nickname(user.getNickname())
                         .profileImage(user.getProfileImageUrl())
-                        .status(user.getAccountStatus())
+                        .status(user.getAccountStatus().name())
                         .isNewUser(isNewUser)
                         .build())
                 .build();

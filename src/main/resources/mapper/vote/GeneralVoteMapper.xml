@@ -40,4 +40,9 @@
     WHERE general_vote_id = #{voteId}
   </select>
 
+  <update id="updateStatus">
+    UPDATE woorido.general_votes
+    SET status = #{status}, completed_at = SYSTIMESTAMP
+    WHERE id = #{voteId}
+  </update>
 </mapper>

@@ -1,5 +1,7 @@
 package com.woorido.vote.domain;
 
+import com.woorido.vote.domain.Vote.VoteStatus;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +21,7 @@ public class GeneralVote {
   private String id;
   private String challengeId;
   private String createdBy; // userId
-  private String type; // KICK, LEADER_KICK, DISSOLVE
+  private GeneralVoteType type; // KICK, LEADER_KICK, DISSOLVE
   private String title;
   private String description;
   private String targetUserId; // 퇴출 대상 ID
@@ -27,7 +29,7 @@ public class GeneralVote {
   private Integer requiredCount;
   private Integer approveCount;
   private Integer rejectCount;
-  private String status; // PENDING, APPROVED, REJECTED, EXPIRED
+  private VoteStatus status; // PENDING, APPROVED, REJECTED, EXPIRED
   private Integer version;
   private LocalDateTime createdAt;
   private LocalDateTime expiresAt;

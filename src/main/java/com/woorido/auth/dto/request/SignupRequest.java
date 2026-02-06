@@ -19,4 +19,5 @@ public class SignupRequest {
     private Boolean termsAgreed;
     private Boolean privacyAgreed;
     private Boolean marketingAgreed;
+    private String gender;
 }

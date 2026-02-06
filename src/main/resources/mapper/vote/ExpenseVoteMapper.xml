@@ -2,21 +2,32 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.vote.repository.ExpenseVoteMapper">
 
+  <!-- expense_votes 테이블 구조에 맞춤 (DB 스키마 4.2) -->
   <insert id="insert">
     INSERT INTO woorido.expense_votes (
-      id, challenge_id, created_by, title, description,
-      status, required_count,
-      created_at, expires_at
+      id, expense_request_id, eligible_count, required_count,
+      approve_count, reject_count, status, version, created_at, expires_at
     ) VALUES (
-      #{id}, #{challengeId}, #{createdBy}, #{title}, #{description},
-      #{status}, #{requiredCount},
-      #{createdAt}, #{expiresAt}
+      #{id}, #{expenseRequestId}, #{eligibleCount}, #{requiredCount},
+      0, 0, #{status}, 0, #{createdAt}, #{expiresAt}
     )
-        <!-- target_id 등 추가 필드는 스키마 확정 후 추가 -->
   </insert>
 
   <select id="findById" resultType="com.woorido.vote.domain.ExpenseVote">
-    SELECT * FROM woorido.expense_votes WHERE id = #{id}
+    SELECT id, expense_request_id as expenseRequestId, 
+           eligible_count as eligibleCount, required_count as requiredCount,
+           approve_count as approveCount, reject_count as rejectCount,
+           status, version, created_at as createdAt, expires_at as expiresAt
+    FROM woorido.expense_votes WHERE id = #{id}
+  </select>
+
+  <!-- expense_request_id 기반 조회 -->
+  <select id="findByExpenseRequestId" resultType="com.woorido.vote.domain.ExpenseVote">
+    SELECT id, expense_request_id as expenseRequestId, 
+           eligible_count as eligibleCount, required_count as requiredCount,
+           approve_count as approveCount, reject_count as rejectCount,
+           status, version, created_at as createdAt, expires_at as expiresAt
+    FROM woorido.expense_votes WHERE expense_request_id = #{expenseRequestId}
   </select>
 
   <insert id="insertRecord">

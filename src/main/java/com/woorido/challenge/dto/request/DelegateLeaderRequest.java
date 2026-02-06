@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DelegateLeaderRequest {
-    private String targetMemberId;
+    private String targetUserId;
+    private String targetMemberId; // For backward compatibility
 }

@@ -25,13 +25,13 @@
 
         UNION ALL
 
-        -- 2. Expense Votes
+        -- 2. Expense Votes (JOIN expense_requests, meetings)
         SELECT 
           ev.id AS VOTE_ID,
           'EXPENSE' AS TYPE,
-          ev.title AS TITLE,
+          er.title AS TITLE,
           ev.status AS STATUS,
-          ev.created_by AS CREATED_BY_ID,
+          er.created_by AS CREATED_BY_ID,
           u.nickname AS CREATED_BY_NICKNAME,
           ev.created_at AS CREATED_AT,
           ev.expires_at AS DEADLINE,
@@ -39,8 +39,10 @@
           ev.reject_count AS DISAGREE_COUNT,
           (ev.approve_count + ev.reject_count) AS TOTAL_VOTE_COUNT
         FROM woorido.expense_votes ev
-        LEFT JOIN woorido.users u ON ev.created_by = u.id
-        WHERE ev.challenge_id = #{challengeId}
+        JOIN woorido.expense_requests er ON ev.expense_request_id = er.id
+        JOIN woorido.meetings m ON er.meeting_id = m.id
+        LEFT JOIN woorido.users u ON er.created_by = u.id
+        WHERE m.challenge_id = #{challengeId}
 
         UNION ALL
 
@@ -72,7 +74,7 @@
     SELECT SUM(CNT) FROM (
       SELECT COUNT(*) AS CNT FROM woorido.meeting_votes mv JOIN woorido.meetings m ON mv.meeting_id = m.id WHERE m.challenge_id = #{challengeId}
       UNION ALL
-      SELECT COUNT(*) AS CNT FROM woorido.expense_votes WHERE challenge_id = #{challengeId}
+      SELECT COUNT(*) AS CNT FROM woorido.expense_votes ev JOIN woorido.expense_requests er ON ev.expense_request_id = er.id JOIN woorido.meetings m ON er.meeting_id = m.id WHERE m.challenge_id = #{challengeId}
       UNION ALL
       SELECT COUNT(*) AS CNT FROM woorido.general_votes WHERE challenge_id = #{challengeId}
     )
@@ -92,12 +94,14 @@
       UNION ALL
       
       SELECT 
-        id AS VOTE_ID, 
+        ev.id AS VOTE_ID, 
         'EXPENSE' AS TYPE, 
-        challenge_id AS CHALLENGE_ID, 
-        expires_at AS DEADLINE
-      FROM woorido.expense_votes
-      WHERE id = #{voteId}
+        m.challenge_id AS CHALLENGE_ID, 
+        ev.expires_at AS DEADLINE
+      FROM woorido.expense_votes ev
+      JOIN woorido.expense_requests er ON ev.expense_request_id = er.id
+      JOIN woorido.meetings m ON er.meeting_id = m.id
+      WHERE ev.id = #{voteId}
       
       UNION ALL
       

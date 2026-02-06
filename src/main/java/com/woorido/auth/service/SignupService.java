@@ -1,5 +1,7 @@
 package com.woorido.auth.service;
 
+import com.woorido.common.entity.AccountStatus;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -62,7 +64,10 @@ public class SignupService {
                     .nickname(request.getNickname())
                     .phone(request.getPhone())
                     .birthDate(birthDate)
-                    .accountStatus("ACTIVE")
+                    .accountStatus(AccountStatus.ACTIVE)
+                    .gender(request.getGender() != null
+                            ? com.woorido.common.entity.UserGender.valueOf(request.getGender())
+                            : null)
                     .agreedTerms(Boolean.TRUE.equals(request.getTermsAgreed()) ? "Y" : "N")
                     .agreedPrivacy(Boolean.TRUE.equals(request.getPrivacyAgreed()) ? "Y" : "N")
                     .agreedMarketing(Boolean.TRUE.equals(request.getMarketingAgreed()) ? "Y" : "N")
