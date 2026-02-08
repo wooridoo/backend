@@ -53,4 +53,13 @@ public interface UserMapper {
 
         // 사용자 상태 업데이트
         void updateAccountStatus(@Param("id") String id, @Param("status") String status);
+
+        // 비밀번호 재설정 토큰으로 사용자 조회
+        User findByPasswordResetToken(@Param("token") String token);
+
+        // 비밀번호 업데이트
+        void updatePassword(@Param("id") String id, @Param("password") String password);
+
+        // 비밀번호 재설정 토큰 초기화
+        void clearPasswordResetToken(@Param("id") String id);
 }

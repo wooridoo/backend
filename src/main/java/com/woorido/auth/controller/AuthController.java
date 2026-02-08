@@ -175,4 +175,31 @@ public class AuthController {
                     .body(ApiResponse.error("서버 오류가 발생했습니다"));
         }
     }
+
+    /**
+     * 비밀번호 재설정 실행 API
+     * PUT /auth/password/reset
+     */
+    @org.springframework.web.bind.annotation.PutMapping("/password/reset")
+    public ResponseEntity<ApiResponse<com.woorido.auth.dto.response.PasswordResetExecuteResponse>> resetPassword(
+            @Valid @RequestBody com.woorido.auth.dto.request.PasswordResetExecuteRequest request) {
+
+        try {
+            com.woorido.auth.dto.response.PasswordResetExecuteResponse response = passwordResetService
+                    .resetPassword(request);
+            return ResponseEntity.ok(ApiResponse.success(response, "비밀번호가 재설정되었습니다"));
+
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            if (message != null) {
+                if (message.startsWith("AUTH_009")) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+                } else if (message.startsWith("VALIDATION_001")) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+                }
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
+        }
+    }
 }

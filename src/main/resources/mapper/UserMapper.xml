@@ -122,4 +122,26 @@
         WHERE id = #{id, jdbcType=VARCHAR}
     </update>
 
+    <!-- 비밀번호 재설정 토큰으로 사용자 조회 -->
+    <select id="findByPasswordResetToken" resultMap="UserResultMap">
+        SELECT * FROM woorido.users WHERE password_reset_token = #{token}
+    </select>
+
+    <!-- 비밀번호 변경 -->
+    <update id="updatePassword">
+        UPDATE woorido.users 
+        SET password_hash = #{password},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- 비밀번호 재설정 토큰 초기화 -->
+    <update id="clearPasswordResetToken">
+        UPDATE woorido.users 
+        SET password_reset_token = NULL,
+            password_reset_expires = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
 </mapper>

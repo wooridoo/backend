@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.woorido.auth.dto.response.LoginResponse;
 import com.woorido.auth.dto.response.UserInfo;
+import com.woorido.common.entity.AccountStatus;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
 import com.woorido.common.util.JwtUtil;
@@ -35,7 +36,7 @@ public class LoginService {
         }
 
         // 3. 탈퇴 대기 상태 확인
-        if ("WITHDRAWN".equals(user.getAccountStatus())) {
+        if (user.getAccountStatus() == AccountStatus.WITHDRAWN) {
             throw new RuntimeException("USER_005:탈퇴 대기 상태입니다");
         }
 
