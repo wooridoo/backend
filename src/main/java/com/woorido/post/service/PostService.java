@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+import com.woorido.post.repository.PostLikeMapper;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -32,6 +33,90 @@ public class PostService {
   private final PostMapper postMapper;
   private final ChallengeMemberMapper challengeMemberMapper;
   private final UserMapper userMapper;
+  private final PostLikeMapper postLikeMapper;
+  // private final PostImageMapper postImageMapper; // Uncomment if handling
+  // images
+
+  public void updatePost(String challengeId, String userId, String postId,
+      com.woorido.post.dto.request.UpdatePostRequest request) {
+    Post post = postMapper.findById(postId);
+    if (post == null || !post.getChallengeId().equals(challengeId)) {
+      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+    }
+    if (!post.getCreatedBy().equals(userId)) {
+      throw new IllegalArgumentException("POST_004: 수정 권한이 없습니다");
+    }
+
+    boolean isNotice = "NOTICE".equals(request.getCategory());
+    if (isNotice) {
+      Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+      String role = memberInfo != null ? (String) memberInfo.get("ROLE") : null;
+      if (!"LEADER".equals(role)) {
+        throw new IllegalArgumentException("POST_002: 공지사항은 모임장만 작성할 수 있습니다");
+      }
+    }
+
+    String finalContent = request.getTitle() + "\n" + request.getContent();
+
+    Post updatedPost = Post.builder()
+        .id(postId)
+        .content(finalContent)
+        .isNotice(isNotice ? "Y" : "N")
+        .isPinned(post.getIsPinned())
+        .updatedAt(LocalDateTime.now())
+        .build();
+
+    postMapper.update(updatedPost);
+  }
+
+  public void deletePost(String challengeId, String postId, String userId) {
+    Post post = postMapper.findById(postId);
+    if (post == null || !post.getChallengeId().equals(challengeId)) {
+      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+    }
+    // 작성자 또는 LEADER 삭제 허용 (PM-004, spec 061)
+    if (!post.getCreatedBy().equals(userId)) {
+      Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+      String role = memberInfo != null ? (String) memberInfo.get("ROLE") : null;
+      if (!"LEADER".equals(role)) {
+        throw new IllegalArgumentException("POST_004: 삭제 권한이 없습니다");
+      }
+    }
+    postMapper.delete(postId);
+  }
+
+  @Transactional
+  public Map<String, Object> toggleLike(String postId, String userId) {
+    // 비관적 락으로 동시성 제어
+    Post post = postMapper.findByIdForUpdate(postId);
+    if (post == null) {
+      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+    }
+
+    boolean liked;
+    if (postLikeMapper.exists(postId, userId)) {
+      postLikeMapper.delete(postId, userId);
+      postMapper.decreaseLikeCount(postId);
+      liked = false;
+    } else {
+      postLikeMapper.save(com.woorido.post.domain.PostLike.builder()
+          .id(UUID.randomUUID().toString())
+          .postId(postId)
+          .userId(userId)
+          .createdAt(LocalDateTime.now())
+          .build());
+      postMapper.increaseLikeCount(postId);
+      liked = true;
+    }
+
+    // spec 062: {postId, liked, likeCount}
+    long newLikeCount = liked ? post.getLikeCount() + 1 : Math.max(post.getLikeCount() - 1, 0);
+    Map<String, Object> result = new HashMap<>();
+    result.put("postId", postId);
+    result.put("liked", liked);
+    result.put("likeCount", newLikeCount);
+    return result;
+  }
 
   public CreatePostResponse createPost(String challengeId, String userId, CreatePostRequest request) {
     // 1. Check Membership
@@ -62,6 +147,7 @@ public class PostService {
 
     // 4. Create Post Entity
     String postId = UUID.randomUUID().toString();
+    LocalDateTime now = LocalDateTime.now();
     Post post = Post.builder()
         .id(postId)
         .challengeId(challengeId)
@@ -69,6 +155,8 @@ public class PostService {
         .content(finalContent)
         .isNotice(isNotice ? "Y" : "N")
         .isPinned("N")
+        .createdAt(now)
+        .updatedAt(now)
         .build();
 
     postMapper.insert(post);

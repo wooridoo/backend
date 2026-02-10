@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.woorido.post.repository.CommentMapper">
+
+    <resultMap id="CommentResultMap" type="com.woorido.post.domain.Comment">
+        <id property="id" column="id"/>
+        <result property="postId" column="post_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="content" column="content"/>
+        <result property="likeCount" column="like_count"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <insert id="save">
+        INSERT INTO woorido.comments (
+            id, post_id, parent_id, created_by, content, like_count, created_at, updated_at
+        ) VALUES (
+            #{id}, #{postId}, #{parentId, jdbcType=VARCHAR}, #{createdBy}, #{content}, #{likeCount}, #{createdAt}, #{updatedAt, jdbcType=TIMESTAMP}
+        )
+    </insert>
+
+    <select id="findAllByPostId" resultMap="CommentResultMap">
+        SELECT * FROM woorido.comments
+        WHERE post_id = #{postId} AND deleted_at IS NULL
+        ORDER BY created_at ASC
+    </select>
+
+    <select id="findById" resultMap="CommentResultMap">
+        SELECT * FROM woorido.comments WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <select id="findByIdForUpdate" resultMap="CommentResultMap">
+        SELECT * FROM woorido.comments WHERE id = #{id} AND deleted_at IS NULL FOR UPDATE
+    </select>
+
+    <update id="increaseLikeCount">
+        UPDATE woorido.comments
+        SET like_count = like_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="decreaseLikeCount">
+        UPDATE woorido.comments
+        SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END
+        WHERE id = #{id}
+    </update>
+
+    <update id="deleteById">
+        UPDATE woorido.comments
+        SET deleted_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>

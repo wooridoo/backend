@@ -1,0 +1,13 @@
+﻿python : Traceback (most recent call last):
+위치 줄:1 문자:1
++ python woorido_api_missed_test.py > missed_test_output.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Workspace\backend\woorido_api_missed_test.py", line 67, in <module>
+    main()
+  File "C:\Workspace\backend\woorido_api_missed_test.py", line 52, in main
+    chall_id = res_ch.json()["data"]["challengeId"]
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
