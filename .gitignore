@@ -10,4 +10,5 @@ bin/
 build/
 *.class
 
-.test/
+test/
+server.log
