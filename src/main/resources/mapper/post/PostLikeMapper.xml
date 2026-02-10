@@ -1,17 +1,8 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.post.repository.PostLikeMapper">
 
-    <resultMap id="PostLikeResultMap" type="com.woorido.post.domain.PostLike">
-        <id property="id" column="id"/>
-        <result property="postId" column="post_id"/>
-        <result property="userId" column="user_id"/>
-        <result property="createdAt" column="created_at"/>
-    </resultMap>
-
-    <insert id="save">
+    <insert id="save" parameterType="com.woorido.post.domain.PostLike">
         INSERT INTO woorido.post_likes (
             id, post_id, user_id, created_at
         ) VALUES (
@@ -25,8 +16,15 @@
     </delete>
 
     <select id="exists" resultType="boolean">
-        SELECT CASE WHEN count(*) > 0 THEN 1 ELSE 0 END
+        SELECT COUNT(*)
         FROM woorido.post_likes
         WHERE post_id = #{postId} AND user_id = #{userId}
     </select>
+    
+    <select id="countByPostId" resultType="long">
+        SELECT COUNT(*)
+        FROM woorido.post_likes
+        WHERE post_id = #{postId}
+    </select>
+
 </mapper>

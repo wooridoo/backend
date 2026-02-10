@@ -12,7 +12,7 @@ import java.util.Map;
 @Builder
 public class NotificationResponse {
     private String notificationId;
-    private NotificationType type;
+    private String type;
     private String title;
     private String message;
     private boolean isRead;
@@ -33,7 +33,7 @@ public class NotificationResponse {
 
         return NotificationResponse.builder()
                 .notificationId(notification.getId())
-                .type(notification.getType())
+                .type(notification.getType().getCategory())
                 .title(notification.getTitle())
                 .message(notification.getContent())
                 .isRead(notification.getIsRead())

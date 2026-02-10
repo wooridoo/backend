@@ -7,5 +7,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CreateCommentRequest {
     private String content;
-    private String parentId;
+    private String parentId; // Optional for nested comments
 }

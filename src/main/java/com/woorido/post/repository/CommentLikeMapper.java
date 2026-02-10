@@ -7,6 +7,10 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CommentLikeMapper {
     void save(CommentLike commentLike);
-    boolean exists(@Param("commentId") String commentId, @Param("userId") String userId);
+
     void delete(@Param("commentId") String commentId, @Param("userId") String userId);
+
+    boolean exists(@Param("commentId") String commentId, @Param("userId") String userId);
+
+    long countByCommentId(@Param("commentId") String commentId);
 }

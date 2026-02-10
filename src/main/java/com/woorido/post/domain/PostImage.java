@@ -1,20 +1,15 @@
 package com.woorido.post.domain;
 
-import lombok.AllArgsConstructor;
+import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class PostImage {
     private String id;
     private String postId;
     private String imageUrl;
-    private int displayOrder;
+    private Integer displayOrder;
     private LocalDateTime createdAt;
 }

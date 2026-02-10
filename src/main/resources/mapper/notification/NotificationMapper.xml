@@ -1,0 +1,57 @@
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.woorido.notification.mapper.NotificationMapper">
+
+    <resultMap id="NotificationResultMap" type="com.woorido.notification.domain.Notification">
+        <id property="id" column="ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="type" column="TYPE"/>
+        <result property="title" column="TITLE"/>
+        <result property="content" column="CONTENT"/>
+        <result property="linkUrl" column="LINK_URL"/>
+        <result property="relatedEntityType" column="RELATED_ENTITY_TYPE"/>
+        <result property="relatedEntityId" column="RELATED_ENTITY_ID"/>
+        <result property="isRead" column="IS_READ" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="readAt" column="READ_AT"/>
+        <result property="createdAt" column="CREATED_AT"/>
+    </resultMap>
+
+    <insert id="save" parameterType="com.woorido.notification.domain.Notification">
+        INSERT INTO WOORIDO.NOTIFICATIONS (
+            ID, USER_ID, TYPE, TITLE, CONTENT, LINK_URL,
+            RELATED_ENTITY_TYPE, RELATED_ENTITY_ID, IS_READ, CREATED_AT
+        ) VALUES (
+            #{id}, #{userId}, #{type}, #{title}, #{content}, #{linkUrl},
+            #{relatedEntityType}, #{relatedEntityId}, 'N', CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <select id="findAllByUserId" resultMap="NotificationResultMap">
+        SELECT *
+        FROM WOORIDO.NOTIFICATIONS
+        WHERE USER_ID = #{userId}
+        ORDER BY CREATED_AT DESC
+    </select>
+
+    <select id="findById" resultMap="NotificationResultMap">
+        SELECT *
+        FROM WOORIDO.NOTIFICATIONS
+        WHERE ID = #{id}
+    </select>
+
+    <update id="updateIsRead">
+        UPDATE WOORIDO.NOTIFICATIONS
+        SET IS_READ = 'Y',
+            READ_AT = CURRENT_TIMESTAMP
+        WHERE ID = #{id}
+    </update>
+
+    <select id="countUnreadByUserId" resultType="int">
+        SELECT COUNT(*)
+        FROM WOORIDO.NOTIFICATIONS
+        WHERE USER_ID = #{userId}
+        AND IS_READ = 'N'
+    </select>
+
+</mapper>

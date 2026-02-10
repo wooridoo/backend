@@ -11,4 +11,6 @@ public interface PostLikeMapper {
     void delete(@Param("postId") String postId, @Param("userId") String userId);
 
     boolean exists(@Param("postId") String postId, @Param("userId") String userId);
+
+    long countByPostId(@Param("postId") String postId);
 }

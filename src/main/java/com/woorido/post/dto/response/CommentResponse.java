@@ -14,11 +14,10 @@ public class CommentResponse {
     private String content;
     private AuthorInfo author;
     private int likeCount;
-    private boolean isLiked;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String parentId;
-    private List<CommentResponse> replies;
+    private List<CommentResponse> replies; // For nested comments
 
     public static CommentResponse from(Comment comment, AuthorInfo author) {
         return CommentResponse.builder()
@@ -26,7 +25,6 @@ public class CommentResponse {
                 .content(comment.getContent())
                 .author(author)
                 .likeCount(comment.getLikeCount())
-                // isLiked is typically set separately or requires user context
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
                 .parentId(comment.getParentId())

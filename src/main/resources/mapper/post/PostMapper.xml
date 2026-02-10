@@ -4,54 +4,66 @@
 
 <mapper namespace="com.woorido.post.repository.PostMapper">
 
-    <resultMap id="PostResultMap" type="com.woorido.post.domain.Post">
-        <id property="id" column="id"/>
-        <result property="challengeId" column="challenge_id"/>
-        <result property="createdBy" column="created_by"/>
-        <result property="content" column="content"/>
-        <result property="isNotice" column="is_notice"/>
-        <result property="isPinned" column="is_pinned"/>
-        <result property="likeCount" column="like_count"/>
-        <result property="commentCount" column="comment_count"/>
-        <result property="viewCount" column="view_count"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
-        <result property="deletedAt" column="deleted_at"/>
-    </resultMap>
-
-    <insert id="insert">
+      <insert id="insert" parameterType="com.woorido.post.domain.Post">
         INSERT INTO woorido.posts (
-            id, challenge_id, created_by, content, is_notice, is_pinned,
-            like_count, comment_count, view_count, created_at, updated_at
+            id,
+            challenge_id,
+            created_by,
+            title,
+            content,
+            category,
+            is_notice,
+            is_pinned,
+            like_count,
+            comment_count,
+            view_count,
+            created_at,
+            updated_at
         ) VALUES (
-            #{id}, #{challengeId}, #{createdBy}, #{content}, #{isNotice}, #{isPinned},
-            #{likeCount}, #{commentCount}, #{viewCount}, #{createdAt}, #{updatedAt, jdbcType=TIMESTAMP}
+            #{id},
+            #{challengeId},
+            #{createdBy},
+            #{title},
+            #{content},
+            #{category},
+            #{isNotice},
+            #{isPinned},
+            #{likeCount},
+            #{commentCount},
+            #{viewCount},
+            #{createdAt},
+            #{updatedAt}
         )
-    </insert>
+      </insert>
 
-    <update id="update">
-        UPDATE woorido.posts
-        SET content = #{content},
-            is_notice = #{isNotice},
-            is_pinned = #{isPinned},
-            updated_at = #{updatedAt, jdbcType=TIMESTAMP}
-        WHERE id = #{id}
-    </update>
+      <resultMap id="PostResultMap" type="com.woorido.post.domain.Post">
+          <id property="id" column="id"/>
+          <result property="challengeId" column="challenge_id"/>
+          <result property="createdBy" column="created_by"/>
+          <result property="title" column="title"/>
+          <result property="content" column="content"/>
+          <result property="category" column="category"/>
+          <result property="isNotice" column="is_notice"/>
+          <result property="isPinned" column="is_pinned"/>
+          <result property="likeCount" column="like_count"/>
+          <result property="commentCount" column="comment_count"/>
+          <result property="viewCount" column="view_count"/>
+          <result property="createdAt" column="created_at"/>
+          <result property="updatedAt" column="updated_at"/>
+      </resultMap>
 
-    <select id="findById" resultMap="PostResultMap">
+      <select id="findById" resultMap="PostResultMap">
         SELECT * FROM woorido.posts WHERE id = #{id} AND deleted_at IS NULL
-    </select>
+      </select>
 
-    <select id="findByIdForUpdate" resultMap="PostResultMap">
-        SELECT * FROM woorido.posts WHERE id = #{id} AND deleted_at IS NULL FOR UPDATE
-    </select>
-
-    <select id="findByIdWithAuthor" resultType="java.util.Map">
+      <select id="findByIdWithAuthor" resultType="java.util.Map">
         SELECT 
             p.id,
             p.challenge_id as CHALLENGE_ID,
             p.created_by as CREATED_BY,
+            p.title,
             p.content,
+            p.category,
             p.is_notice as IS_NOTICE,
             p.is_pinned as IS_PINNED,
             p.like_count as LIKE_COUNT,
@@ -64,39 +76,45 @@
         FROM woorido.posts p
         JOIN woorido.users u ON p.created_by = u.id
         WHERE p.id = #{id} AND p.deleted_at IS NULL
-    </select>
+      </select>
 
-    <update id="increaseViewCount">
+      <update id="increaseViewCount">
         UPDATE woorido.posts
         SET view_count = view_count + 1
         WHERE id = #{id}
-    </update>
+      </update>
 
     <update id="increaseLikeCount">
         UPDATE woorido.posts
         SET like_count = like_count + 1
-        WHERE id = #{id}
+        WHERE id = #{postId}
     </update>
 
     <update id="decreaseLikeCount">
         UPDATE woorido.posts
-        SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END
-        WHERE id = #{id}
+        SET like_count = like_count - 1
+        WHERE id = #{postId} AND like_count > 0
     </update>
 
-    <update id="delete">
+      <update id="update" parameterType="com.woorido.post.domain.Post">
         UPDATE woorido.posts
-        SET deleted_at = CURRENT_TIMESTAMP
+        SET 
+            title = #{title},
+            content = #{content},
+            category = #{category},
+            is_notice = #{isNotice},
+            is_pinned = #{isPinned},
+            updated_at = #{updatedAt}
         WHERE id = #{id}
-    </update>
+      </update>
 
-    <select id="isLiked" resultType="boolean">
+      <select id="isLiked" resultType="boolean">
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM woorido.post_likes
         WHERE post_id = #{postId} AND user_id = #{userId}
-    </select>
+      </select>
 
-    <select id="findAttachments" resultType="java.util.Map">
+      <select id="findAttachments" resultType="java.util.Map">
         SELECT 
             id as FILE_ID,
             image_url as FILE_URL,
@@ -104,16 +122,38 @@
         FROM woorido.post_images
         WHERE post_id = #{postId}
         ORDER BY display_order ASC
-    </select>
+      </select>
 
-    <select id="findAll" resultType="java.util.Map">
+    <update id="delete">
+        UPDATE woorido.posts
+        SET deleted_at = CURRENT_TIMESTAMP
+        WHERE id = #{postId}
+    </update>
+
+      <sql id="searchCriteria">
+            <where>
+            challenge_id = #{challengeId}
+            AND deleted_at IS NULL
+                  <if test="category != null and category != 'ALL'">
+                AND category = #{category}
+                  </if>
+                  <if test="isNotice != null">
+                AND is_notice = #{isNotice}
+                  </if>
+            </where>
+      </sql>
+
+      <!-- Oracle 11g Style Pagination -->
+      <select id="findAll" resultType="java.util.Map">
         SELECT * FROM (
             SELECT A.*, ROWNUM RNUM FROM (
                 SELECT 
                     p.id as ID,
                     p.challenge_id as CHALLENGE_ID,
                     p.created_by as CREATED_BY,
+                    p.title as TITLE,
                     p.content as CONTENT,
+                    p.category as CATEGORY,
                     p.is_notice as IS_NOTICE,
                     p.is_pinned as IS_PINNED,
                     p.like_count as LIKE_COUNT,
@@ -124,22 +164,16 @@
                     u.profile_image_url as AUTHOR_PROFILE_IMAGE
                 FROM woorido.posts p
                 JOIN woorido.users u ON p.created_by = u.id
-                WHERE p.challenge_id = #{challengeId} AND p.deleted_at IS NULL
-                <if test="isNotice != null">
-                    AND p.is_notice = #{isNotice}
-                </if>
+            <include refid="searchCriteria"/>
                 ORDER BY p.is_pinned DESC, ${sortColumn} ${sortOrder}
             ) A WHERE ROWNUM &lt;= #{endRow}
         ) WHERE RNUM &gt; #{startRow}
-    </select>
+      </select>
 
-    <select id="count" resultType="int">
+      <select id="count" resultType="int">
         SELECT COUNT(*)
         FROM woorido.posts
-        WHERE challenge_id = #{challengeId} AND deleted_at IS NULL
-        <if test="isNotice != null">
-            AND is_notice = #{isNotice}
-        </if>
-    </select>
+            <include refid="searchCriteria"/>
+      </select>
 
 </mapper>

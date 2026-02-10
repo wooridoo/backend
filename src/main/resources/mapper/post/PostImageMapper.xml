@@ -1,18 +1,8 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.post.repository.PostImageMapper">
 
-    <resultMap id="PostImageResultMap" type="com.woorido.post.domain.PostImage">
-        <id property="id" column="id"/>
-        <result property="postId" column="post_id"/>
-        <result property="imageUrl" column="image_url"/>
-        <result property="displayOrder" column="display_order"/>
-        <result property="createdAt" column="created_at"/>
-    </resultMap>
-
-    <insert id="save">
+    <insert id="save" parameterType="com.woorido.post.domain.PostImage">
         INSERT INTO woorido.post_images (
             id, post_id, image_url, display_order, created_at
         ) VALUES (
@@ -20,14 +10,16 @@
         )
     </insert>
 
-    <delete id="deleteByPostId">
+    <select id="findAllByPostId" resultType="com.woorido.post.domain.PostImage">
+        SELECT id, post_id, image_url, display_order, created_at
+        FROM woorido.post_images
+        WHERE post_id = #{postId}
+        ORDER BY display_order ASC
+    </select>
+
+    <delete id="deleteAllByPostId">
         DELETE FROM woorido.post_images
         WHERE post_id = #{postId}
     </delete>
 
-    <select id="findAllByPostId" resultMap="PostImageResultMap">
-        SELECT * FROM woorido.post_images
-        WHERE post_id = #{postId}
-        ORDER BY display_order ASC
-    </select>
 </mapper>

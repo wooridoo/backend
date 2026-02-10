@@ -10,16 +10,13 @@ import org.apache.ibatis.annotations.Param;
 public interface CommentMapper {
     void save(Comment comment);
 
-    List<Comment> findAllByPostId(String postId);
+    List<Comment> findAllByPostId(@Param("postId") String postId);
 
-    Optional<Comment> findById(String id);
+    void increaseLikeCount(@Param("commentId") String commentId);
 
-    // 비관적 락 조회 (좋아요 토글 동시성 제어)
-    Comment findByIdForUpdate(@Param("id") String id);
+    void decreaseLikeCount(@Param("commentId") String commentId);
 
-    void deleteById(String id);
+    Optional<Comment> findById(@Param("id") String id);
 
-    void increaseLikeCount(String id);
-
-    void decreaseLikeCount(String id);
+    void deleteById(@Param("id") String id); // Soft delete handled in SQL
 }

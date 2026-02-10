@@ -5,6 +5,8 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
+import com.woorido.common.dto.AuthorInfo;
+
 @Getter
 @Builder
 public class PostDetailResponse {
@@ -12,8 +14,8 @@ public class PostDetailResponse {
   private String title;
   private String content;
   private String category;
-  private CreatePostResponse.AuthorInfo author; // Reusing AuthorInfo class
-  private List<AttachmentInfo> attachments;
+  private AuthorInfo author; // Reusing AuthorInfo class
+  private List<ImageInfo> images;
   private Long likeCount;
   private Long commentCount;
   private Long viewCount;
@@ -24,10 +26,9 @@ public class PostDetailResponse {
 
   @Getter
   @Builder
-  public static class AttachmentInfo {
-    private String fileId;
-    private String fileName;
-    private String fileUrl;
-    private Long fileSize;
+  public static class ImageInfo {
+    private String id;
+    private String url;
+    private Integer displayOrder;
   }
 }
