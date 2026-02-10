@@ -10,10 +10,16 @@ import org.apache.ibatis.annotations.Param;
 public interface PostMapper {
   void insert(Post post);
 
+  Post findById(String id);
+
   // 상세 조회용 (작성자 정보 포함)
   Map<String, Object> findByIdWithAuthor(@Param("id") String id);
 
   void increaseViewCount(@Param("id") String id);
+
+  void increaseLikeCount(@Param("postId") String postId);
+
+  void decreaseLikeCount(@Param("postId") String postId);
 
   boolean isLiked(@Param("postId") String postId, @Param("userId") String userId);
 
@@ -23,4 +29,8 @@ public interface PostMapper {
   List<Map<String, Object>> findAll(Map<String, Object> params);
 
   int count(Map<String, Object> params);
+
+  void update(Post post);
+
+  void delete(@Param("postId") String postId);
 }
