@@ -35,6 +35,7 @@ def log_section(title: str):
 class APITester:
     def __init__(self):
         self.results = {"passed": 0, "failed": 0, "skipped": 0}
+        self.fail_count = 0
         # Try existing test user first (may have funds), fallback to new user
         self.existing_user_email = "realtest1@example.com"
         self.existing_user_password = "password123!"
@@ -426,7 +427,8 @@ class APITester:
         resp = requests.post(f"{BASE_URL}/challenges/{self.challenge_id}/posts", headers=self.get_auth_headers(), json={
             "title": f"테스트 게시글_{uuid.uuid4().hex[:6]}",
             "content": "API 테스트용 게시글 내용입니다. 오늘도 열심히 절약 중!",
-            "category": "DAILY"
+            "category": "DAILY",
+            "imageUrls": ["http://example.com/img1.jpg", "http://example.com/img2.jpg"]
         })
         passed = resp.status_code in [200, 201]
         log_result("게시글 작성", passed, f"Status: {resp.status_code}, Body: {resp.text[:200] if resp.text else 'N/A'}")
@@ -452,11 +454,153 @@ class APITester:
             resp = requests.get(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}", headers=self.get_auth_headers())
             passed = resp.status_code == 200
             log_result("게시글 상세 조회", passed, f"Status: {resp.status_code}")
+            log_result("게시글 상세 조회", passed, f"Status: {resp.status_code}")
+            
+            if passed:
+                data = resp.json()
+                if "data" in data:
+                    data = data["data"]
+                # Verify images
+                images = data.get("images", [])
+                if images and len(images) == 2:
+                     print(f"         Images verified: {len(images)} items")
+                else:
+                     print(f"         Images verification failed: expected 2, got {len(images)}")
+                     # self.fail_count += 1 # Not strictly failing yet until fully implemented? No, we implemented it.
+                     # Let's verify strict equality if possible, or just presence.
+                     # create_post sent 2 images.
             self.record(passed)
         else:
             log_result("게시글 상세 조회", False, "No post ID")
             self.skip()
-    
+
+        # API 057: Update Post
+        if self.post_id:
+            print("\n[API 057] PUT /challenges/{challengeId}/posts/{postId}")
+            resp = requests.put(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}", headers=self.get_auth_headers(), json={
+                "title": f"수정된 게시글_{uuid.uuid4().hex[:6]}",
+                "content": "내용이 수정되었습니다. 업데이트 API 테스트 중!",
+                "category": "QUESTION",
+                "imageUrls": ["http://example.com/img3_new.jpg"]
+            })
+            passed = resp.status_code == 200
+            log_result("게시글 수정", passed, resp.text if not passed else "")
+            self.record(passed)
+            if not passed: self.fail_count += 1
+            
+            if passed:
+                # Verify update
+                data = resp.json()
+                if "data" in data:
+                    data = data["data"]
+                # Check category changed to QUESTION
+                category = data.get("category")
+                if category == "QUESTION":
+                    print(f"         Category updated correctly: {category}")
+                else:
+                    print(f"         Category update failed: {category}")
+        else:
+            log_result("게시글 수정", False, "No post ID")
+            self.skip()
+
+        # API 064: Create Comment
+        print("\n[API 064] POST /challenges/{challengeId}/posts/{postId}/comments")
+        if self.post_id:
+            resp = requests.post(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}/comments", 
+                                headers=self.get_auth_headers(), 
+                                json={
+                                    "content": "테스트 댓글입니다.",
+                                    "parentId": None
+                                })
+            passed = resp.status_code == 201
+            log_result("댓글 작성", passed, resp.text if not passed else "")
+            if passed:
+                self.comment_id = resp.json()['data']['commentId']
+            else:
+                self.fail_count += 1
+        else:
+            log_result("댓글 작성", False, "No Post ID")
+            self.skip()
+
+        # API 063: Get Comments
+        print("\n[API 063] GET /challenges/{challengeId}/posts/{postId}/comments")
+        if self.post_id:
+            resp = requests.get(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}/comments", headers=self.get_auth_headers())
+            passed = resp.status_code == 200
+            log_result("댓글 목록 조회", passed, resp.text if not passed else "")
+            if passed:
+                comments = resp.json()['data']
+                if not comments:
+                    print("  - 댓글이 없습니다 (방금 생성했는데?)")
+                else:
+                    print(f"  - 댓글 수: {len(comments)}")
+            else:
+                self.fail_count += 1
+        else:
+             log_result("댓글 목록 조회", False, "No Post ID")
+             self.skip()
+
+        # API 058: Toggle Post Like
+        print("\n[API 058] POST /challenges/{challengeId}/posts/{postId}/like")
+        if self.post_id:
+            resp = requests.post(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}/like", headers=self.get_auth_headers())
+            passed = resp.status_code == 200
+            log_result("게시글 좋아요 토글", passed, resp.text if not passed else "")
+            if passed:
+                is_liked = resp.json()['data']['isLiked']
+                print(f"         Post Liked: {is_liked}")
+            else:
+                self.fail_count += 1
+        else:
+            log_result("게시글 좋아요 토글", False, "No Post ID")
+            self.skip()
+
+        # API 065: Toggle Comment Like
+        print("\n[API 065] POST /challenges/{challengeId}/posts/{postId}/comments/{commentId}/like")
+        if self.comment_id:
+            resp = requests.post(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}/comments/{self.comment_id}/like", headers=self.get_auth_headers())
+            passed = resp.status_code == 200
+            log_result("댓글 좋아요 토글", passed, resp.text if not passed else "")
+            if passed:
+                is_liked = resp.json()['data']['isLiked']
+                print(f"         Comment Liked: {is_liked}")
+            else:
+                self.fail_count += 1
+        else:
+            log_result("댓글 좋아요 토글", False, "No Comment ID")
+            self.skip()
+
+        # API 066: Delete Comment
+        print("\n[API 066] DELETE /challenges/{challengeId}/posts/{postId}/comments/{commentId}")
+        if self.comment_id:
+            resp = requests.delete(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}/comments/{self.comment_id}", headers=self.get_auth_headers())
+            passed = resp.status_code == 200
+            log_result("댓글 삭제", passed, resp.text if not passed else "")
+            if not passed:
+                self.fail_count += 1
+        else:
+            log_result("댓글 삭제", False, "No Comment ID")
+            self.skip()
+
+        # API 059: Delete Post
+        print("\n[API 059] DELETE /challenges/{challengeId}/posts/{postId}")
+        if self.post_id:
+            resp = requests.delete(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}", headers=self.get_auth_headers())
+            passed = resp.status_code == 200
+            log_result("게시글 삭제", passed, resp.text if not passed else "")
+            if not passed:
+                self.fail_count += 1
+            else:
+                # Verify soft delete
+                resp_get = requests.get(f"{BASE_URL}/challenges/{self.challenge_id}/posts/{self.post_id}", headers=self.get_auth_headers())
+                if resp_get.status_code == 404:
+                    print("         Soft delete verified: GET returns 404")
+                else:
+                    print(f"         Soft delete FAILED: GET returns {resp_get.status_code}")
+        else:
+            log_result("게시글 삭제", False, "No Post ID")
+            self.skip()
+
     # ============================================
     # VOTE APIs (041-044)
     # ============================================

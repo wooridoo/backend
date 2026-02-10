@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.post.repository.CommentMapper">
+
+    <resultMap id="CommentResultMap" type="com.woorido.post.domain.Comment">
+        <id property="id" column="id"/>
+        <result property="postId" column="post_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="content" column="content"/>
+        <result property="likeCount" column="like_count"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <insert id="save" parameterType="com.woorido.post.domain.Comment">
+        INSERT INTO woorido.comments (
+            id, post_id, parent_id, created_by, content, like_count, created_at, updated_at
+        ) VALUES (
+            #{id}, #{postId}, #{parentId, jdbcType=VARCHAR}, #{createdBy}, #{content}, #{likeCount, jdbcType=INTEGER}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="findAllByPostId" resultMap="CommentResultMap">
+        <!-- Recursivity logic handled in Service or recursive query -->
+        SELECT
+            c.id, c.post_id, c.parent_id, c.created_by, c.content, c.like_count,
+            c.created_at, c.updated_at,
+            u.nickname as author_nickname,
+            u.profile_image_url as author_profile_image
+        FROM woorido.comments c
+        LEFT JOIN woorido.users u ON c.created_by = u.id
+        WHERE c.post_id = #{postId} AND c.deleted_at IS NULL
+        ORDER BY c.created_at ASC
+    </select>
+
+    <select id="findById" resultMap="CommentResultMap">
+        SELECT * FROM woorido.comments WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <update id="increaseLikeCount">
+        UPDATE woorido.comments
+        SET like_count = like_count + 1
+        WHERE id = #{commentId}
+    </update>
+
+    <update id="decreaseLikeCount">
+        UPDATE woorido.comments
+        SET like_count = like_count - 1
+        WHERE id = #{commentId} AND like_count > 0
+    </update>
+
+    <update id="deleteById">
+        UPDATE woorido.comments 
+        SET deleted_at = CURRENT_TIMESTAMP 
+        WHERE id = #{id}
+    </update>
+
+</mapper>
