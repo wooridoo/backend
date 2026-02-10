@@ -1,7 +1,6 @@
 package com.woorido.notification.dto;
 
 import com.woorido.notification.domain.Notification;
-import com.woorido.notification.domain.NotificationType;
 import lombok.Builder;
 import lombok.Getter;
 import java.time.format.DateTimeFormatter;
