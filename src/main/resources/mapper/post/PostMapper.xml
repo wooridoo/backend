@@ -9,7 +9,9 @@
             id,
             challenge_id,
             created_by,
+            title,
             content,
+            category,
             is_notice,
             is_pinned,
             like_count,
@@ -21,7 +23,9 @@
             #{id},
             #{challengeId},
             #{createdBy},
+            #{title},
             #{content},
+            #{category},
             #{isNotice},
             #{isPinned},
             #{likeCount},
@@ -32,8 +36,24 @@
         )
       </insert>
 
-      <select id="findById" resultType="com.woorido.post.domain.Post">
-        SELECT * FROM woorido.posts WHERE id = #{id}
+      <resultMap id="PostResultMap" type="com.woorido.post.domain.Post">
+          <id property="id" column="id"/>
+          <result property="challengeId" column="challenge_id"/>
+          <result property="createdBy" column="created_by"/>
+          <result property="title" column="title"/>
+          <result property="content" column="content"/>
+          <result property="category" column="category"/>
+          <result property="isNotice" column="is_notice"/>
+          <result property="isPinned" column="is_pinned"/>
+          <result property="likeCount" column="like_count"/>
+          <result property="commentCount" column="comment_count"/>
+          <result property="viewCount" column="view_count"/>
+          <result property="createdAt" column="created_at"/>
+          <result property="updatedAt" column="updated_at"/>
+      </resultMap>
+
+      <select id="findById" resultMap="PostResultMap">
+        SELECT * FROM woorido.posts WHERE id = #{id} AND deleted_at IS NULL
       </select>
 
       <select id="findByIdWithAuthor" resultType="java.util.Map">
@@ -41,7 +61,9 @@
             p.id,
             p.challenge_id as CHALLENGE_ID,
             p.created_by as CREATED_BY,
+            p.title,
             p.content,
+            p.category,
             p.is_notice as IS_NOTICE,
             p.is_pinned as IS_PINNED,
             p.like_count as LIKE_COUNT,
@@ -53,12 +75,36 @@
             u.profile_image_url as AUTHOR_PROFILE_IMAGE
         FROM woorido.posts p
         JOIN woorido.users u ON p.created_by = u.id
-        WHERE p.id = #{id}
+        WHERE p.id = #{id} AND p.deleted_at IS NULL
       </select>
 
       <update id="increaseViewCount">
         UPDATE woorido.posts
         SET view_count = view_count + 1
+        WHERE id = #{id}
+      </update>
+
+    <update id="increaseLikeCount">
+        UPDATE woorido.posts
+        SET like_count = like_count + 1
+        WHERE id = #{postId}
+    </update>
+
+    <update id="decreaseLikeCount">
+        UPDATE woorido.posts
+        SET like_count = like_count - 1
+        WHERE id = #{postId} AND like_count > 0
+    </update>
+
+      <update id="update" parameterType="com.woorido.post.domain.Post">
+        UPDATE woorido.posts
+        SET 
+            title = #{title},
+            content = #{content},
+            category = #{category},
+            is_notice = #{isNotice},
+            is_pinned = #{isPinned},
+            updated_at = #{updatedAt}
         WHERE id = #{id}
       </update>
 
@@ -78,9 +124,19 @@
         ORDER BY display_order ASC
       </select>
 
+    <update id="delete">
+        UPDATE woorido.posts
+        SET deleted_at = CURRENT_TIMESTAMP
+        WHERE id = #{postId}
+    </update>
+
       <sql id="searchCriteria">
             <where>
             challenge_id = #{challengeId}
+            AND deleted_at IS NULL
+                  <if test="category != null and category != 'ALL'">
+                AND category = #{category}
+                  </if>
                   <if test="isNotice != null">
                 AND is_notice = #{isNotice}
                   </if>
@@ -95,7 +151,9 @@
                     p.id as ID,
                     p.challenge_id as CHALLENGE_ID,
                     p.created_by as CREATED_BY,
+                    p.title as TITLE,
                     p.content as CONTENT,
+                    p.category as CATEGORY,
                     p.is_notice as IS_NOTICE,
                     p.is_pinned as IS_PINNED,
                     p.like_count as LIKE_COUNT,

@@ -10,5 +10,5 @@ public class CreatePostRequest {
   private String title;
   private String content;
   private String category; // NOTICE, GENERAL, QUESTION
-  private List<Long> attachmentIds;
+  private List<String> imageUrls;
 }
