@@ -26,6 +26,8 @@ public class CommentService {
     private final CommentMapper commentMapper;
     private final UserMapper userMapper;
     private final CommentLikeMapper commentLikeMapper;
+    private final com.woorido.post.domain.CommentDeleteStrategy commentDeleteStrategy;
+    private final com.woorido.challenge.repository.ChallengeMemberMapper challengeMemberMapper;
 
     @Transactional
     public String createComment(String postId, String userId, CreateCommentRequest request) {
@@ -62,6 +64,37 @@ public class CommentService {
             commentMapper.increaseLikeCount(commentId);
             return true;
         }
+    }
+
+    public com.woorido.post.dto.response.UpdateCommentResponse updateComment(String challengeId, String postId,
+            String commentId, String userId, com.woorido.post.dto.request.UpdateCommentRequest request) {
+        // 1. Find Comment
+        Comment comment = commentMapper.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
+
+        // 2. Validate Membership & Post
+        if (!comment.getPostId().equals(postId)) {
+            throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
+        }
+
+        // 3. Check Author
+        if (!comment.getCreatedBy().equals(userId)) {
+            throw new IllegalArgumentException("COMMENT_003: 수정 권한이 없습니다");
+        }
+
+        // 4. Update using Visitor
+        com.woorido.post.domain.CommentUpdateVisitor visitor = new com.woorido.post.domain.CommentUpdateVisitor(
+                request);
+        comment.accept(visitor);
+
+        // 5. Update DB
+        commentMapper.update(comment);
+
+        return com.woorido.post.dto.response.UpdateCommentResponse.builder()
+                .commentId(comment.getId())
+                .content(comment.getContent())
+                .updatedAt(comment.getUpdatedAt())
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -201,12 +234,43 @@ public class CommentService {
                 .collect(Collectors.toList());
     }
 
-    public void deleteComment(String commentId, String userId) {
+    public com.woorido.post.dto.response.DeleteCommentResponse deleteComment(String challengeId, String postId,
+            String commentId, String userId) {
+        // 1. Find Comment
         Comment comment = commentMapper.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("COMMENT_001: 댓글을 찾을 수 없습니다"));
-        if (!comment.getCreatedBy().equals(userId)) {
-            throw new IllegalArgumentException("COMMENT_002: 삭제 권한이 없습니다");
+                .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
+
+        if (!comment.getPostId().equals(postId)) {
+            throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
         }
-        commentMapper.deleteById(commentId);
+
+        // 2. Fetch User Role
+        Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+        String role = (memberInfo != null) ? (String) memberInfo.get("ROLE") : null;
+
+        // 3. Validate Permission (Strategy)
+        commentDeleteStrategy.validate(comment, userId, role);
+
+        // 4. Check Children
+        int childCount = commentMapper.countByParentId(commentId);
+
+        if (childCount > 0) {
+            // 5-A. Soft Delete using Visitor
+            com.woorido.post.domain.CommentDeleteVisitor visitor = new com.woorido.post.domain.CommentDeleteVisitor();
+            comment.accept(visitor);
+            commentMapper.update(comment);
+        } else {
+            // 5-B. Hard Delete (Physical)
+            // Need to remove Likes first due to FK if cascading is not set
+            // Ideally we should delete likes. Spec says "Complete Delete".
+            // Let's safe guard by deleting likes first.
+            commentLikeMapper.deleteByCommentId(commentId);
+            commentMapper.deletePhysical(commentId);
+        }
+
+        return com.woorido.post.dto.response.DeleteCommentResponse.builder()
+                .commentId(commentId)
+                .deletedAt(LocalDateTime.now())
+                .build();
     }
 }

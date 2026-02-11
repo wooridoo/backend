@@ -19,4 +19,10 @@ public interface CommentMapper {
     Optional<Comment> findById(@Param("id") String id);
 
     void deleteById(@Param("id") String id); // Soft delete handled in SQL
+
+    void update(com.woorido.post.domain.Comment comment);
+
+    int countByParentId(@Param("parentId") String parentId);
+
+    void deletePhysical(@Param("id") String id);
 }

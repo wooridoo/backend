@@ -28,23 +28,12 @@ public interface PostMapper {
   // 목록 조회용
   List<Map<String, Object>> findAll(Map<String, Object> params);
 
-  // 단건 조회 (Entity 반환 - 수정/삭제 등의 로직용)
-  Post findById(@Param("id") String id);
-
   // 비관적 락 조회 (좋아요 토글 동시성 제어)
   Post findByIdForUpdate(@Param("id") String id);
 
   void update(Post post);
 
-  void delete(@Param("id") String id);
-
-  void increaseLikeCount(@Param("id") String id);
-
-  void decreaseLikeCount(@Param("id") String id);
+  void delete(@Param("postId") String postId);
 
   int count(Map<String, Object> params);
-
-  void update(Post post);
-
-  void delete(@Param("postId") String postId);
 }

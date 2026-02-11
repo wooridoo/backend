@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,6 +33,9 @@ public class PostController {
 
   private final PostService postService;
   private final JwtUtil jwtUtil;
+  private final com.woorido.common.strategy.ImageUploadStrategy imageUploadStrategy;
+  private final com.woorido.challenge.repository.ChallengeMemberMapper challengeMemberMapper; // Need to verify
+                                                                                              // membership
 
   /**
    * 게시글 작성 API
@@ -229,7 +233,7 @@ public class PostController {
    * POST /challenges/{challengeId}/posts/{postId}/like
    */
   @PostMapping("/{postId}/like")
-  public ResponseEntity<ApiResponse<Map<String, Boolean>>> toggleLike(
+  public ResponseEntity<ApiResponse<com.woorido.post.dto.response.PostLikeResponse>> toggleLike(
       @PathVariable("challengeId") String challengeId,
       @PathVariable("postId") String postId,
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
@@ -245,11 +249,10 @@ public class PostController {
       }
       String userId = jwtUtil.getUserIdFromToken(accessToken);
 
-      boolean isLiked = postService.toggleLike(postId, userId);
+      com.woorido.post.dto.response.PostLikeResponse response = postService.toggleLike(postId, userId);
 
-      return ResponseEntity.ok(ApiResponse.success(
-          java.util.Map.of("isLiked", isLiked),
-          isLiked ? "좋아요를 눌렀습니다" : "좋아요를 취소했습니다"));
+      String message = response.isLiked() ? "좋아요를 눌렀습니다" : "좋아요를 취소했습니다";
+      return ResponseEntity.ok(ApiResponse.success(response, message));
 
     } catch (IllegalArgumentException e) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(e.getMessage()));
@@ -267,8 +270,8 @@ public class PostController {
    * 게시글 삭제 API
    * DELETE /challenges/{challengeId}/posts/{postId}
    */
-  @org.springframework.web.bind.annotation.DeleteMapping("/{postId}")
-  public ResponseEntity<ApiResponse<Void>> deletePost(
+  @DeleteMapping("/{postId}")
+  public ResponseEntity<ApiResponse<com.woorido.post.dto.response.DeletePostResponse>> deletePost(
       @PathVariable("challengeId") String challengeId,
       @PathVariable("postId") String postId,
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
@@ -284,9 +287,9 @@ public class PostController {
       }
       String userId = jwtUtil.getUserIdFromToken(accessToken);
 
-      postService.deletePost(challengeId, postId, userId);
+      com.woorido.post.dto.response.DeletePostResponse response = postService.deletePost(challengeId, postId, userId);
 
-      return ResponseEntity.ok(ApiResponse.success(null, "게시글이 삭제되었습니다"));
+      return ResponseEntity.ok(ApiResponse.success(response, "게시글이 삭제되었습니다"));
 
     } catch (IllegalArgumentException e) {
       String message = e.getMessage();
@@ -301,6 +304,69 @@ public class PostController {
       log.error("Delete Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
+   * 파일 업로드 API
+   * POST /challenges/{challengeId}/posts/upload
+   */
+  @PostMapping("/upload")
+  public ResponseEntity<ApiResponse<com.woorido.post.dto.response.FileUploadResponse>> uploadFile(
+      @PathVariable("challengeId") String challengeId,
+      @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+    try {
+      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("AUTH_001:인증이 필요합니다");
+      }
+      String accessToken = authHeader.substring(7);
+
+      if (!jwtUtil.validateToken(accessToken)) {
+        throw new RuntimeException("AUTH_002:유효하지 않은 토큰입니다");
+      }
+      String userId = jwtUtil.getUserIdFromToken(accessToken);
+
+      // Check Membership
+      Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+      if (memberInfo == null) {
+        throw new IllegalArgumentException("MEMBER_001: 챌린지에 참여하지 않았습니다");
+      }
+
+      // Upload File
+      String uploadedPath = imageUploadStrategy.upload(file, "attachments");
+
+      // Build Response
+      // Note: We don't save to DB here as per requirement. ID is generated for
+      // display.
+      Long fileId = Math.abs(java.util.UUID.randomUUID().getMostSignificantBits());
+      String fileUrl = "/uploads/" + uploadedPath; // Assuming handled by static resource handler
+
+      com.woorido.post.dto.response.FileUploadResponse response = com.woorido.post.dto.response.FileUploadResponse
+          .builder()
+          .fileId(fileId)
+          .fileName(file.getOriginalFilename())
+          .fileUrl(fileUrl)
+          .fileSize(file.getSize())
+          .contentType(file.getContentType())
+          .build();
+
+      return ResponseEntity.ok(ApiResponse.success(response, "파일이 업로드되었습니다"));
+
+    } catch (IllegalArgumentException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith("MEMBER_001")) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+    } catch (RuntimeException e) {
+      if (e.getMessage() != null && e.getMessage().startsWith("AUTH_")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
+      }
+      log.error("File Upload Error", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
   }
 }

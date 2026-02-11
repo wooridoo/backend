@@ -90,8 +90,42 @@ public class CommentController {
         }
         String userId = jwtUtil.getUserIdFromToken(token);
 
-        commentService.deleteComment(commentId, userId);
+        commentService.deleteComment(challengeId, postId, commentId, userId);
 
         return ResponseEntity.ok(ApiResponse.success(null, "댓글이 삭제되었습니다"));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/{commentId}")
+    public ResponseEntity<ApiResponse<com.woorido.post.dto.response.UpdateCommentResponse>> updateComment(
+            @PathVariable("challengeId") String challengeId,
+            @PathVariable("postId") String postId,
+            @PathVariable("commentId") String commentId,
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody com.woorido.post.dto.request.UpdateCommentRequest request) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("AUTH_001:인증이 필요합니다");
+        }
+        String token = authHeader.substring(7);
+        if (!jwtUtil.validateToken(token)) {
+            throw new RuntimeException("AUTH_002:유효하지 않은 토큰입니다");
+        }
+        String userId = jwtUtil.getUserIdFromToken(token);
+
+        try {
+            com.woorido.post.dto.response.UpdateCommentResponse response = commentService.updateComment(challengeId,
+                    postId, commentId, userId, request);
+            return ResponseEntity.ok(ApiResponse.success(response, "댓글이 수정되었습니다"));
+        } catch (IllegalArgumentException e) {
+            String message = e.getMessage();
+            if (message != null && message.startsWith("COMMENT_003")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
+            } else if (message != null && message.startsWith("COMMENT_002")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(message));
+            }
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+        }
     }
 }

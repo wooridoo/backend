@@ -15,6 +15,11 @@
         WHERE comment_id = #{commentId} AND user_id = #{userId}
     </delete>
 
+    <delete id="deleteByCommentId">
+        DELETE FROM woorido.comment_likes
+        WHERE comment_id = #{commentId}
+    </delete>
+
     <select id="exists" resultType="boolean">
         SELECT COUNT(*)
         FROM woorido.comment_likes

@@ -31,4 +31,19 @@ public class Comment {
         this.updatedAt = updatedAt;
         this.likeCount = 0;
     }
+
+    public void modify(String content) {
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void accept(CommentVisitor visitor) {
+        visitor.visit(this);
+    }
+
+    public void markAsDeleted() {
+        this.content = "삭제된 댓글입니다";
+        this.deletedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
 }

@@ -6,6 +6,7 @@ import com.woorido.common.mapper.UserMapper;
 import com.woorido.post.domain.Post;
 import com.woorido.post.domain.PostFactory;
 import com.woorido.post.domain.PostUpdateVisitor;
+import com.woorido.post.domain.PostDeleteVisitor;
 import com.woorido.post.dto.request.CreatePostRequest;
 import com.woorido.post.dto.request.UpdatePostRequest;
 import com.woorido.post.dto.response.CreatePostResponse;
@@ -38,6 +39,9 @@ public class PostService {
   private final PostFactory postFactory;
   private final com.woorido.post.repository.PostImageMapper postImageMapper;
   private final com.woorido.post.repository.PostLikeMapper postLikeMapper;
+  private final com.woorido.post.domain.PostLikeFactory postLikeFactory;
+  private final com.woorido.post.domain.PostImageFactory postImageFactory;
+  private final com.woorido.post.domain.PostDeleteStrategy postDeleteStrategy;
 
   public CreatePostResponse createPost(String challengeId, String userId, CreatePostRequest request) {
     // 1. Check Membership
@@ -78,6 +82,8 @@ public class PostService {
             .profileImage(user != null ? user.getProfileImageUrl() : null)
             .build())
         .createdAt(post.getCreatedAt())
+        .updatedAt(post.getCreatedAt())
+        .content(post.getContent())
         .build();
   }
 
@@ -121,7 +127,7 @@ public class PostService {
 
     // 6.1 Update Images
     postImageMapper.deleteAllByPostId(postId);
-    saveImages(postId, request.getImageUrls());
+    saveImages(postId, request.getAttachmentIds());
 
     User user = userMapper.findById(userId);
     return CreatePostResponse.builder()
@@ -133,7 +139,9 @@ public class PostService {
             .nickname(user != null ? user.getNickname() : "Unknown")
             .profileImage(user != null ? user.getProfileImageUrl() : null)
             .build())
-        .createdAt(post.getUpdatedAt())
+        .createdAt(post.getCreatedAt()) // Return created_at for consistency or null? Spec says updatedAt for Update.
+        .updatedAt(post.getUpdatedAt())
+        .content(post.getContent())
         .build();
   }
 
@@ -207,13 +215,7 @@ public class PostService {
     }
     for (int i = 0; i < imageUrls.size(); i++) {
       String url = imageUrls.get(i);
-      com.woorido.post.domain.PostImage image = com.woorido.post.domain.PostImage.builder()
-          .id(java.util.UUID.randomUUID().toString())
-          .postId(postId)
-          .imageUrl(url)
-          .displayOrder(i)
-          .createdAt(LocalDateTime.now())
-          .build();
+      com.woorido.post.domain.PostImage image = postImageFactory.create(postId, url, i);
       postImageMapper.save(image);
     }
   }
@@ -330,31 +332,63 @@ public class PostService {
 
   }
 
-  public boolean toggleLike(String postId, String userId) {
+  public com.woorido.post.dto.response.PostLikeResponse toggleLike(String postId, String userId) {
+    Post post = postMapper.findById(postId);
+    if (post == null) {
+      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+    }
+
+    boolean liked;
     if (postLikeMapper.exists(postId, userId)) {
       postLikeMapper.delete(postId, userId);
       postMapper.decreaseLikeCount(postId);
-      return false;
+      liked = false;
     } else {
-      postLikeMapper.save(com.woorido.post.domain.PostLike.builder()
-          .id(java.util.UUID.randomUUID().toString())
-          .postId(postId)
-          .userId(userId)
-          .createdAt(LocalDateTime.now())
-          .build());
+      com.woorido.post.domain.PostLike newLike = postLikeFactory.create(postId, userId);
+      postLikeMapper.save(newLike);
       postMapper.increaseLikeCount(postId);
-      return true;
+      liked = true;
     }
+
+    // Refresh post to get updated count
+    post = postMapper.findById(postId);
+
+    return com.woorido.post.dto.response.PostLikeResponse.builder()
+        .postId(postId)
+        .liked(liked)
+        .likeCount(post.getLikeCount())
+        .build();
   }
 
-  public void deletePost(String challengeId, String postId, String userId) {
+  public com.woorido.post.dto.response.DeletePostResponse deletePost(String challengeId, String postId, String userId) {
     Post post = postMapper.findById(postId);
-    if (post == null || !post.getChallengeId().equals(challengeId)) {
+    if (post == null) {
       throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
     }
-    if (!post.getCreatedBy().equals(userId)) {
-      throw new IllegalArgumentException("POST_004: 삭제 권한이 없습니다");
+    if (!post.getChallengeId().equals(challengeId)) {
+      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
     }
+
+    // 0. Fetch Member Role
+    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+    if (memberInfo == null) {
+      throw new IllegalArgumentException("MEMBER_001: 챌린지에 참여하지 않았습니다");
+    }
+    String role = (String) memberInfo.get("ROLE");
+
+    // 1. Validate using Strategy
+    postDeleteStrategy.validate(post, userId, role);
+
+    // 2. Update State using Visitor
+    PostDeleteVisitor visitor = new PostDeleteVisitor();
+    post.accept(visitor);
+
+    // 3. Persist (Soft Delete)
     postMapper.delete(postId);
+
+    return com.woorido.post.dto.response.DeletePostResponse.builder()
+        .postId(postId)
+        .deletedAt(post.getDeletedAt())
+        .build();
   }
 }
