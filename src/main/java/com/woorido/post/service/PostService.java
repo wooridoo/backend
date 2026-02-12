@@ -231,6 +231,7 @@ public class PostService {
     // 2. Prepare Params
     Map<String, Object> params = new HashMap<>();
     params.put("challengeId", challengeId);
+    params.put("userId", userId);
 
     // Category Filter
     if ("NOTICE".equals(category)) {
@@ -279,6 +280,14 @@ public class PostService {
       if (categoryVal == null)
         categoryVal = "GENERAL";
 
+      // Oracle returns BigDecimal for number, sometimes Integer depending on driver
+      // Safe conversion logic
+      boolean isLikedVal = false;
+      Object isLikedObj = p.get("IS_LIKED"); // expecting 0 or 1
+      if (isLikedObj instanceof Number) {
+        isLikedVal = ((Number) isLikedObj).intValue() > 0;
+      }
+
       return PostSummaryResponse.builder()
           .postId((String) p.get("ID"))
           .title(title)
@@ -293,6 +302,7 @@ public class PostService {
           .commentCount(((Number) p.get("COMMENT_COUNT")).longValue())
           .viewCount(((Number) p.get("VIEW_COUNT")).longValue())
           .isPinned("Y".equals(p.get("IS_PINNED")))
+          .isLiked(isLikedVal)
           .createdAt(toLocalDateTime(p.get("CREATED_AT")))
           .build();
     }).toList();

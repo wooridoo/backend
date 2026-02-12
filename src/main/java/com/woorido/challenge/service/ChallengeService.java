@@ -972,7 +972,7 @@ public class ChallengeService {
   /**
    * API 032: 챌린지 멤버 목록 조회
    */
-  public ChallengeMemberListResponse getChallengeMembers(String challengeId, String accessToken) {
+  public ChallengeMemberListResponse getChallengeMembers(String challengeId, String accessToken, String filterStatus) {
 
     // 1. 토큰 검증 및 사용자 ID 추출
     String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
@@ -991,7 +991,7 @@ public class ChallengeService {
     }
 
     // 4. 멤버 목록 조회 (User Join)
-    List<Map<String, Object>> membersData = challengeMemberMapper.findMembersWithUserInfo(challengeId);
+    List<Map<String, Object>> membersData = challengeMemberMapper.findMembersWithUserInfo(challengeId, filterStatus);
 
     // 5. Response 매핑
     List<ChallengeMemberListResponse.MemberInfo> memberList = new ArrayList<>();
@@ -1019,9 +1019,32 @@ public class ChallengeService {
           .brix(0.0) // Temporary
           .build();
 
+      // Calculate real support status
+      String thisMonthStatus = "UNPAID";
+      int consecutivePaid = 0;
+
+      Object lastPaidObj = data.get("LAST_SUPPORT_PAID_AT");
+      if (lastPaidObj != null) {
+        LocalDateTime lastPaidAt = null;
+        if (lastPaidObj instanceof java.sql.Timestamp) {
+          lastPaidAt = ((java.sql.Timestamp) lastPaidObj).toLocalDateTime();
+        } else if (lastPaidObj instanceof LocalDateTime) {
+          lastPaidAt = (LocalDateTime) lastPaidObj;
+        }
+
+        if (lastPaidAt != null) {
+          String currentMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+          String paidMonth = lastPaidAt.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+          if (currentMonth.equals(paidMonth)) {
+            thisMonthStatus = "PAID";
+            consecutivePaid = 1;
+          }
+        }
+      }
+
       ChallengeMemberListResponse.SupportStatus supportStatus = ChallengeMemberListResponse.SupportStatus.builder()
-          .thisMonth("PAID") // Temporary logic
-          .consecutivePaid(1) // Temporary logic
+          .thisMonth(thisMonthStatus)
+          .consecutivePaid(consecutivePaid)
           .overdueCount(0)
           .build();
 

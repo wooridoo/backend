@@ -72,10 +72,14 @@
         cm.joined_at as JOINED_AT,
         cm.privilege_status as STATUS,
         cm.deposit_status as DEPOSIT_STATUS,
+        cm.last_support_paid_at as LAST_SUPPORT_PAID_AT,
         u.profile_image_url as PROFILE_IMAGE
     FROM woorido.challenge_members cm
     JOIN woorido.users u ON cm.user_id = u.id
     WHERE cm.challenge_id = #{challengeId}
+    <if test="status != null and status != ''">
+      AND cm.privilege_status = #{status}
+    </if>
     ORDER BY 
         CASE WHEN cm.role = 'LEADER' THEN 1 ELSE 2 END,
         cm.joined_at ASC

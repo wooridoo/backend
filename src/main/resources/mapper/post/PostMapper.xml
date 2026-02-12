@@ -161,7 +161,10 @@
                     p.view_count as VIEW_COUNT,
                     p.created_at as CREATED_AT,
                     u.nickname as AUTHOR_NICKNAME,
-                    u.profile_image_url as AUTHOR_PROFILE_IMAGE
+                    u.profile_image_url as AUTHOR_PROFILE_IMAGE,
+                    (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END 
+                     FROM woorido.post_likes pl 
+                     WHERE pl.post_id = p.id AND pl.user_id = #{userId}) as IS_LIKED
                 FROM woorido.posts p
                 JOIN woorido.users u ON p.created_by = u.id
             <include refid="searchCriteria"/>

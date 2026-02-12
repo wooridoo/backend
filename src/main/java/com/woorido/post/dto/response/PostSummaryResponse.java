@@ -18,5 +18,6 @@ public class PostSummaryResponse {
   private Long commentCount;
   private Long viewCount;
   private Boolean isPinned;
+  private Boolean isLiked;
   private LocalDateTime createdAt;
 }

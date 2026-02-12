@@ -275,10 +275,11 @@ public class ChallengeController {
   @GetMapping("/{challengeId}/members")
   public ResponseEntity<ApiResponse<ChallengeMemberListResponse>> getChallengeMembers(
       @PathVariable("challengeId") String challengeId,
-      @RequestHeader("Authorization") String authorization) {
+      @RequestHeader("Authorization") String authorization,
+      @org.springframework.web.bind.annotation.RequestParam(value = "status", required = false) String status) {
 
     try {
-      ChallengeMemberListResponse response = challengeService.getChallengeMembers(challengeId, authorization);
+      ChallengeMemberListResponse response = challengeService.getChallengeMembers(challengeId, authorization, status);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
       e.printStackTrace(); // Added for debugging
