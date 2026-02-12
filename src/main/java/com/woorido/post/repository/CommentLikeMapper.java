@@ -12,5 +12,7 @@ public interface CommentLikeMapper {
 
     boolean exists(@Param("commentId") String commentId, @Param("userId") String userId);
 
+    void deleteByCommentId(@Param("commentId") String commentId);
+
     long countByCommentId(@Param("commentId") String commentId);
 }

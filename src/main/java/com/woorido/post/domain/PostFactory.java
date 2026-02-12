@@ -16,7 +16,7 @@ public class PostFactory {
                 .content(request.getContent())
                 .category(request.getCategory())
                 .isNotice(isNotice)
-                .isPinned("N") // Default
+                .isPinned("N")
                 .build();
     }
 }

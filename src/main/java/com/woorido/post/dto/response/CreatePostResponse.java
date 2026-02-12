@@ -13,5 +13,7 @@ public class CreatePostResponse {
   private String title;
   private String category;
   private AuthorInfo author;
+  private String content; // Added for Update Response
   private LocalDateTime createdAt;
+  private LocalDateTime updatedAt; // Added for Update Response
 }

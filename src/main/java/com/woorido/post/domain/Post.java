@@ -54,4 +54,8 @@ public class Post {
     this.isPinned = isPinned != null ? isPinned : "N";
     this.updatedAt = LocalDateTime.now();
   }
+
+  public void markAsDeleted() {
+    this.deletedAt = LocalDateTime.now();
+  }
 }

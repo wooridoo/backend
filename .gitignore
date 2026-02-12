@@ -9,3 +9,6 @@
 bin/
 build/
 *.class
+
+test/
+server.log

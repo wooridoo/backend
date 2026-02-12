@@ -28,9 +28,12 @@ public interface PostMapper {
   // 목록 조회용
   List<Map<String, Object>> findAll(Map<String, Object> params);
 
-  int count(Map<String, Object> params);
+  // 비관적 락 조회 (좋아요 토글 동시성 제어)
+  Post findByIdForUpdate(@Param("id") String id);
 
   void update(Post post);
 
   void delete(@Param("postId") String postId);
+
+  int count(Map<String, Object> params);
 }

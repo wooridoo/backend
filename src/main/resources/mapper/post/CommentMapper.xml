@@ -57,4 +57,19 @@
         WHERE id = #{id}
     </update>
 
+    <update id="update" parameterType="com.woorido.post.domain.Comment">
+        UPDATE woorido.comments
+        SET content = #{content}, updated_at = #{updatedAt}, deleted_at = #{deletedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="countByParentId" resultType="int">
+        SELECT count(*) FROM woorido.comments
+        WHERE parent_id = #{parentId} AND deleted_at IS NULL
+    </select>
+
+    <delete id="deletePhysical">
+        DELETE FROM woorido.comments WHERE id = #{id}
+    </delete>
+
 </mapper>
