@@ -35,7 +35,7 @@ public class MeetingDetailResponse {
   @AllArgsConstructor
   public static class AttendanceSummary {
     private int confirmed;
-    private int declind;
+    private int declined;
     private int pending;
     private int total;
   }

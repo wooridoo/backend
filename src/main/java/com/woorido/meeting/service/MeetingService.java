@@ -137,7 +137,7 @@ public class MeetingService {
     com.woorido.meeting.dto.response.MeetingDetailResponse.AttendanceSummary attendance = com.woorido.meeting.dto.response.MeetingDetailResponse.AttendanceSummary
         .builder()
         .confirmed(Integer.parseInt(String.valueOf(meetingMap.get("CONFIRMED_COUNT"))))
-        .declind(Integer.parseInt(String.valueOf(meetingMap.get("DECLINED_COUNT"))))
+        .declined(Integer.parseInt(String.valueOf(meetingMap.get("DECLINED_COUNT"))))
         .pending(Integer.parseInt(String.valueOf(meetingMap.get("PENDING_COUNT"))))
         .total(Integer.parseInt(String.valueOf(meetingMap.get("TOTAL_MEMBERS"))))
         .build();
@@ -397,37 +397,10 @@ public class MeetingService {
       meetingVoteMapper.insertRecord(record);
     }
 
-    if (record.getChoice() != null && !"PENDING".equals(record.getChoice())) {
-      // 기존 로직 유지 (이미 참석/불참 의사 밝힌 경우 수정 허용 여부는 정책에 따름.
-      // 현재 코드는 Exception 던짐 -> 수정 불가?
-      // Request가 update 성격이라면 수정 허용해야 함.
-      // 하지만 기존 코드가 throw하고 있었으므로, '수정' 로직이 별도로 없다면 여기서 Exception.
-      // 단, 사용자가 "참석 취소" 등을 하려면 이 체크를 풀어야 함.
-      // Frontend RegularMeetingDetail.tsx를 보면 "handleAction"이 toggle 형태임 (New Status를
-      // 보냄).
-      // 즉, 수정이 가능해야 함.
-      // 기존 코드: if (record.getChoice() != null &&
-      // !"PENDING".equals(record.getChoice())) { throw ... }
-      // 이것 때문에 한번 정하면 못바꾸는 듯?
-      // User Requirements don't explicitly say "Allow toggle", but UI implies it.
-      // Let's stick to fixing the *Error Message* and *Missing Record* first.
-      // If the user wants toggle, that's another change.
-      // Wait, the UI has "Cancel" button. If backend blocks it, that's another bug.
-      // But let's check the context. The user reported "Not a member" error.
-      // I will keep the existing "Already responded" check IF it was there, but
-      // checking line 382:
-      // if (record.getChoice() != null && !"PENDING".equals(record.getChoice()))
-      // This blocks updates. But `RegularMeetingDetail` tries to toggle.
-      // If I don't fix this, the user can attend once, but not cancel.
-      // However, the reported issue is "Not a member" (403).
-      // I will strictly fix the "Not a member" (Missing Record) issue first.
-
-      // Actually, removing this check enables modification, which is likely desired
-      // for "Attendance".
-      // But I should be careful not to expand scope too much.
-      // Let's just fix the record creation and the message.
-      throw new RuntimeException("MEETING_003: 이미 참석 의사를 표시했습니다");
-    }
+    // if (record.getChoice() != null && !"PENDING".equals(record.getChoice())) {
+    // throw new RuntimeException("MEETING_003: 이미 참석 의사를 표시했습니다"); // Updating
+    // allowed
+    // }
 
     // 4. 예정 일시 검증 (unchanged)
     Object meetingDateObj = meetingMap.get("MEETING_DATE");
