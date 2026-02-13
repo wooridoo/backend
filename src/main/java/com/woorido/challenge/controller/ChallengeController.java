@@ -193,6 +193,9 @@ public class ChallengeController {
         } else if (message.startsWith("CHALLENGE_004")) {
           return ResponseEntity.status(HttpStatus.FORBIDDEN)
               .body(ApiResponse.error(message));
+        } else if (message.startsWith("CHALLENGE_011")) {
+          return ResponseEntity.status(HttpStatus.CONFLICT)
+              .body(ApiResponse.error(message));
         } else if (message.startsWith("VALIDATION_001")) {
           return ResponseEntity.status(HttpStatus.BAD_REQUEST)
               .body(ApiResponse.error(message));
@@ -227,6 +230,9 @@ public class ChallengeController {
               .body(ApiResponse.error(message));
         } else if (message.startsWith("CHALLENGE_007")) {
           return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+              .body(ApiResponse.error(message));
+        } else if (message.startsWith("CHALLENGE_011")) {
+          return ResponseEntity.status(HttpStatus.CONFLICT)
               .body(ApiResponse.error(message));
         } else if (message.startsWith("VALIDATION_001")) {
           return ResponseEntity.status(HttpStatus.BAD_REQUEST)

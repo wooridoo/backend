@@ -67,6 +67,21 @@
         )
     </insert>
 
+    <!-- 챌린지명 중복 확인 -->
+    <select id="countByName" resultType="int">
+        SELECT COUNT(*)
+        FROM woorido.challenges
+        WHERE LOWER(TRIM(name)) = LOWER(TRIM(#{name}))
+    </select>
+
+    <!-- 챌린지명 중복 확인 (자기 자신 제외) -->
+    <select id="countByNameExcludingId" resultType="int">
+        SELECT COUNT(*)
+        FROM woorido.challenges
+        WHERE LOWER(TRIM(name)) = LOWER(TRIM(#{name}))
+          AND id != #{challengeId}
+    </select>
+
     <!-- 리더로 참여중인 챌린지 수 조회 (활성 상태만 카운트) -->
     <select id="countLeaderChallenges" parameterType="string" resultType="int">
         SELECT COUNT(*)

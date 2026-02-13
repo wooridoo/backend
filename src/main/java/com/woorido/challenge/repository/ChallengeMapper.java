@@ -39,6 +39,12 @@ public interface ChallengeMapper {
         // 챌린지 생성
         void insert(Challenge challenge);
 
+        // 챌린지명 중복 확인
+        int countByName(@Param("name") String name);
+
+        // 챌린지명 중복 확인 (자기 자신 제외)
+        int countByNameExcludingId(@Param("name") String name, @Param("challengeId") String challengeId);
+
         // 리더로 참여중인 챌린지 수 조회
         int countLeaderChallenges(@Param("userId") String userId);
 

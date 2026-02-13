@@ -84,12 +84,18 @@ public class ChallengeService {
     // 3. 유효성 검증
     validateRequest(request);
 
-    // 4. 챌린지 생성
+    // 4. 챌린지명 중복 확인
+    String normalizedName = request.getName().trim();
+    if (challengeMapper.countByName(normalizedName) > 0) {
+      throw new RuntimeException("CHALLENGE_011: 이미 사용 중인 챌린지명입니다");
+    }
+
+    // 5. 챌린지 생성
     LocalDateTime now = LocalDateTime.now();
     String challengeId = UUID.randomUUID().toString();
     Challenge challenge = Challenge.builder()
         .id(challengeId)
-        .name(request.getName())
+        .name(normalizedName)
         .description(request.getDescription())
         .category(ChallengeCategory.valueOf(request.getCategory()))
         .creatorId(userId)
@@ -105,7 +111,7 @@ public class ChallengeService {
 
     challengeMapper.insert(challenge);
 
-    // 5. 챌린지 멤버 생성 (리더)
+    // 6. 챌린지 멤버 생성 (리더)
     String memberId = UUID.randomUUID().toString();
     DepositStatus depositStatus = request.getDepositAmount() > 0 ? DepositStatus.LOCKED : DepositStatus.NONE;
     LocalDateTime depositLockedAt = request.getDepositAmount() > 0 ? LocalDateTime.now() : null;
@@ -126,15 +132,15 @@ public class ChallengeService {
 
     challengeMemberMapper.insert(member);
 
-    // 6. 보증금 잠금 처리
+    // 7. 보증금 잠금 처리
     if (request.getDepositAmount() > 0) {
       lockDeposit(userId, challengeId, request.getDepositAmount());
     }
 
-    // 7. 응답 생성
+    // 8. 응답 생성
     return CreateChallengeResponse.builder()
         .challengeId(challengeId)
-        .name(request.getName())
+        .name(normalizedName)
         .status("RECRUITING")
         .memberCount(CreateChallengeResponse.MemberCount.builder()
             .current(1)
@@ -413,7 +419,15 @@ public class ChallengeService {
       throw new RuntimeException("CHALLENGE_004: 리더만 수정할 수 있습니다");
     }
 
-    // 4. maxMembers 검증 (현재 인원 이상, 증가만 가능)
+    // 4. 챌린지명 중복 확인 (이름 변경 시)
+    if (request.getName() != null) {
+      String normalizedName = request.getName().trim();
+      if (challengeMapper.countByNameExcludingId(normalizedName, challengeId) > 0) {
+        throw new RuntimeException("CHALLENGE_011: 이미 사용 중인 챌린지명입니다");
+      }
+    }
+
+    // 5. maxMembers 검증 (현재 인원 이상, 증가만 가능)
     if (request.getMaxMembers() != null) {
       if (request.getMaxMembers() < challenge.getCurrentMembers()) {
         throw new RuntimeException("VALIDATION_001: 최대 인원은 현재 인원(" + challenge.getCurrentMembers() + ")명 이상이어야 합니다");
@@ -423,7 +437,7 @@ public class ChallengeService {
       }
     }
 
-    // 5. 수정할 필드 설정 (null이 아닌 값만 업데이트)
+    // 6. 수정할 필드 설정 (null이 아닌 값만 업데이트)
     if (request.getName() != null) {
       challenge.setName(request.getName());
     }
@@ -440,7 +454,7 @@ public class ChallengeService {
       challenge.setMaxMembers(request.getMaxMembers());
     }
 
-    // 6. 업데이트 실행
+    // 7. 업데이트 실행
     challengeMapper.update(challenge);
 
     return UpdateChallengeResponse.builder()
