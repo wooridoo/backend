@@ -2,9 +2,11 @@ package com.woorido.user.service;
 
 import java.time.format.DateTimeFormatter;
 
-import org.springframework.security.crypto.password.PasswordEncoder; // Add import
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.woorido.account.domain.Account;
+import com.woorido.account.repository.AccountMapper;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
 import com.woorido.common.util.JwtUtil;
@@ -21,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserMapper userMapper;
+    private final AccountMapper accountMapper;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
 
@@ -47,7 +50,34 @@ public class UserService {
             throw new RuntimeException("AUTH_001:인증이 필요합니다");
         }
 
-        // 4. 응답 생성
+        // 4. 실제 계좌 정보 조회
+        Account account = accountMapper.findByUserId(userId);
+        UserProfileResponse.AccountInfo accountInfo;
+        if (account != null) {
+            long totalBalance = account.getBalance();
+            long locked = account.getLockedBalance();
+            long available = totalBalance - locked;
+            accountInfo = UserProfileResponse.AccountInfo.builder()
+                    .accountId(account.getId())
+                    .balance(totalBalance)
+                    .availableBalance(available)
+                    .lockedBalance(locked)
+                    .build();
+        } else {
+            accountInfo = UserProfileResponse.AccountInfo.builder()
+                    .accountId(null)
+                    .balance(0L)
+                    .availableBalance(0L)
+                    .lockedBalance(0L)
+                    .build();
+        }
+
+        // 5. 실제 통계 정보 조회
+        int challengeCount = userMapper.countChallengesByUserId(userId);
+        int completedChallenges = userMapper.countCompletedChallengesByUserId(userId);
+        long totalSupportAmount = userMapper.sumTotalSupportAmountByUserId(userId);
+
+        // 6. 응답 생성
         return UserProfileResponse.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
@@ -56,17 +86,12 @@ public class UserService {
                 .birthDate(user.getBirthDate() != null ? user.getBirthDate().format(DATE_FORMATTER) : null)
                 .profileImage(user.getProfileImageUrl())
                 .status(user.getAccountStatus().name())
-                .brix(85.5) // TODO: 실제 brix 계산 로직 필요
-                .account(UserProfileResponse.AccountInfo.builder()
-                        .accountId("1") // TODO: 실제 계정 정보 연동 필요
-                        .balance(500000L)
-                        .availableBalance(450000L)
-                        .lockedBalance(50000L)
-                        .build())
+                .brix(12.0) // 기본값 12
+                .account(accountInfo)
                 .stats(UserProfileResponse.StatsInfo.builder()
-                        .challengeCount(3) // TODO: 실제 통계 정보 연동 필요
-                        .completedChallenges(2)
-                        .totalSupportAmount(1500000L)
+                        .challengeCount(challengeCount)
+                        .completedChallenges(completedChallenges)
+                        .totalSupportAmount(totalSupportAmount)
                         .build())
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().format(DATETIME_FORMATTER) : null)
                 .updatedAt(user.getUpdatedAt() != null ? user.getUpdatedAt().format(DATETIME_FORMATTER) : null)

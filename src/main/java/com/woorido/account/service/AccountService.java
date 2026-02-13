@@ -1,5 +1,7 @@
 package com.woorido.account.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +48,7 @@ import com.woorido.challenge.repository.LedgerEntryMapper;
 @RequiredArgsConstructor
 public class AccountService {
 
+    private static final Logger log = LoggerFactory.getLogger(AccountService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final AccountMapper accountMapper;
@@ -193,8 +196,12 @@ public class AccountService {
      */
     @Transactional
     public CreditChargeResponse requestCreditCharge(String accessToken, CreditChargeRequest request) {
+        log.info("[CHARGE] 충전 요청 시작 - amount: {}, paymentMethod: {}, returnUrl: {}",
+                request.getAmount(), request.getPaymentMethod(), request.getReturnUrl());
+
         // 1. 토큰 검증 및 사용자 확인
         String userId = jwtUtil.getUserIdFromToken(accessToken);
+        log.info("[CHARGE] userId: {}", userId);
 
         // 2. 금액 검증
         if (request.getAmount() < 10000) {
@@ -237,6 +244,7 @@ public class AccountService {
                 .expiresAt(expiresAtTime)
                 .build();
         sessionMapper.save(session);
+        log.info("[CHARGE] 세션 저장 완료 - orderId: {}, userId: {}, amount: {}", orderId, userId, request.getAmount());
 
         return CreditChargeResponse.builder()
                 .orderId(orderId)
@@ -253,11 +261,16 @@ public class AccountService {
      */
     @Transactional
     public ChargeCallbackResponse processChargeCallback(ChargeCallbackRequest request) {
+        log.info("[CALLBACK] 콜백 수신 - orderId: {}, paymentKey: {}, amount: {}, status: {}",
+                request.getOrderId(), request.getPaymentKey(), request.getAmount(), request.getStatus());
+
         // 1. Session 조회
         Session session = sessionMapper.findById(request.getOrderId());
         if (session == null) {
+            log.error("[CALLBACK] 세션 없음 - orderId: {}", request.getOrderId());
             throw new RuntimeException("ACCOUNT_009:유효하지 않은 주문입니다");
         }
+        log.info("[CALLBACK] 세션 조회 성공 - userId: {}, isUsed: {}", session.getUserId(), session.getIsUsed());
 
         // 2. 이미 처리된 주문 체크
         if ("Y".equals(session.getIsUsed())) {
@@ -295,12 +308,16 @@ public class AccountService {
 
         long balanceBefore = account.getBalance();
         long newBalance = balanceBefore + request.getAmount();
+        log.info("[CALLBACK] 잔액 업데이트 - accountId: {}, before: {}, after: {}", account.getId(), balanceBefore,
+                newBalance);
 
         account.setBalance(newBalance);
         int updated = accountMapper.update(account);
         if (updated == 0) {
+            log.error("[CALLBACK] 낙관적 락 실패 - accountId: {}", account.getId());
             throw new RuntimeException("ACCOUNT_014:동시 요청으로 처리에 실패했습니다. 다시 시도해주세요.");
         }
+        log.info("[CALLBACK] 잔액 업데이트 완료 - accountId: {}, newBalance: {}", account.getId(), newBalance);
 
         // 7. 거래 내역 저장
         AccountTransaction tx = new AccountTransaction();

@@ -62,4 +62,13 @@ public interface UserMapper {
 
         // 비밀번호 재설정 토큰 초기화
         void clearPasswordResetToken(@Param("id") String id);
+
+        // 사용자가 참여 중인 챌린지 수
+        int countChallengesByUserId(@Param("userId") String userId);
+
+        // 사용자가 완료한 챌린지 수
+        int countCompletedChallengesByUserId(@Param("userId") String userId);
+
+        // 사용자의 총 서포트 금액
+        long sumTotalSupportAmountByUserId(@Param("userId") String userId);
 }

@@ -144,4 +144,24 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 사용자가 참여 중인 챌린지 수 -->
+    <select id="countChallengesByUserId" resultType="int">
+        SELECT COUNT(*) FROM woorido.challenge_members
+        WHERE user_id = #{userId} AND privilege_status = 'ACTIVE'
+    </select>
+
+    <!-- 사용자가 완료한 챌린지 수 -->
+    <select id="countCompletedChallengesByUserId" resultType="int">
+        SELECT COUNT(*) FROM woorido.challenge_members cm
+        JOIN woorido.challenges c ON cm.challenge_id = c.id
+        WHERE cm.user_id = #{userId} AND c.status = 'COMPLETED'
+    </select>
+
+    <!-- 사용자의 총 서포트 금액 -->
+    <select id="sumTotalSupportAmountByUserId" resultType="long">
+        SELECT NVL(SUM(at2.amount), 0) FROM woorido.account_transactions at2
+        JOIN woorido.accounts a ON at2.account_id = a.id
+        WHERE a.user_id = #{userId} AND at2.type IN ('SUPPORT', 'SUPPORT_AUTO')
+    </select>
+
 </mapper>
