@@ -40,4 +40,7 @@ public interface MeetingMapper {
 
         // 모임 참석 여부 확인
         int isAttendee(@Param("meetingId") String meetingId, @Param("userId") String userId);
+
+        // 모임 참석자 목록 조회 (AGREE 상태)
+        List<Map<String, Object>> findAttendeesByMeetingId(@Param("meetingId") String meetingId);
 }

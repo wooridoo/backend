@@ -1,5 +1,6 @@
 package com.woorido.meeting.dto.response;
 
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,16 +17,14 @@ public class MeetingDetailResponse {
   private String title;
   private String description;
   private String status;
-  private String meetingDate; // scheduledAt -> meetingDate
+  private String meetingDate;
   private String location;
   private String locationDetail;
-  // private String agenda; // Removed
 
   private AttendanceSummary attendance;
   private MyAttendance myAttendance;
-  // private BeneficiaryInfo beneficiary; // Removed
+  private List<MemberInfo> members;
 
-  // private Long benefitAmount; // Removed
   private CreatorInfo createdBy;
   private String createdAt;
 
@@ -45,7 +44,7 @@ public class MeetingDetailResponse {
   @NoArgsConstructor
   @AllArgsConstructor
   public static class MyAttendance {
-    private String status; // "CONFIRMED", "PENDING", "DECLINED"
+    private String status;
     private String respondedAt;
   }
 
@@ -56,5 +55,15 @@ public class MeetingDetailResponse {
   public static class CreatorInfo {
     private String userId;
     private String nickname;
+  }
+
+  @Getter
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class MemberInfo {
+    private String userId;
+    private String nickname;
+    private String profileImage;
   }
 }

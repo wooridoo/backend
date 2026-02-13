@@ -122,4 +122,18 @@
       AND mvr.choice = 'AGREE'
   </select>
 
+  <select id="findAttendeesByMeetingId" resultType="java.util.Map">
+    SELECT
+        u.id as USER_ID,
+        u.nickname as NICKNAME,
+        u.profile_image_url as PROFILE_IMAGE,
+        mvr.attendance_confirmed_at as JOINED_AT
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id
+    JOIN woorido.users u ON mvr.user_id = u.id
+    WHERE mv.meeting_id = #{meetingId}
+      AND mvr.choice = 'AGREE'
+    ORDER BY mvr.attendance_confirmed_at ASC
+  </select>
+
 </mapper>

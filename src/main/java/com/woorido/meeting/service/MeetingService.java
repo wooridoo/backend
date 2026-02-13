@@ -142,21 +142,32 @@ public class MeetingService {
         .total(Integer.parseInt(String.valueOf(meetingMap.get("TOTAL_MEMBERS"))))
         .build();
 
+    // 7. 참석자 목록 조회
+    java.util.List<java.util.Map<String, Object>> attendeeRows = meetingMapper.findAttendeesByMeetingId(meetingId);
+    java.util.List<com.woorido.meeting.dto.response.MeetingDetailResponse.MemberInfo> members = new java.util.ArrayList<>();
+    if (attendeeRows != null) {
+      for (java.util.Map<String, Object> row : attendeeRows) {
+        members.add(com.woorido.meeting.dto.response.MeetingDetailResponse.MemberInfo.builder()
+            .userId((String) row.get("USER_ID"))
+            .nickname((String) row.get("NICKNAME"))
+            .profileImage((String) row.get("PROFILE_IMAGE"))
+            .build());
+      }
+    }
+
     return com.woorido.meeting.dto.response.MeetingDetailResponse.builder()
         .meetingId((String) meetingMap.get("MEETING_ID"))
         .challengeId((String) meetingMap.get("CHALLENGE_ID"))
         .title((String) meetingMap.get("TITLE"))
         .description((String) meetingMap.get("DESCRIPTION"))
         .status((String) meetingMap.get("STATUS"))
-        .meetingDate(formatTimestamp(meetingMap.get("MEETING_DATE"))) // Changed
+        .meetingDate(formatTimestamp(meetingMap.get("MEETING_DATE")))
         .location((String) meetingMap.get("LOCATION"))
         .locationDetail((String) meetingMap.get("LOCATION_DETAIL"))
-        // .agenda() removed
-        // .benefitAmount() removed
         .createdAt(formatTimestamp(meetingMap.get("CREATED_AT")))
         .attendance(attendance)
         .myAttendance(myAttendance)
-        // .beneficiary() removed
+        .members(members)
         .createdBy(creator)
         .build();
   }
