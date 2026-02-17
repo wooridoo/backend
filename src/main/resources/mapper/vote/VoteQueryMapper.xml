@@ -1,118 +1,147 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.vote.repository.VoteQueryMapper">
+  <!-- Learning note: SQL ids in this mapper must match Java Mapper method names. -->
+
+  <sql id="voteUnionByChallengeId">
+    SELECT
+      mv.id AS VOTE_ID,
+      'MEETING_ATTENDANCE' AS TYPE,
+      m.title AS TITLE,
+      mv.status AS STATUS,
+      m.created_by AS CREATED_BY_ID,
+      u.nickname AS CREATED_BY_NICKNAME,
+      mv.created_at AS CREATED_AT,
+      mv.expires_at AS DEADLINE,
+      (SELECT COUNT(*) FROM woorido.meeting_vote_records mvr WHERE mvr.meeting_vote_id = mv.id AND mvr.choice = 'AGREE') AS AGREE_COUNT,
+      (SELECT COUNT(*) FROM woorido.meeting_vote_records mvr WHERE mvr.meeting_vote_id = mv.id AND mvr.choice = 'DISAGREE') AS DISAGREE_COUNT,
+      (SELECT COUNT(*) FROM woorido.meeting_vote_records mvr WHERE mvr.meeting_vote_id = mv.id) AS TOTAL_VOTE_COUNT
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meetings m ON mv.meeting_id = m.id
+    LEFT JOIN woorido.users u ON m.created_by = u.id
+    WHERE m.challenge_id = #{challengeId}
+
+    UNION ALL
+
+    SELECT
+      ev.id AS VOTE_ID,
+      'EXPENSE' AS TYPE,
+      er.title AS TITLE,
+      ev.status AS STATUS,
+      er.created_by AS CREATED_BY_ID,
+      u.nickname AS CREATED_BY_NICKNAME,
+      ev.created_at AS CREATED_AT,
+      ev.expires_at AS DEADLINE,
+      (SELECT COUNT(*) FROM woorido.expense_vote_records evr WHERE evr.expense_vote_id = ev.id AND evr.choice = 'APPROVE') AS AGREE_COUNT,
+      (SELECT COUNT(*) FROM woorido.expense_vote_records evr WHERE evr.expense_vote_id = ev.id AND evr.choice = 'REJECT') AS DISAGREE_COUNT,
+      (SELECT COUNT(*) FROM woorido.expense_vote_records evr WHERE evr.expense_vote_id = ev.id) AS TOTAL_VOTE_COUNT
+    FROM woorido.expense_votes ev
+    JOIN woorido.expense_requests er ON ev.expense_request_id = er.id
+    JOIN woorido.meetings m ON er.meeting_id = m.id
+    LEFT JOIN woorido.users u ON er.created_by = u.id
+    WHERE m.challenge_id = #{challengeId}
+
+    UNION ALL
+
+    SELECT
+      gv.id AS VOTE_ID,
+      gv.type AS TYPE,
+      gv.title AS TITLE,
+      gv.status AS STATUS,
+      gv.created_by AS CREATED_BY_ID,
+      u.nickname AS CREATED_BY_NICKNAME,
+      gv.created_at AS CREATED_AT,
+      gv.expires_at AS DEADLINE,
+      (SELECT COUNT(*) FROM woorido.general_vote_records gvr WHERE gvr.general_vote_id = gv.id AND gvr.choice = 'APPROVE') AS AGREE_COUNT,
+      (SELECT COUNT(*) FROM woorido.general_vote_records gvr WHERE gvr.general_vote_id = gv.id AND gvr.choice = 'REJECT') AS DISAGREE_COUNT,
+      (SELECT COUNT(*) FROM woorido.general_vote_records gvr WHERE gvr.general_vote_id = gv.id) AS TOTAL_VOTE_COUNT
+    FROM woorido.general_votes gv
+    LEFT JOIN woorido.users u ON gv.created_by = u.id
+    WHERE gv.challenge_id = #{challengeId}
+  </sql>
 
   <select id="findAllUnionByChallengeId" resultType="map">
     SELECT * FROM (
-      SELECT V.*, ROWNUM AS RNUM FROM (
-        -- 1. Meeting Votes
-        SELECT 
-          mv.id AS VOTE_ID,
-          'MEETING_ATTENDANCE' AS TYPE,
-          m.title AS TITLE,
-          mv.status AS STATUS,
-          m.created_by AS CREATED_BY_ID,
-          u.nickname AS CREATED_BY_NICKNAME,
-          mv.created_at AS CREATED_AT,
-          mv.expires_at AS DEADLINE,
-          mv.attend_count AS AGREE_COUNT,
-          mv.absent_count AS DISAGREE_COUNT,
-          (mv.attend_count + mv.absent_count) AS TOTAL_VOTE_COUNT
-        FROM woorido.meeting_votes mv
-        JOIN woorido.meetings m ON mv.meeting_id = m.id
-        LEFT JOIN woorido.users u ON m.created_by = u.id
-        WHERE m.challenge_id = #{challengeId}
-
-        UNION ALL
-
-        -- 2. Expense Votes (JOIN expense_requests, meetings)
-        SELECT 
-          ev.id AS VOTE_ID,
-          'EXPENSE' AS TYPE,
-          er.title AS TITLE,
-          ev.status AS STATUS,
-          er.created_by AS CREATED_BY_ID,
-          u.nickname AS CREATED_BY_NICKNAME,
-          ev.created_at AS CREATED_AT,
-          ev.expires_at AS DEADLINE,
-          ev.approve_count AS AGREE_COUNT,
-          ev.reject_count AS DISAGREE_COUNT,
-          (ev.approve_count + ev.reject_count) AS TOTAL_VOTE_COUNT
-        FROM woorido.expense_votes ev
-        JOIN woorido.expense_requests er ON ev.expense_request_id = er.id
-        JOIN woorido.meetings m ON er.meeting_id = m.id
-        LEFT JOIN woorido.users u ON er.created_by = u.id
-        WHERE m.challenge_id = #{challengeId}
-
-        UNION ALL
-
-        -- 3. General Votes
-        SELECT 
-          gv.id AS VOTE_ID,
-          gv.type AS TYPE,
-          gv.title AS TITLE,
-          gv.status AS STATUS,
-          gv.created_by AS CREATED_BY_ID,
-          u.nickname AS CREATED_BY_NICKNAME,
-          gv.created_at AS CREATED_AT,
-          gv.expires_at AS DEADLINE,
-          gv.approve_count AS AGREE_COUNT,
-          gv.reject_count AS DISAGREE_COUNT,
-          (gv.approve_count + gv.reject_count) AS TOTAL_VOTE_COUNT
-        FROM woorido.general_votes gv
-        LEFT JOIN woorido.users u ON gv.created_by = u.id
-        WHERE gv.challenge_id = #{challengeId}
-
-        ORDER BY CREATED_AT DESC
-      ) V
+      SELECT V2.*, ROWNUM AS RNUM
+      FROM (
+        SELECT *
+        FROM (
+          <include refid="voteUnionByChallengeId"/>
+        ) V
+        WHERE (#{status, jdbcType=VARCHAR} IS NULL OR UPPER(V.STATUS) = UPPER(#{status}))
+          AND (#{type, jdbcType=VARCHAR} IS NULL OR UPPER(V.TYPE) = UPPER(#{type}))
+        ORDER BY V.CREATED_AT DESC
+      ) V2
       WHERE ROWNUM &lt;= #{offset} + #{limit}
     )
     WHERE RNUM &gt; #{offset}
   </select>
 
   <select id="countAllUnionByChallengeId" resultType="long">
-    SELECT SUM(CNT) FROM (
-      SELECT COUNT(*) AS CNT FROM woorido.meeting_votes mv JOIN woorido.meetings m ON mv.meeting_id = m.id WHERE m.challenge_id = #{challengeId}
-      UNION ALL
-      SELECT COUNT(*) AS CNT FROM woorido.expense_votes ev JOIN woorido.expense_requests er ON ev.expense_request_id = er.id JOIN woorido.meetings m ON er.meeting_id = m.id WHERE m.challenge_id = #{challengeId}
-      UNION ALL
-      SELECT COUNT(*) AS CNT FROM woorido.general_votes WHERE challenge_id = #{challengeId}
-    )
+    SELECT COUNT(*)
+    FROM (
+      <include refid="voteUnionByChallengeId"/>
+    ) V
+    WHERE (#{status, jdbcType=VARCHAR} IS NULL OR UPPER(V.STATUS) = UPPER(#{status}))
+      AND (#{type, jdbcType=VARCHAR} IS NULL OR UPPER(V.TYPE) = UPPER(#{type}))
   </select>
 
   <select id="findByIdBasic" resultType="map">
-    SELECT * FROM (
-      SELECT 
-        mv.id AS VOTE_ID, 
-        'MEETING_ATTENDANCE' AS TYPE, 
-        m.challenge_id AS CHALLENGE_ID, 
-        mv.expires_at AS DEADLINE
+    SELECT *
+    FROM (
+      SELECT
+        mv.id AS VOTE_ID,
+        'MEETING_ATTENDANCE' AS TYPE,
+        m.challenge_id AS CHALLENGE_ID,
+        mv.expires_at AS DEADLINE,
+        mv.status AS STATUS,
+        mv.created_at AS CREATED_AT,
+        mv.required_count AS REQUIRED_COUNT,
+        (SELECT COUNT(*)
+         FROM woorido.challenge_members cm
+         WHERE cm.challenge_id = m.challenge_id
+           AND cm.privilege_status = 'ACTIVE') AS ELIGIBLE_COUNT,
+        mv.meeting_id AS MEETING_ID,
+        CAST(NULL AS VARCHAR2(36)) AS TARGET_ID
       FROM woorido.meeting_votes mv
       JOIN woorido.meetings m ON mv.meeting_id = m.id
       WHERE mv.id = #{voteId}
-      
+
       UNION ALL
-      
-      SELECT 
-        ev.id AS VOTE_ID, 
-        'EXPENSE' AS TYPE, 
-        m.challenge_id AS CHALLENGE_ID, 
-        ev.expires_at AS DEADLINE
+
+      SELECT
+        ev.id AS VOTE_ID,
+        'EXPENSE' AS TYPE,
+        m.challenge_id AS CHALLENGE_ID,
+        ev.expires_at AS DEADLINE,
+        ev.status AS STATUS,
+        ev.created_at AS CREATED_AT,
+        ev.required_count AS REQUIRED_COUNT,
+        ev.eligible_count AS ELIGIBLE_COUNT,
+        er.meeting_id AS MEETING_ID,
+        CAST(NULL AS VARCHAR2(36)) AS TARGET_ID
       FROM woorido.expense_votes ev
       JOIN woorido.expense_requests er ON ev.expense_request_id = er.id
       JOIN woorido.meetings m ON er.meeting_id = m.id
       WHERE ev.id = #{voteId}
-      
+
       UNION ALL
-      
-      SELECT 
-        id AS VOTE_ID, 
-        type AS TYPE, 
-        challenge_id AS CHALLENGE_ID, 
-        expires_at AS DEADLINE
-      FROM woorido.general_votes
-      WHERE id = #{voteId}
-    ) WHERE ROWNUM = 1
+
+      SELECT
+        gv.id AS VOTE_ID,
+        gv.type AS TYPE,
+        gv.challenge_id AS CHALLENGE_ID,
+        gv.expires_at AS DEADLINE,
+        gv.status AS STATUS,
+        gv.created_at AS CREATED_AT,
+        gv.required_count AS REQUIRED_COUNT,
+        gv.eligible_count AS ELIGIBLE_COUNT,
+        CAST(NULL AS VARCHAR2(36)) AS MEETING_ID,
+        gv.target_user_id AS TARGET_ID
+      FROM woorido.general_votes gv
+      WHERE gv.id = #{voteId}
+    )
+    WHERE ROWNUM = 1
   </select>
 
 </mapper>

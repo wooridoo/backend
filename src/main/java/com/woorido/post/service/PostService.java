@@ -32,6 +32,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Transactional
 public class PostService {
+  // 학습 포인트:
+  // - 생성/수정은 Factory + Visitor 패턴으로 도메인 변경 책임을 분리한다.
+  // - 삭제 권한은 Strategy로 분리해 서비스 로직을 단순화한다.
 
   private final PostMapper postMapper;
   private final ChallengeMemberMapper challengeMemberMapper;
@@ -43,33 +46,34 @@ public class PostService {
   private final com.woorido.post.domain.PostImageFactory postImageFactory;
   private final com.woorido.post.domain.PostDeleteStrategy postDeleteStrategy;
 
+  /**
+   * 게시글 생성.
+   * 흐름: 멤버 검증 -> 공지 권한 검증 -> 게시글/이미지 저장 -> 응답 생성
+   */
   public CreatePostResponse createPost(String challengeId, String userId, CreatePostRequest request) {
-    // 1. Check Membership
-    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-    if (memberInfo == null) {
-      throw new IllegalArgumentException("MEMBER_001: 챌린지에 참여하지 않았습니다");
-    }
+    // 챌린지 멤버 여부(LEFT 제외) 검증
+    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
 
     String role = (String) memberInfo.get("ROLE");
 
-    // 2. Validate Category & Role
+    // 공지 글은 리더만 작성 가능
     boolean isNotice = "NOTICE".equals(request.getCategory());
     if (isNotice) {
       if (!"LEADER".equals(role)) {
-        throw new IllegalArgumentException("POST_002: 공지사항은 모임장만 작성할 수 있습니다");
+        throw new IllegalArgumentException("POST_002:공지 게시글은 리더만 작성할 수 있습니다");
       }
     }
 
-    // 3. Create Post Entity using Factory
+    // 도메인 팩토리로 게시글 엔티티 생성
     Post post = postFactory.create(challengeId, userId, request, isNotice ? "Y" : "N");
 
-    // 4. Insert
+    // 게시글 본문 저장
     postMapper.insert(post);
 
-    // 4.1 Save Images
+    // 첨부 이미지 메타데이터 저장
     saveImages(post.getId(), request.getImageUrls());
 
-    // 5. Build Response
+    // 작성자 정보 포함 응답 구성
     User user = userMapper.findById(userId);
 
     return CreatePostResponse.builder()
@@ -87,45 +91,46 @@ public class PostService {
         .build();
   }
 
+  /**
+   * 게시글 수정.
+   * 흐름: 멤버/대상 게시글 검증 -> 작성자 검증 -> 공지 권한 검증 -> 수정 반영
+   */
   public CreatePostResponse updatePost(String challengeId, String postId, String userId, UpdatePostRequest request) {
-    // 1. Check Membership
-    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-    if (memberInfo == null) {
-      throw new IllegalArgumentException("MEMBER_001: 챌린지에 참여하지 않았습니다");
-    }
+    // 챌린지 멤버 여부(LEFT 제외) 검증
+    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
     String role = (String) memberInfo.get("ROLE");
 
-    // 2. Find Post
+    // 수정 대상 게시글 조회 및 경계(challengeId) 검증
     Post post = postMapper.findById(postId);
     if (post == null) {
-      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
     if (!post.getChallengeId().equals(challengeId)) {
-      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
 
-    // 3. Check Author
+    // 작성자 본인만 수정 가능
     if (!post.getCreatedBy().equals(userId)) {
-      throw new IllegalArgumentException("POST_004: 수정 권한이 없습니다");
+      throw new IllegalArgumentException("POST_004:게시글 수정 권한이 없습니다");
     }
 
-    // 4. Validate Category & Permission
+    // 공지글 전환 시 리더 권한 검증
     String category = request.getCategory();
     boolean isNotice = "NOTICE".equals(category);
     if (isNotice) {
       if (!"LEADER".equals(role)) {
-        throw new IllegalArgumentException("POST_002: 공지사항은 모임장만 작성할 수 있습니다");
+        throw new IllegalArgumentException("POST_002:공지 게시글은 리더만 작성할 수 있습니다");
       }
     }
 
-    // 5. Update using Visitor
+    // Visitor 패턴으로 변경값 반영
     PostUpdateVisitor visitor = new PostUpdateVisitor(request, isNotice ? "Y" : "N");
     post.accept(visitor);
 
-    // 6. Update DB
+    // 게시글 본문 업데이트
     postMapper.update(post);
 
-    // 6.1 Update Images
+    // 이미지 목록은 전체 교체 방식으로 동기화
     postImageMapper.deleteAllByPostId(postId);
     saveImages(postId, request.getAttachmentIds());
 
@@ -139,34 +144,36 @@ public class PostService {
             .nickname(user != null ? user.getNickname() : "Unknown")
             .profileImage(user != null ? user.getProfileImageUrl() : null)
             .build())
-        .createdAt(post.getCreatedAt()) // Return created_at for consistency or null? Spec says updatedAt for Update.
+        // 수정 응답에서도 createdAt은 원본 생성 시각을 그대로 유지한다.
+        .createdAt(post.getCreatedAt())
         .updatedAt(post.getUpdatedAt())
         .content(post.getContent())
         .build();
   }
 
+  /**
+   * 게시글 상세 조회.
+   * 흐름: 멤버 검증 -> 조회수 증가 -> 상세 조회 -> 좋아요/이미지 포함 응답 구성
+   */
   public PostDetailResponse getPostDetail(String challengeId, String postId, String userId) {
-    // 1. Check Membership
-    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-    if (memberInfo == null) {
-      throw new IllegalArgumentException("MEMBER_001: 챌린지에 참여하지 않았습니다");
-    }
+    // 조회 권한(멤버십) 검증
+    requireMemberAny(challengeId, userId);
 
-    // 2. Increase View Count
+    // 조회수 증가
     postMapper.increaseViewCount(postId);
 
-    // 3. Get Post Data
+    // 작성자 조인 포함 상세 데이터 조회
     Map<String, Object> postMap = postMapper.findByIdWithAuthor(postId);
     if (postMap == null) {
-      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
 
-    // Validate Challenge ID
+    // 경로 challengeId와 실제 게시글 소속 challengeId 일치 검증
     if (!challengeId.equals(postMap.get("CHALLENGE_ID"))) {
-      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
 
-    // 4. Use Title & Content directly
+    // null-safe 기본값 처리
     String title = (String) postMap.get("TITLE");
     String content = (String) postMap.get("CONTENT");
     String category = (String) postMap.get("CATEGORY");
@@ -176,11 +183,11 @@ public class PostService {
     if (category == null)
       category = "GENERAL";
 
-    // 6. Check Liked & Images
+    // 로그인 사용자의 좋아요 여부/이미지 목록 조회
     boolean isLiked = postMapper.isLiked(postId, userId);
     List<com.woorido.post.domain.PostImage> images = postImageMapper.findAllByPostId(postId);
 
-    // 7. Build Response
+    // 응답 DTO 조립
     return PostDetailResponse.builder()
         .postId((String) postMap.get("ID"))
         .title(title)
@@ -209,6 +216,9 @@ public class PostService {
         .build();
   }
 
+  /**
+   * 이미지 URL 목록을 게시글 이미지 엔티티로 저장한다.
+   */
   private void saveImages(String postId, List<String> imageUrls) {
     if (imageUrls == null || imageUrls.isEmpty()) {
       return;
@@ -220,48 +230,50 @@ public class PostService {
     }
   }
 
+  /**
+   * 게시글 목록 조회.
+   * 흐름: 멤버 검증 -> 필터/정렬/페이징 파라미터 구성 -> 목록/카운트 조회 -> DTO 변환
+   */
   public PostListResponse getPostList(String challengeId, String userId, int page, int size, String category,
       String sortBy, String order) {
-    // 1. Check Membership
-    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-    if (memberInfo == null) {
-      throw new IllegalArgumentException("MEMBER_001: 챌린지에 참여하지 않았습니다");
-    }
+    // 챌린지 멤버 여부(LEFT 제외) 검증
+    requireMemberAny(challengeId, userId);
 
-    // 2. Prepare Params
+    // 동적 SQL 파라미터 구성
     Map<String, Object> params = new HashMap<>();
     params.put("challengeId", challengeId);
     params.put("userId", userId);
 
-    // Category Filter
+    // 카테고리 필터
     if ("NOTICE".equals(category)) {
       params.put("isNotice", "Y");
     } else if ("GENERAL".equals(category) || "QUESTION".equals(category)) {
       params.put("isNotice", "N");
     }
-    // if ALL or null, no isNotice filter
+    // ALL/null인 경우 카테고리 필터 미적용
 
-    // Sort
-    String sortColumn = "created_at"; // default
+    // 정렬 컬럼/정렬 방향 결정
+    String sortColumn = "created_at";
     if ("LIKES".equals(sortBy))
       sortColumn = "like_count";
     else if ("COMMENTS".equals(sortBy))
       sortColumn = "comment_count";
 
-    String sortOrder = "DESC"; // default
+    String sortOrder = "DESC";
     if ("ASC".equalsIgnoreCase(order))
       sortOrder = "ASC";
 
     params.put("sortColumn", sortColumn);
     params.put("sortOrder", sortOrder);
 
-    // Pagination (1-based rownum)
+    // 페이징 범위 계산(rownum/offset용)
+    // page=0, size=20이면 0~19 구간을 의미한다.
     int startRow = page * size;
     int endRow = (page + 1) * size;
     params.put("startRow", startRow);
     params.put("endRow", endRow);
 
-    // 3. Get Data
+    // 데이터 조회
     int totalElements = postMapper.count(params);
     List<Map<String, Object>> posts = Collections.emptyList();
 
@@ -269,7 +281,7 @@ public class PostService {
       posts = postMapper.findAll(params);
     }
 
-    // 4. Map to DTO
+    // 조회 결과를 응답 DTO로 변환
     List<PostSummaryResponse> contentList = posts.stream().map(p -> {
       String title = (String) p.get("TITLE");
       String content = (String) p.get("CONTENT");
@@ -280,10 +292,9 @@ public class PostService {
       if (categoryVal == null)
         categoryVal = "GENERAL";
 
-      // Oracle returns BigDecimal for number, sometimes Integer depending on driver
-      // Safe conversion logic
+      // JDBC 드라이버별 숫자 타입 차이를 흡수하는 변환 로직
       boolean isLikedVal = false;
-      Object isLikedObj = p.get("IS_LIKED"); // expecting 0 or 1
+      Object isLikedObj = p.get("IS_LIKED");
       if (isLikedObj instanceof Number) {
         isLikedVal = ((Number) isLikedObj).intValue() > 0;
       }
@@ -316,6 +327,9 @@ public class PostService {
         .build();
   }
 
+  /**
+   * DB 타임스탬프 값을 LocalDateTime으로 안전하게 변환한다.
+   */
   private LocalDateTime toLocalDateTime(Object timestampObj) {
     if (timestampObj == null) {
       return null;
@@ -326,11 +340,9 @@ public class PostService {
     if (timestampObj instanceof java.time.LocalDateTime) {
       return (java.time.LocalDateTime) timestampObj;
     }
-    // Handle Oracle specific type by name to avoid direct dependency if possible
+    // Oracle 전용 타입을 리플렉션으로 처리(컴파일 의존성 분리)
     try {
       if (timestampObj.getClass().getName().equals("oracle.sql.TIMESTAMP")) {
-        // oracle.sql.TIMESTAMP has toLocalDateTime() or timestampValue()
-        // Reflection to avoid compile error if dependency missing
         java.lang.reflect.Method method = timestampObj.getClass().getMethod("timestampValue");
         java.sql.Timestamp ts = (java.sql.Timestamp) method.invoke(timestampObj);
         return ts.toLocalDateTime();
@@ -342,11 +354,18 @@ public class PostService {
 
   }
 
-  public com.woorido.post.dto.response.PostLikeResponse toggleLike(String postId, String userId) {
+  /**
+   * 게시글 좋아요 토글.
+   * 이미 좋아요가 있으면 취소, 없으면 생성한다.
+   */
+  public com.woorido.post.dto.response.PostLikeResponse toggleLike(String challengeId, String postId, String userId) {
     Post post = postMapper.findById(postId);
-    if (post == null) {
-      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+    if (post == null || !challengeId.equals(post.getChallengeId())) {
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
+
+    // 좋아요는 챌린지 멤버만 가능하도록 조회 API와 동일한 권한 경계를 맞춘다.
+    requireMemberAny(challengeId, userId);
 
     boolean liked;
     if (postLikeMapper.exists(postId, userId)) {
@@ -360,7 +379,6 @@ public class PostService {
       liked = true;
     }
 
-    // Refresh post to get updated count
     post = postMapper.findById(postId);
 
     return com.woorido.post.dto.response.PostLikeResponse.builder()
@@ -370,30 +388,31 @@ public class PostService {
         .build();
   }
 
+  /**
+   * 게시글 삭제(소프트 삭제).
+   * 삭제 가능 여부는 전략 객체에서 검증한다.
+   */
   public com.woorido.post.dto.response.DeletePostResponse deletePost(String challengeId, String postId, String userId) {
     Post post = postMapper.findById(postId);
     if (post == null) {
-      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
     if (!post.getChallengeId().equals(challengeId)) {
-      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
 
-    // 0. Fetch Member Role
-    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-    if (memberInfo == null) {
-      throw new IllegalArgumentException("MEMBER_001: 챌린지에 참여하지 않았습니다");
-    }
+    // 요청자 역할 조회(삭제 권한 판단에 사용)
+    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
     String role = (String) memberInfo.get("ROLE");
 
-    // 1. Validate using Strategy
+    // 작성자/리더 조건 등 삭제 정책 검증
     postDeleteStrategy.validate(post, userId, role);
 
-    // 2. Update State using Visitor
+    // 도메인 상태값(삭제 시각 등) 갱신
     PostDeleteVisitor visitor = new PostDeleteVisitor();
     post.accept(visitor);
 
-    // 3. Persist (Soft Delete)
+    // DB 반영(소프트 삭제)
     postMapper.delete(postId);
 
     return com.woorido.post.dto.response.DeletePostResponse.builder()
@@ -401,4 +420,18 @@ public class PostService {
         .deletedAt(post.getDeletedAt())
         .build();
   }
+
+  /**
+   * 챌린지 멤버(LEFT 제외) 검증 공통 메서드.
+   */
+  private Map<String, Object> requireMemberAny(String challengeId, String userId) {
+    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+    // 탈퇴(LEFT) 상태는 조회/작성 모두 차단한다.
+    if (memberInfo == null || "LEFT".equals(memberInfo.get("STATUS"))) {
+      throw new IllegalArgumentException("MEMBER_001:챌린지 멤버가 아닙니다");
+    }
+    return memberInfo;
+  }
 }
+
+

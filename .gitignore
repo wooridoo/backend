@@ -12,3 +12,8 @@ build/
 
 test/
 server.log
+
+# local API smoke test artifacts
+api-smoke.ps1
+api-smoke-server.out.log
+api-smoke-server.err.log

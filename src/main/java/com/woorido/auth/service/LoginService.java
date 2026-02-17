@@ -17,11 +17,14 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class LoginService {
+  // Learning note:
+  // - Read flow as: validate auth/role -> execute domain logic -> persist via Mapper.
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
+    // [학습] 이메일/비밀번호 검증 후 로그인 토큰을 발급한다.
     public LoginResponse login(String email, String password) {
         // 1. 이메일로 사용자 조회
         User user = userMapper.findByEmail(email);

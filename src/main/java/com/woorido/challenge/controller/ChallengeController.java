@@ -36,16 +36,21 @@ import com.woorido.common.dto.ApiResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/challenges")
 @RequiredArgsConstructor
+@Slf4j
 public class ChallengeController {
+  // Learning note:
+  // - Controller parses request/header and delegates business rules to Service.
+  // - Keep API response mapping here, keep domain rules in Service.
 
   private final ChallengeService challengeService;
 
   /**
-   * 챌린지 목록 조회 API (API 023)
+   * 梨뚮┛吏 紐⑸줉 議고쉶 API (API 023)
    * GET /challenges
    */
   @GetMapping
@@ -63,7 +68,7 @@ public class ChallengeController {
   }
 
   /**
-   * 내 챌린지 목록 조회 API (API 027)
+   * ??梨뚮┛吏 紐⑸줉 議고쉶 API (API 027)
    * GET /challenges/me
    */
   @GetMapping("/me")
@@ -84,7 +89,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 상세 조회 API (API 024)
+   * 梨뚮┛吏 ?곸꽭 議고쉶 API (API 024)
    * GET /challenges/{challengeId}
    */
   @GetMapping("/{challengeId}")
@@ -96,8 +101,7 @@ public class ChallengeController {
       ChallengeDetailResponse response = challengeService.getChallengeDetail(challengeId, authorization);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
-      e.printStackTrace();
+      log.error("Challenge API error: {}", e.getMessage(), e);
 
       String message = e.getMessage();
       if (message != null && message.startsWith("CHALLENGE_001")) {
@@ -110,7 +114,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 어카운트 조회 API (API 028)
+   * 梨뚮┛吏 ?댁뭅?댄듃 議고쉶 API (API 028)
    * GET /challenges/{challengeId}/account
    */
   @GetMapping("/{challengeId}/account")
@@ -134,7 +138,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 가입 API (API 030)
+   * 梨뚮┛吏 媛??API (API 030)
    * POST /challenges/{challengeId}/join
    */
   @PostMapping("/{challengeId}/join")
@@ -151,9 +155,9 @@ public class ChallengeController {
     } catch (IllegalStateException e) {
       String message = e.getMessage();
       if ("CHALLENGE_002".equals(message))
-        return ResponseEntity.badRequest().body(ApiResponse.error("이미 가입한 챌린지입니다"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("CHALLENGE_002:Already joined challenge"));
       if ("CHALLENGE_005".equals(message))
-        return ResponseEntity.badRequest().body(ApiResponse.error("챌린지 정원이 초과되었습니다"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("CHALLENGE_005:Challenge member limit exceeded"));
       if ("CHALLENGE_006".equals(message))
         return ResponseEntity.badRequest().body(ApiResponse.error("모집 중인 챌린지가 아닙니다"));
       if ("ACCOUNT_004".equals(message))
@@ -166,7 +170,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 수정 API (API 025)
+   * 梨뚮┛吏 ?섏젙 API (API 025)
    * PUT /challenges/{challengeId}
    */
   @PutMapping("/{challengeId}")
@@ -179,8 +183,7 @@ public class ChallengeController {
       UpdateChallengeResponse response = challengeService.updateChallenge(challengeId, authorization, request);
       return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
-      e.printStackTrace();
+      log.error("Challenge API error: {}", e.getMessage(), e);
 
       String message = e.getMessage();
       if (message != null) {
@@ -207,7 +210,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 생성 API (API 022)
+   * 梨뚮┛吏 ?앹꽦 API (API 022)
    * POST /challenges
    */
   @PostMapping
@@ -220,8 +223,7 @@ public class ChallengeController {
       return ResponseEntity.status(HttpStatus.CREATED)
           .body(ApiResponse.success(response, response.getMessage()));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
-      e.printStackTrace();
+      log.error("Challenge API error: {}", e.getMessage(), e);
 
       String message = e.getMessage();
       if (message != null) {
@@ -248,7 +250,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 탈퇴 API (API 031)
+   * 梨뚮┛吏 ?덊눜 API (API 031)
    * DELETE /challenges/{challengeId}/leave
    */
   @DeleteMapping("/{challengeId}/leave")
@@ -267,7 +269,7 @@ public class ChallengeController {
         if (message.startsWith("CHALLENGE_003"))
           return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
         if (message.startsWith("MEMBER_002"))
-          return ResponseEntity.badRequest().body(ApiResponse.error("리더는 탈퇴할 수 없습니다"));
+          return ResponseEntity.badRequest().body(ApiResponse.error("리더는 챌린지를 탈퇴할 수 없습니다"));
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
@@ -275,7 +277,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 멤버 목록 조회 API (API 032)
+   * 梨뚮┛吏 硫ㅻ쾭 紐⑸줉 議고쉶 API (API 032)
    * GET /challenges/{challengeId}/members
    */
   @GetMapping("/{challengeId}/members")
@@ -288,7 +290,6 @@ public class ChallengeController {
       ChallengeMemberListResponse response = challengeService.getChallengeMembers(challengeId, authorization, status);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
-      e.printStackTrace(); // Added for debugging
       String message = e.getMessage();
       if (message != null) {
         if (message.startsWith("CHALLENGE_001"))
@@ -302,7 +303,7 @@ public class ChallengeController {
   }
 
   /**
-   * 챌린지 삭제 API (API 026)
+   * 梨뚮┛吏 ??젣 API (API 026)
    * DELETE /challenges/{challengeId}
    */
   @DeleteMapping("/{challengeId}")
@@ -313,9 +314,9 @@ public class ChallengeController {
     try {
       ChallengeDeleteResponse response = challengeService
           .deleteChallenge(authorization, challengeId);
-      return ResponseEntity.ok(ApiResponse.success(response, "챌린지가 삭제되었습니다"));
+      return ResponseEntity.ok(ApiResponse.success(response, "Challenge deleted successfully"));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
+      log.error("Challenge API error: {}", e.getMessage(), e);
 
       String message = e.getMessage();
       if (message != null) {
@@ -324,7 +325,7 @@ public class ChallengeController {
         if (message.startsWith("CHALLENGE_004"))
           return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("리더만 삭제할 수 있습니다"));
         if (message.startsWith("CHALLENGE_010"))
-          return ResponseEntity.badRequest().body(ApiResponse.error("활성화된 챌린지는 삭제할 수 없습니다"));
+          return ResponseEntity.badRequest().body(ApiResponse.error("모집 중 상태의 챌린지만 삭제할 수 있습니다"));
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
@@ -332,7 +333,7 @@ public class ChallengeController {
   }
 
   /**
-   * 자동 납입 설정 API (API 029)
+   * ?먮룞 ?⑹엯 ?ㅼ젙 API (API 029)
    * PUT /challenges/{challengeId}/support/settings
    */
   @PutMapping("/{challengeId}/support/settings")
@@ -344,9 +345,9 @@ public class ChallengeController {
     try {
       UpdateSupportSettingsResponse response = challengeService
           .updateSupportSettings(challengeId, authorization, request);
-      return ResponseEntity.ok(ApiResponse.success(response, "자동 납입이 설정되었습니다"));
+      return ResponseEntity.ok(ApiResponse.success(response, "Support settings updated successfully"));
     } catch (RuntimeException e) {
-      System.out.println("에러 발생: " + e.getMessage());
+      log.error("Challenge API error: {}", e.getMessage(), e);
 
       String message = e.getMessage();
       if (message != null) {
@@ -363,7 +364,7 @@ public class ChallengeController {
   }
 
   /**
-   * API 033: 챌린지 멤버 상세 조회
+   * API 033: 梨뚮┛吏 硫ㅻ쾭 ?곸꽭 議고쉶
    * GET /challenges/{challengeId}/members/{memberId}
    */
   @GetMapping("/{challengeId}/members/{memberId}")
@@ -377,8 +378,7 @@ public class ChallengeController {
           .getMemberDetail(challengeId, memberId, authorization);
       return ResponseEntity.ok(ApiResponse.success(response, "멤버 상세 정보 조회 성공"));
     } catch (RuntimeException e) {
-      System.out.println("API 033 Error: " + e.getMessage());
-      e.printStackTrace();
+      log.error("API 033 Error: {}", e.getMessage(), e);
       String message = e.getMessage();
       if (message != null) {
         if (message.startsWith("CHALLENGE_") || message.startsWith("MEMBER_")) {
@@ -396,30 +396,30 @@ public class ChallengeController {
     }
   }
 
-  // API 034: 리더 위임
-  // API 034: 리더 위임
+  // API 034: 由щ뜑 ?꾩엫
+  // API 034: 由щ뜑 ?꾩엫
   @PostMapping("/{challengeId}/delegate")
   public ResponseEntity<DelegateLeaderResponse> delegateLeader(
       @RequestHeader("Authorization") String authorization,
       @PathVariable("challengeId") String challengeId,
       @RequestBody DelegateLeaderRequest request) {
 
-    // 토큰에서 userId 추출 (다른 API와 일관성 유지)
+    // ?좏겙?먯꽌 userId 異붿텧 (?ㅻⅨ API? ?쇨????좎?)
     String token = authorization;
     if (token != null && token.startsWith("Bearer ")) {
       token = token.substring(7);
     }
-    // Controller에는 JwtUtil이 주입되어 있지 않으므로, Service에 토큰과 로직을 위임하는 것이 가장 깔끔함.
-    // 하지만 Service 시그니처 변경은 번거로움.
-    // 임시로 여기서 파싱...을 하려면 JwtUtil이 필요함.
-    // ChallengeController 상단에 JwtUtil 주입 코드가 보이지 않음 (`private final
-    // ChallengeService challengeService;` 만 보임)
-    // 따라서, 가장 확실한 방법은 Service에 메서드를 하나 더 만들거나(오버로딩), Service 시그니처를 변경하는 것임.
-    // 기존 Service 메서드: delegateLeader(challengeId, userId, targetMemberId)
-    // 변경: delegateLeader(challengeId, token, targetMemberId) -> Service 내부에서
+    // Controller?먮뒗 JwtUtil??二쇱엯?섏뼱 ?덉? ?딆쑝誘濡? Service???좏겙怨?濡쒖쭅???꾩엫?섎뒗 寃껋씠 媛??源붾걫??
+    // ?섏?留?Service ?쒓렇?덉쿂 蹂寃쎌? 踰덇굅濡쒖?.
+    // ?꾩떆濡??ш린???뚯떛...???섎젮硫?JwtUtil???꾩슂??
+    // ChallengeController ?곷떒??JwtUtil 二쇱엯 肄붾뱶媛 蹂댁씠吏 ?딆쓬 (`private final
+    // ChallengeService challengeService;` 留?蹂댁엫)
+    // ?곕씪?? 媛???뺤떎??諛⑸쾿? Service??硫붿꽌?쒕? ?섎굹 ??留뚮뱾嫄곕굹(?ㅻ쾭濡쒕뵫), Service ?쒓렇?덉쿂瑜?蹂寃쏀븯??寃껋엫.
+    // 湲곗〈 Service 硫붿꽌?? delegateLeader(challengeId, userId, targetMemberId)
+    // 蹂寃? delegateLeader(challengeId, token, targetMemberId) -> Service ?대??먯꽌
     // parsing.
 
-    // Service 변경이 낫다. (Controller 복잡도 감소)
+    // Service 蹂寃쎌씠 ?ル떎. (Controller 蹂듭옟??媛먯냼)
 
     String targetId = request.getTargetUserId();
     if (targetId == null) {

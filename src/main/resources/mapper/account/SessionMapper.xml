@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.account.repository.SessionMapper">
+  <!-- Learning note: SQL ids in this mapper must match Java Mapper method names. -->
 
     <resultMap id="SessionResultMap" type="com.woorido.account.domain.Session">
         <id property="id" column="ID" />
@@ -31,6 +32,13 @@
         UPDATE WOORIDO.SESSIONS
         SET IS_USED = 'Y'
         WHERE ID = #{id}
+    </update>
+
+    <update id="markAsUsedIfUnused" parameterType="string">
+        UPDATE WOORIDO.SESSIONS
+        SET IS_USED = 'Y'
+        WHERE ID = #{id}
+          AND IS_USED = 'N'
     </update>
 
 </mapper>

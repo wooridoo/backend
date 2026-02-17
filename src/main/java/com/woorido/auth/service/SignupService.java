@@ -25,11 +25,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class SignupService {
+  // Learning note:
+  // - Read flow as: validate auth/role -> execute domain logic -> persist via Mapper.
 
     private final UserMapper userMapper;
     private final AccountMapper accountMapper;
     private final PasswordEncoder passwordEncoder;
 
+    // [학습] 회원가입과 초기 계좌 생성을 처리한다.
     public SignupResponse signup(SignupRequest request) {
 
         try {
@@ -99,6 +102,7 @@ public class SignupService {
         }
     }
 
+    // [학습] 신규 계좌번호를 생성한다.
     private String generateAccountNumber() {
         // 12자리 랜덤 숫자 (예: 1000-0000-0000 형식이나 DB는 String)
         // 여기서는 간단히 랜덤 숫자만 생성

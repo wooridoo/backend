@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.vote.repository.ExpenseVoteMapper">
+  <!-- Learning note: SQL ids in this mapper must match Java Mapper method names. -->
 
-  <!-- expense_votes 테이블 구조에 맞춤 (DB 스키마 4.2) -->
   <insert id="insert">
     INSERT INTO woorido.expense_votes (
       id, expense_request_id, eligible_count, required_count,
@@ -14,20 +14,19 @@
   </insert>
 
   <select id="findById" resultType="com.woorido.vote.domain.ExpenseVote">
-    SELECT id, expense_request_id as expenseRequestId, 
-           eligible_count as eligibleCount, required_count as requiredCount,
-           approve_count as approveCount, reject_count as rejectCount,
-           status, version, created_at as createdAt, expires_at as expiresAt
-    FROM woorido.expense_votes WHERE id = #{id}
-  </select>
-
-  <!-- expense_request_id 기반 조회 -->
-  <select id="findByExpenseRequestId" resultType="com.woorido.vote.domain.ExpenseVote">
-    SELECT id, expense_request_id as expenseRequestId, 
-           eligible_count as eligibleCount, required_count as requiredCount,
-           approve_count as approveCount, reject_count as rejectCount,
-           status, version, created_at as createdAt, expires_at as expiresAt
-    FROM woorido.expense_votes WHERE expense_request_id = #{expenseRequestId}
+    SELECT id,
+           expense_request_id AS expenseRequestId,
+           eligible_count AS eligibleCount,
+           required_count AS requiredCount,
+           approve_count AS approveCount,
+           reject_count AS rejectCount,
+           status,
+           version,
+           created_at AS createdAt,
+           expires_at AS expiresAt,
+           closed_at AS closedAt
+    FROM woorido.expense_votes
+    WHERE id = #{id}
   </select>
 
   <insert id="insertRecord">
@@ -39,17 +38,33 @@
   </insert>
 
   <select id="checkRecordExisting" resultType="int">
-    SELECT COUNT(*) FROM woorido.expense_vote_records
-    WHERE expense_vote_id = #{voteId} AND user_id = #{userId}
+    SELECT COUNT(*)
+    FROM woorido.expense_vote_records
+    WHERE expense_vote_id = #{voteId}
+      AND user_id = #{userId}
   </select>
 
   <select id="findVoteCounts" resultType="map">
-    SELECT 
-      NVL(SUM(CASE WHEN choice = 'APPROVE' THEN 1 ELSE 0 END), 0) as AGREE,
-      NVL(SUM(CASE WHEN choice = 'REJECT' THEN 1 ELSE 0 END), 0) as DISAGREE,
-      COUNT(*) as TOTAL
+    SELECT
+      NVL(SUM(CASE WHEN choice = 'APPROVE' THEN 1 ELSE 0 END), 0) AS AGREE,
+      NVL(SUM(CASE WHEN choice = 'REJECT' THEN 1 ELSE 0 END), 0) AS DISAGREE,
+      COUNT(*) AS TOTAL
     FROM woorido.expense_vote_records
     WHERE expense_vote_id = #{voteId}
   </select>
+
+  <select id="findMyVote" resultType="string">
+    SELECT choice
+    FROM woorido.expense_vote_records
+    WHERE expense_vote_id = #{voteId}
+      AND user_id = #{userId}
+  </select>
+
+  <update id="updateStatus">
+    UPDATE woorido.expense_votes
+    SET status = #{status},
+        closed_at = SYSTIMESTAMP
+    WHERE id = #{voteId}
+  </update>
 
 </mapper>

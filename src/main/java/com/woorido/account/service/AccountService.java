@@ -47,6 +47,8 @@ import com.woorido.challenge.repository.LedgerEntryMapper;
 @Service
 @RequiredArgsConstructor
 public class AccountService {
+  // Learning note:
+  // - Read flow as: validate auth/role -> execute domain logic -> persist via Mapper.
 
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -61,53 +63,56 @@ public class AccountService {
     private final LedgerEntryMapper ledgerEntryMapper;
 
     /**
-     * 내 어카운트 조회
+     * ?????⑤９???熬곣뫀肄??釉뚰???
      */
     @Transactional(readOnly = true)
+    // [학습] 내 계좌 요약 정보를 조회한다.
     public MyAccountResponse getMyAccount(String accessToken) {
         String userId = jwtUtil.getUserIdFromToken(accessToken);
 
-        // 2. DB 조회
+        // 2. DB ?釉뚰???
         Account account = accountMapper.findByUserId(userId);
 
         if (account == null) {
-            throw new RuntimeException("ACCOUNT_001:계좌를 찾을 수 없습니다");
+            throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
         }
 
-        // 3. 응답 DTO 변환
+        // 3. ???쑩?젆?DTO ?怨뚮뼚???
         return MyAccountResponse.from(account);
     }
 
     /**
-     * 거래 내역 조회
+     * 癲꾧퀗???????⑤９肉??釉뚰???
      */
     @Transactional(readOnly = true)
+    // [학습] 거래 내역 목록/합계/페이지 정보를 조회한다.
     public TransactionHistoryResponse getTransactionHistory(String accessToken, TransactionSearchRequest request) {
-        // 1. 토큰에서 userId 추출
+        // 1. ???ャ뀕??????userId ??⑤베毓??
         String userId = jwtUtil.getUserIdFromToken(accessToken);
 
-        // 2. 계좌 조회
+        // 2. ??節뚮쳮辱??釉뚰???
         Account account = accountMapper.findByUserId(userId);
         if (account == null) {
-            throw new RuntimeException("ACCOUNT_001:계좌를 찾을 수 없습니다");
+            throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
         }
 
-        // 3. 검색 조건에 accountId 설정
+        // 3. ?濡ろ떟????釉뚰???쨨??accountId ???源놁젳
         request.setAccountId(account.getId());
 
-        // 4. 거래 내역 조회
+        // 4. 癲꾧퀗???????⑤９肉??釉뚰???
         List<AccountTransaction> transactions = accountMapper.findTransactions(request);
 
-        // 5. 총 개수 조회
+        // 5. ????좊즵獒???釉뚰???
         Long totalElements = accountMapper.countTransactions(request);
 
-        // 6. 수입/지출 합계 조회
+        // 6. ???쒓낮??癲ル슣???????룸폍???釉뚰???
         Map<String, Long> sums = accountMapper.sumAmountsByDirection(request);
 
-        // 7. 응답 DTO 변환 및 반환
+        // 7. ???쑩?젆?DTO ?怨뚮뼚??????袁⑸즵???
         return buildResponse(transactions, totalElements, request, sums);
     }
 
+    // [학습] 거래 목록/페이지/요약 정보를 응답 DTO로 조립한다.
     private TransactionHistoryResponse buildResponse(
             List<AccountTransaction> transactions,
             Long totalElements,
@@ -145,18 +150,19 @@ public class AccountService {
                 .build();
     }
 
+    // [학습] 계좌 거래 엔티티를 응답 아이템 DTO로 변환한다.
     private TransactionHistoryResponse.TransactionItem toTransactionItem(AccountTransaction tx) {
-        // RelatedChallenge 구성
-        // JOIN이 없으므로 일단 챌린지 정보는 비워둠 (추후 구현)
+        // RelatedChallenge ????늄??
+        // JOIN?????⑤챶?뺜벧猿뗪묄??????⑤베??癲??????? ?嶺뚮㉡?€쾮????????(?????????열野?
         TransactionHistoryResponse.RelatedChallenge related = null;
         if (tx.getRelatedChallengeId() != null) {
             related = TransactionHistoryResponse.RelatedChallenge.builder()
-                    .challengeId(null) // ID 변환 이슈로 일단 null
-                    .name(null) // 별도 조회 필요
+                    .challengeId(null) // ID ?怨뚮뼚??????⑤８??????⑤베??null
+                    .name(null) // ?怨뚮옓?????釉뚰?????ш끽維??
                     .build();
         }
 
-        // UUID -> Long 변환 이슈. 음수 방지
+        // UUID -> Long ?怨뚮뼚??????⑤８?. ??????袁⑸젻泳?
         Long transactionId = Math.abs((long) tx.getId().hashCode());
 
         return TransactionHistoryResponse.TransactionItem.builder()
@@ -170,7 +176,8 @@ public class AccountService {
                 .build();
     }
 
-    // Map 키 대소문자 무시하고 값 조회
+    // Map ????????????뺤깓????寃뗏????釉뚰???
+    // [학습] 집계 Map에서 숫자 값을 안전하게 추출한다.
     private Long getMapValue(Map<String, ?> map, String key) {
         if (map == null)
             return 0L;
@@ -192,59 +199,60 @@ public class AccountService {
     }
 
     /**
-     * 크레딧 충전 요청
+     * ??????野껊챶爾????釉먯뒜??
      */
     @Transactional
+    // [학습] 크레딧 충전 결제를 요청하고 결제 세션을 생성한다.
     public CreditChargeResponse requestCreditCharge(String accessToken, CreditChargeRequest request) {
-        log.info("[CHARGE] 충전 요청 시작 - amount: {}, paymentMethod: {}, returnUrl: {}",
+        log.info("[CHARGE] ?野껊챶爾????釉먯뒜????筌믨퀣援?- amount: {}, paymentMethod: {}, returnUrl: {}",
                 request.getAmount(), request.getPaymentMethod(), request.getReturnUrl());
 
-        // 1. 토큰 검증 및 사용자 확인
+        // 1. ???ャ뀕???濡ろ떟?癲?????????嶺뚮Ĳ?됮?
         String userId = jwtUtil.getUserIdFromToken(accessToken);
         log.info("[CHARGE] userId: {}", userId);
 
-        // 2. 금액 검증
+        // 2. ??ヂ???쎈눀??濡ろ떟?癲?
         if (request.getAmount() < 10000) {
-            throw new RuntimeException("ACCOUNT_002:충전 금액은 10,000원 이상이어야 합니다");
+            throw new RuntimeException("ACCOUNT_002:Charge amount must be at least 10000");
         }
         if (request.getAmount() % 10000 != 0) {
-            throw new RuntimeException("ACCOUNT_007:충전 금액은 10,000원 단위여야 합니다");
+            throw new RuntimeException("ACCOUNT_007:Charge amount must be in units of 10000");
         }
 
-        // 3. 결제 수단 검증
+        // 3. ?濡ろ뜏?????嚥▲꺂???濡ろ떟?癲?
         if (!List.of("CARD", "BANK_TRANSFER").contains(request.getPaymentMethod())) {
-            throw new RuntimeException("ACCOUNT_008:결제 수단은 CARD 또는 BANK_TRANSFER 만 가능합니다");
+            throw new RuntimeException("ACCOUNT_008:결제 수단은 CARD 또는 BANK_TRANSFER만 가능합니다");
         }
 
-        // 4. 수수료 계산 (10,000 ~ 200,000원: 3%)
-        // 현재 정책상 200,000원 초과는 명시되지 않았으나, 일단 문맥상 모든 금액에 대해 3% 적용 혹은 200,000원까지만 3%인지 확인
-        // 필요.
-        // 문서상 "10,000 ~ 200,000원: 3% 부과"라고 되어 있음. 그 외 구간에 대한 언급 없음.
-        // 일단 모든 충전 건에 대해 3%로 가정하고 구현 (가장 안전한 해석).
+        // 4. ??筌뚯슜鍮????節뚮쳮雅?(10,000 ~ 200,000?? 3%)
+        // ??ш끽維???嶺뚮Ĳ????200,000???縕????癲ル슢?뤸뤃???? ????⒱봼???⑤슢猷? ???⑤베?????뽮덧???癲ル슢?꾤땟?????ヂ???쎈눀??????3% ???ㅼ굣??????? 200,000????湲븐땡?堉온癲?3%?嶺? ?嶺뚮Ĳ?됮?
+        // ??ш끽維??
+        // ???뽮덫???"10,000 ~ 200,000?? 3% ??딅텑???????뫢???筌뚯슦苑????源낆쓱. ????????쐠????????嶺뚮∥梨?????⑤챶苡?
+        // ???⑤베??癲ル슢?꾤땟????野껊챶爾??癲꾧퀗????덩?????3%????좊읈??嶺뚮쮳?년봼??????열野?(??좊읈??????源놁벁?????⑤똾留?.
         long fee = (long) (request.getAmount() * 0.03);
         long totalPaymentAmount = request.getAmount() + fee;
 
-        // 5. OrderId 생성 (ORD + yyyyMMddHHmmss + Random 5자리)
+        // 5. OrderId ??獄쏅똻??(ORD + yyyyMMddHHmmss + Random 5?????
         String orderId = generateOrderId();
 
-        // 6. PaymentUrl 생성 (Mock)
+        // 6. PaymentUrl ??獄쏅똻??(Mock)
         String paymentUrl = "https://pay.woorido.com/checkout/" + orderId;
 
-        // 7. 만료시간 (15분 후)
+        // 7. 癲ル슢???彛??癰???(15????
         LocalDateTime expiresAtTime = LocalDateTime.now().plusMinutes(15);
         String expiresAt = expiresAtTime.toString();
 
-        // 8. Session 저장 (API 018 콜백 처리를 위해)
+        // 8. Session ????(API 018 ?熬곣뫖痢딀뤆?癲ル슪?ｇ몭???????ш낄援??
         Session session = Session.builder()
                 .id(orderId)
                 .userId(userId)
                 .sessionType("CHARGE")
-                .returnUrl(request.getReturnUrl() + "?amount=" + request.getAmount()) // 금액 검증용으로 URL에 포함 (임시 방편)
+                .returnUrl(request.getReturnUrl() + "?amount=" + request.getAmount()) // ??ヂ???쎈눀??濡ろ떟?癲ル슣鍮섌뜮????⑥??URL??????(??ш끽維뽳쭛??袁⑸젻泳??
                 .isUsed("N")
                 .expiresAt(expiresAtTime)
                 .build();
         sessionMapper.save(session);
-        log.info("[CHARGE] 세션 저장 완료 - orderId: {}, userId: {}, amount: {}", orderId, userId, request.getAmount());
+        log.info("[CHARGE] ?嶺뚮ㅎ?????????ш끽維??- orderId: {}, userId: {}, amount: {}", orderId, userId, request.getAmount());
 
         return CreditChargeResponse.builder()
                 .orderId(orderId)
@@ -257,69 +265,62 @@ public class AccountService {
     }
 
     /**
-     * 충전 콜백 처리
+     * ?野껊챶爾???熬곣뫖痢딀뤆?癲ル슪?ｇ몭??
      */
     @Transactional
+    // [학습] 결제 콜백을 멱등 처리하고 잔액/거래를 반영한다.
     public ChargeCallbackResponse processChargeCallback(ChargeCallbackRequest request) {
-        log.info("[CALLBACK] 콜백 수신 - orderId: {}, paymentKey: {}, amount: {}, status: {}",
+        log.info("[CALLBACK] callback received - orderId: {}, paymentKey: {}, amount: {}, status: {}",
                 request.getOrderId(), request.getPaymentKey(), request.getAmount(), request.getStatus());
 
-        // 1. Session 조회
         Session session = sessionMapper.findById(request.getOrderId());
         if (session == null) {
-            log.error("[CALLBACK] 세션 없음 - orderId: {}", request.getOrderId());
-            throw new RuntimeException("ACCOUNT_009:유효하지 않은 주문입니다");
-        }
-        log.info("[CALLBACK] 세션 조회 성공 - userId: {}, isUsed: {}", session.getUserId(), session.getIsUsed());
-
-        // 2. 이미 처리된 주문 체크
-        if ("Y".equals(session.getIsUsed())) {
-            throw new RuntimeException("ACCOUNT_010:이미 처리된 주문입니다");
+            log.error("[CALLBACK] session not found - orderId: {}", request.getOrderId());
+            throw new RuntimeException("ACCOUNT_009:Invalid order");
         }
 
-        // 3. 만료 체크
-        // expiresAt이 null인 경우(legacy)는 통과시키는 정책 or 필수 체크 정책. 일단 null이면 통과? 아니면 현재 시간
-        // 기준?
-        // 방금 만든 Session에는 expiresAt이 있으므로 null 체크 후 비교
         if (session.getExpiresAt() != null && session.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("ACCOUNT_011:만료된 주문입니다");
+            throw new RuntimeException("ACCOUNT_011:Expired order");
+        }
+        if (!"CHARGE".equals(session.getSessionType())) {
+            throw new RuntimeException("ACCOUNT_009:Invalid order");
         }
 
-        // 4. 상태 체크 (PG 결제 실패 시)
         if (!"SUCCESS".equals(request.getStatus())) {
-            // 실패 시에도 세션은 사용 처리하여 재사용 방지 (정책에 따라 다를 수 있음)
-            sessionMapper.markAsUsed(session.getId());
-            throw new RuntimeException("ACCOUNT_012:결제 실패: " + request.getStatus());
+            int lockedOnFailure = sessionMapper.markAsUsedIfUnused(session.getId());
+            if (lockedOnFailure == 0) {
+                throw new RuntimeException("ACCOUNT_010:Order already processed");
+            }
+            throw new RuntimeException("ACCOUNT_012:결제 실패 상태입니다: " + request.getStatus());
         }
 
-        // 5. 금액 검증 (권장)
-        // Session의 returnUrl에서 amount 파싱하여 비교 (임시 방편)
-        // returnUrl 형식: ...?amount=10000
         Long expectedAmount = parseAmountFromReturnUrl(session.getReturnUrl());
         if (expectedAmount != null && !expectedAmount.equals(request.getAmount())) {
-            throw new RuntimeException("ACCOUNT_013:결제 금액 불일치");
+            throw new RuntimeException("ACCOUNT_013:Payment amount mismatch");
         }
 
-        // 6. 계좌 조회 및 잔액 업데이트
+        int locked = sessionMapper.markAsUsedIfUnused(session.getId());
+        if (locked == 0) {
+            throw new RuntimeException("ACCOUNT_010:Order already processed");
+        }
+
         Account account = accountMapper.findByUserId(session.getUserId());
         if (account == null) {
-            throw new RuntimeException("ACCOUNT_001:계좌를 찾을 수 없습니다");
+            throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
         }
 
         long balanceBefore = account.getBalance();
         long newBalance = balanceBefore + request.getAmount();
-        log.info("[CALLBACK] 잔액 업데이트 - accountId: {}, before: {}, after: {}", account.getId(), balanceBefore,
+        log.info("[CALLBACK] updating balance - accountId: {}, before: {}, after: {}", account.getId(), balanceBefore,
                 newBalance);
 
         account.setBalance(newBalance);
         int updated = accountMapper.update(account);
         if (updated == 0) {
-            log.error("[CALLBACK] 낙관적 락 실패 - accountId: {}", account.getId());
-            throw new RuntimeException("ACCOUNT_014:동시 요청으로 처리에 실패했습니다. 다시 시도해주세요.");
+            log.error("[CALLBACK] concurrent update failure - accountId: {}", account.getId());
+            throw new RuntimeException("ACCOUNT_014:동시 요청으로 계좌 처리에 실패했습니다. 다시 시도해주세요.");
         }
-        log.info("[CALLBACK] 잔액 업데이트 완료 - accountId: {}, newBalance: {}", account.getId(), newBalance);
 
-        // 7. 거래 내역 저장
         AccountTransaction tx = new AccountTransaction();
         tx.setId(java.util.UUID.randomUUID().toString());
         tx.setAccountId(account.getId());
@@ -330,20 +331,12 @@ public class AccountService {
         tx.setLockedBefore(account.getLockedBalance());
         tx.setLockedAfter(account.getLockedBalance());
         tx.setDescription("크레딧 충전");
-        // tx.setRelatedChallengeId(null);
-        // tx.setRelatedUserId(null);
-        tx.setPgProvider("TOSS"); // 예시
+        tx.setPgProvider("TOSS");
         tx.setPgTxId(request.getPaymentKey());
-        tx.setCreatedAt(LocalDateTime.now()); // DB DEFAULT가 있지만 명시적으로 설정
-
+        tx.setCreatedAt(LocalDateTime.now());
         accountMapper.saveTransaction(tx);
 
-        // 8. Session 사용 처리
-        sessionMapper.markAsUsed(session.getId());
-
-        // UUID -> Long 변환 (임시)
         Long transactionId = Math.abs((long) tx.getId().hashCode());
-
         return ChargeCallbackResponse.builder()
                 .transactionId(transactionId)
                 .orderId(request.getOrderId())
@@ -353,6 +346,7 @@ public class AccountService {
                 .build();
     }
 
+    // [학습] 리턴 URL의 amount 파라미터를 파싱한다.
     private Long parseAmountFromReturnUrl(String returnUrl) {
         if (returnUrl == null || !returnUrl.contains("amount=")) {
             return null;
@@ -360,58 +354,59 @@ public class AccountService {
         try {
             String[] parts = returnUrl.split("amount=");
             if (parts.length > 1) {
-                // 뒤에 다른 파라미터가 붙을 수 있으므로 &로 한번 더 자름
+                // ???怨좊군 ????렺?????앗꾩쒀?濡?뎄?臾뺥맀筌? ??됰Ŧ????????源끹걬雅?퍔源???&????筌먦끉踰????????
                 String amountStr = parts[1].split("&")[0];
                 return Long.parseLong(amountStr);
             }
         } catch (Exception e) {
-            // 파싱 실패 시 검증 스킵 (로그 남기기 권장)
+            // ?????????됰꽡 ???濡ろ떟?癲????袁⑤툞 (?棺??짆????影??탿????援???
         }
         return null; // temporary
     }
 
     /**
-     * 출금 요청
+     * ??⑥レ툏????釉먯뒜??
      */
     @Transactional
+    // [학습] 출금 정책 검증 후 잔액 차감 및 출금 거래를 생성한다.
     public WithdrawResponse requestWithdraw(String accessToken, WithdrawRequest request) {
-        // 1. 사용자/계좌 검증
+        // 1. ???????節뚮쳮辱??濡ろ떟?癲?
         String userId = jwtUtil.getUserIdFromToken(accessToken);
         Account account = accountMapper.findByUserId(userId);
         if (account == null) {
-            throw new RuntimeException("ACCOUNT_001:계좌를 찾을 수 없습니다");
+            throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
         }
 
-        // 2. 출금 합계 조회 (Strategy 전달용)
+        // 2. ??⑥レ툏?????룸폍???釉뚰???(Strategy ??ш끽維???
         long dailyTotal = accountMapper.sumWithdrawalsToday(account.getId());
         long monthlyTotal = accountMapper.sumWithdrawalsThisMonth(account.getId());
 
-        // 3. 정책 검증 (한도, 잔액 등)
+        // 3. ?嶺뚮Ĳ????濡ろ떟?癲?(??筌먲퐣?? ??釉먯뒠筌???
         withdrawalPolicyStrategy.validate(account, request.getAmount(), dailyTotal, monthlyTotal);
 
-        // 4. 수수료 계산
+        // 4. ??筌뚯슜鍮????節뚮쳮雅?
         long fee = withdrawalPolicyStrategy.calculateFee(request.getAmount());
-        long netAmount = request.getAmount(); // 수수료 무료이므로 요청 금액 그대로 출금 (만약 수수료가 차감된다면 로직 변경 필요)
-        // 현재 정책: 수수료 무료. 만약 수수료가 있다면 잔액에서 (amount + fee)를 차감할지, amount에서 뗄지 결정 필요.
-        // 여기서는 amount만큼 출금하고 수수료는 0원이므로 단순화.
+        long netAmount = request.getAmount(); // ??筌뚯슜鍮?????嶺????????釉먯뒜????ヂ???쎈눀???숆강筌?????⑥レ툏??(癲ル슢??節됰쑏???筌뚯슜鍮??룸챷?? 癲ル슓堉곤쭗?ㅒ??筌먲퐢?뀐┼??棺??짆?먰맪??怨뚮뼚?????ш끽維??
+        // ??ш끽維???嶺뚮Ĳ??? ??筌뚯슜鍮?????嶺? 癲ル슢??節됰쑏???筌뚯슜鍮??룸챷?? ????덊렡癲???釉먯뒠筌?????(amount + fee)??癲ル슓堉곤쭗?ㅒ???, amount???????? ?濡ろ뜏?????ш끽維??
+        // ?????筌먲퐢痢?amount癲ル슢???移???⑥レ툏????寃뗏???筌뚯슜鍮??룸챷???0????얠×苡?鍮㎳????縕???
 
         long totalDeduction = request.getAmount() + fee;
 
-        // 5. 잔액 업데이트
+        // 5. ??釉먯뒠筌?????녿ぅ??熬곣뫀肄?
         long balanceBefore = account.getBalance();
         long newBalance = balanceBefore - totalDeduction;
         account.setBalance(newBalance);
         int updated = accountMapper.update(account);
         if (updated == 0) {
-            throw new RuntimeException("ACCOUNT_014:동시 요청으로 처리에 실패했습니다. 다시 시도해주세요.");
+            throw new RuntimeException("ACCOUNT_014:동시 요청으로 계좌 처리에 실패했습니다. 다시 시도해주세요.");
         }
 
-        // 6. 거래 내역 생성 및 저장 (Factory 활용)
+        // 6. 癲꾧퀗???????⑤９肉???獄쏅똻????????(Factory ??筌믨퀡裕?
         AccountTransaction tx = accountTransactionFactory.createWithdrawTransaction(
                 account.getId(), request, balanceBefore, newBalance);
         accountMapper.saveTransaction(tx);
 
-        // 7. 응답 생성
+        // 7. ???쑩?젆???獄쏅똻??
         WithdrawResponse.BankInfo bankInfo = WithdrawResponse.BankInfo.builder()
                 .bankCode(request.getBankCode())
                 .bankName(BankCode.getNameByCode(request.getBankCode()))
@@ -419,79 +414,80 @@ public class AccountService {
                 .build();
 
         return WithdrawResponse.builder()
-                .withdrawId(Math.abs((long) tx.getId().hashCode())) // UUID -> Long (임시)
+                .withdrawId(Math.abs((long) tx.getId().hashCode())) // UUID -> Long (??ш끽維뽳쭛?
                 .amount(request.getAmount())
                 .fee(fee)
                 .netAmount(netAmount)
                 .newBalance(newBalance)
                 .bankInfo(bankInfo)
-                .estimatedArrival(LocalDateTime.now().plusSeconds(30).toString()) // 30초 후 입금 가정
+                .estimatedArrival(LocalDateTime.now().plusSeconds(30).toString()) // 30???????용∥????좊읈???
                 .createdAt(LocalDateTime.now().toString())
                 .build();
     }
 
     /**
-     * 서포트 수동 납입 (API 020)
+     * ?????룎????嚥▲꺃彛???獄???(API 020)
      */
     @Transactional
+    // [학습] 챌린지 후원금을 납부하고 계좌/챌린지 잔액을 갱신한다.
     public SupportResponse requestSupport(String accessToken, SupportRequest request) {
-        // 1. 사용자 확인
+        // 1. ??????嶺뚮Ĳ?됮?
         String userId = jwtUtil.getUserIdFromToken(accessToken);
         Account account = accountMapper.findByUserId(userId);
         if (account == null) {
-            throw new RuntimeException("ACCOUNT_001:계좌를 찾을 수 없습니다");
+            throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
         }
 
-        // 2. 챌린지 조회
+        // 2. 癲??????? ?釉뚰???
         Challenge challenge = challengeMapper.findById(request.getChallengeId());
         if (challenge == null) {
             throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
         }
 
-        // 3. 멤버 여부 확인
+        // 3. 癲ル슢???볥뼀???? ?嶺뚮Ĳ?됮?
         int isMember = challengeMapper.countMemberByChallengeIdAndUserId(request.getChallengeId(), userId);
         if (isMember == 0) {
             throw new RuntimeException("CHALLENGE_003:챌린지 멤버가 아닙니다");
         }
 
-        // 4. 이번 달 납입 여부 확인
+        // 4. ?????????獄?????? ?嶺뚮Ĳ?됮?
         int supportCount = accountMapper.countSupportByMonth(account.getId(), request.getChallengeId());
         if (supportCount > 0) {
-            throw new RuntimeException("SUPPORT_001:이미 이번 달 서포트를 납입했습니다");
+            throw new RuntimeException("SUPPORT_001:이번 달에는 이미 후원금을 납부했습니다");
         }
 
-        // 5. 잔액 검증
+        // 5. ??釉먯뒠筌??濡ろ떟?癲?
         long amount = challenge.getMonthlyFee();
         if (account.getBalance() < amount) {
             throw new RuntimeException("ACCOUNT_004:잔액이 부족합니다");
         }
 
-        // 6. 트랜잭션 처리 (사용자 계좌)
+        // 6. ?嶺뚮ㅎ??????癲ル슪?ｇ몭??(???????節뚮쳮辱?
         long balanceBefore = account.getBalance();
         long newBalance = balanceBefore - amount;
 
         account.setBalance(newBalance);
         int accountUpdated = accountMapper.update(account);
         if (accountUpdated == 0) {
-            throw new RuntimeException("ACCOUNT_014:동시 요청으로 처리에 실패했습니다. 다시 시도해주세요.");
+            throw new RuntimeException("ACCOUNT_014:동시 요청으로 계좌 처리에 실패했습니다. 다시 시도해주세요.");
         }
 
-        // 사용자 거래 내역
+        // ?????癲꾧퀗???????⑤９肉?
         AccountTransaction tx = accountTransactionFactory.createSupportTransaction(
                 account.getId(), request.getChallengeId(), amount, balanceBefore, newBalance);
         accountMapper.saveTransaction(tx);
 
-        // 7. 트랜잭션 처리 (챌린지 계좌/장부)
+        // 7. ?嶺뚮ㅎ??????癲ル슪?ｇ몭??(癲??????? ??節뚮쳮辱??潁?)
         long challengeBalanceBefore = challenge.getBalance();
         long newChallengeBalance = challengeBalanceBefore + amount;
 
         challenge.setBalance(newChallengeBalance);
         int challengeUpdated = challengeMapper.updateBalance(challenge);
         if (challengeUpdated == 0) {
-            throw new RuntimeException("CHALLENGE_014:동시 요청으로 처리에 실패했습니다. 다시 시도해주세요.");
+            throw new RuntimeException("CHALLENGE_014:동시 요청으로 챌린지 잔액 반영에 실패했습니다. 다시 시도해주세요.");
         }
 
-        // 챌린지 장부 기록
+        // 癲??????? ?潁? ??れ삀??쎈뭄?
         LedgerEntry ledger = LedgerEntry.builder()
                 .id(java.util.UUID.randomUUID().toString())
                 .challengeId(challenge.getId())
@@ -500,16 +496,16 @@ public class AccountService {
                 .balanceBefore(challengeBalanceBefore)
                 .balanceAfter(newChallengeBalance)
                 .relatedUserId(userId)
-                .description("월 회비 납입")
+                .description("챌린지 월 후원금")
                 .createdAt(LocalDateTime.now())
                 .build();
         ledgerEntryMapper.save(ledger);
 
-        // 8. 첫 서포트 여부 확인
+        // 8. 癲??????룎????? ?嶺뚮Ĳ?됮?
         int totalSupport = accountMapper.countTotalSupport(account.getId(), challenge.getId());
-        boolean isFirstSupport = (totalSupport == 1); // 방금 넣은 1건이 전부라면 첫 서포트
+        boolean isFirstSupport = (totalSupport == 1); // ?袁⑸젻泳???壤굿? 1癲꾧퀗?????????野껊갭??癲??????룎??
 
-        // 9. 응답 생성
+        // 9. ???쑩?젆???獄쏅똻??
         return SupportResponse.builder()
                 .transactionId(Math.abs((long) tx.getId().hashCode()))
                 .challengeId(challenge.getId())
@@ -522,6 +518,7 @@ public class AccountService {
                 .build();
     }
 
+    // [학습] 결제 주문번호를 생성한다.
     private String generateOrderId() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         int randomNum = RANDOM.nextInt(90000) + 10000; // 10000 ~ 99999

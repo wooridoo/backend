@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.meeting.repository.MeetingMapper">
+  <!-- Learning note: SQL ids in this mapper must match Java Mapper method names. -->
 
   <insert id="insert" parameterType="com.woorido.meeting.domain.Meeting">
     INSERT INTO woorido.meetings (
@@ -77,7 +78,7 @@
         (SELECT u.nickname FROM woorido.users u WHERE u.id = m.created_by) as CREATOR_NICKNAME,
         (SELECT COUNT(*) FROM woorido.meeting_votes mv JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id WHERE mv.meeting_id = m.id AND mvr.choice = 'AGREE') as CONFIRMED_COUNT,
         (SELECT COUNT(*) FROM woorido.meeting_votes mv JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id WHERE mv.meeting_id = m.id AND mvr.choice = 'DISAGREE') as DECLINED_COUNT,
-        (SELECT COUNT(*) FROM woorido.meeting_votes mv JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id WHERE mv.meeting_id = m.id AND mvr.choice IS NULL) as PENDING_COUNT,
+        (SELECT COUNT(*) FROM woorido.meeting_votes mv JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id WHERE mv.meeting_id = m.id AND mvr.choice = 'PENDING') as PENDING_COUNT,
         (SELECT COUNT(*) FROM woorido.challenge_members cm WHERE cm.challenge_id = m.challenge_id AND cm.privilege_status = 'ACTIVE') as TOTAL_MEMBERS
     FROM woorido.meetings m
     WHERE m.id = #{meetingId}
@@ -137,3 +138,4 @@
   </select>
 
 </mapper>
+

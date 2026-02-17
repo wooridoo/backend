@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+    // 학습 포인트:
+    // - 프로필 조회/수정은 "토큰 검증 -> 사용자 조회 -> 응답 조립" 공통 구조를 따른다.
 
     private final UserMapper userMapper;
     private final AccountMapper accountMapper;
@@ -86,6 +88,7 @@ public class UserService {
                 .birthDate(user.getBirthDate() != null ? user.getBirthDate().format(DATE_FORMATTER) : null)
                 .profileImage(user.getProfileImageUrl())
                 .status(user.getAccountStatus().name())
+                // TODO: 실제 브릭스 계산 로직이 준비되면 하드코딩 값을 교체한다.
                 .brix(12.0) // 기본값 12
                 .account(accountInfo)
                 .stats(UserProfileResponse.StatsInfo.builder()

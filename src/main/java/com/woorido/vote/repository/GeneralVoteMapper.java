@@ -4,22 +4,24 @@ import com.woorido.vote.domain.GeneralVote;
 import com.woorido.vote.domain.GeneralVoteRecord;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
 import java.util.Map;
 
 @Mapper
 public interface GeneralVoteMapper {
+  // Learning note:
+  // - Methods here map 1:1 to MyBatis XML statement ids.
   void insert(GeneralVote vote);
 
   GeneralVote findById(String id);
 
-  // 투표 기록 관련
   void insertRecord(GeneralVoteRecord record);
 
   int checkRecordExisting(@Param("voteId") String voteId, @Param("userId") String userId);
 
-  // 집계 조회
   Map<String, Object> findVoteCounts(String voteId);
 
-  // 투표 상태 업데이트
+  String findMyVote(@Param("voteId") String voteId, @Param("userId") String userId);
+
   int updateStatus(@Param("voteId") String voteId, @Param("status") String status);
 }

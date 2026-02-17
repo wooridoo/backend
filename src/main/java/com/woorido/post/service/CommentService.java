@@ -1,276 +1,273 @@
 package com.woorido.post.service;
 
+import com.woorido.challenge.repository.ChallengeMemberMapper;
 import com.woorido.common.dto.AuthorInfo;
-import com.woorido.post.domain.Comment;
-import com.woorido.post.dto.request.CreateCommentRequest;
-import com.woorido.post.dto.response.CommentResponse;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
-import com.woorido.post.repository.CommentMapper;
+import com.woorido.post.domain.Comment;
+import com.woorido.post.domain.CommentDeleteStrategy;
+import com.woorido.post.domain.CommentLike;
+import com.woorido.post.domain.CommentUpdateVisitor;
+import com.woorido.post.domain.Post;
+import com.woorido.post.dto.request.CreateCommentRequest;
+import com.woorido.post.dto.request.UpdateCommentRequest;
+import com.woorido.post.dto.response.CommentResponse;
+import com.woorido.post.dto.response.DeleteCommentResponse;
+import com.woorido.post.dto.response.UpdateCommentResponse;
 import com.woorido.post.repository.CommentLikeMapper;
+import com.woorido.post.repository.CommentMapper;
+import com.woorido.post.repository.PostMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class CommentService {
+  // 학습 포인트:
+  // - 댓글/좋아요는 항상 challengeId, postId 경계를 함께 검증해 데이터 오염을 막는다.
 
-    private final CommentMapper commentMapper;
-    private final UserMapper userMapper;
-    private final CommentLikeMapper commentLikeMapper;
-    private final com.woorido.post.domain.CommentDeleteStrategy commentDeleteStrategy;
-    private final com.woorido.challenge.repository.ChallengeMemberMapper challengeMemberMapper;
+  private final CommentMapper commentMapper;
+  private final UserMapper userMapper;
+  private final CommentLikeMapper commentLikeMapper;
+  private final CommentDeleteStrategy commentDeleteStrategy;
+  private final ChallengeMemberMapper challengeMemberMapper;
+  private final PostMapper postMapper;
 
-    @Transactional
-    public String createComment(String postId, String userId, CreateCommentRequest request) {
-        String id = UUID.randomUUID().toString();
-        LocalDateTime now = LocalDateTime.now();
+  /**
+   * 댓글 생성.
+   * 흐름: 멤버/게시글 검증 -> (대댓글인 경우) 부모 댓글 검증 -> 댓글 저장
+   */
+  @Transactional
+  public String createComment(String challengeId, String postId, String userId, CreateCommentRequest request) {
+    // 요청자가 해당 챌린지의 유효 멤버인지 확인
+    requireMemberAny(challengeId, userId);
+    // 댓글 대상 게시글이 현재 챌린지에 속하는지 확인
+    requirePostInChallenge(challengeId, postId);
 
-        Comment comment = Comment.builder()
-                .id(id)
-                .postId(postId)
-                .parentId(request.getParentId())
-                .createdBy(userId)
-                .content(request.getContent())
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-
-        commentMapper.save(comment);
-
-        return comment.getId();
+    if (request.getParentId() != null) {
+      // 대댓글이면 부모 댓글 존재 여부/게시글 일치 여부를 확인
+      Comment parent = commentMapper.findById(request.getParentId())
+          .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
+      if (!postId.equals(parent.getPostId())) {
+        throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
+      }
     }
 
-    public boolean toggleLike(String commentId, String userId) {
-        if (commentLikeMapper.exists(commentId, userId)) {
-            commentLikeMapper.delete(commentId, userId);
-            commentMapper.decreaseLikeCount(commentId);
-            return false;
-        } else {
-            commentLikeMapper.save(com.woorido.post.domain.CommentLike.builder()
-                    .id(java.util.UUID.randomUUID().toString())
-                    .commentId(commentId)
-                    .userId(userId)
-                    .createdAt(java.time.LocalDateTime.now())
-                    .build());
-            commentMapper.increaseLikeCount(commentId);
-            return true;
-        }
+    String id = UUID.randomUUID().toString();
+    LocalDateTime now = LocalDateTime.now();
+
+    Comment comment = Comment.builder()
+        .id(id)
+        .postId(postId)
+        .parentId(request.getParentId())
+        .createdBy(userId)
+        .content(request.getContent())
+        .createdAt(now)
+        .updatedAt(now)
+        .build();
+
+    commentMapper.save(comment);
+    return comment.getId();
+  }
+
+  /**
+   * 댓글 좋아요 토글.
+   * 이미 좋아요가 있으면 취소, 없으면 생성한다.
+   */
+  @Transactional
+  public boolean toggleLike(String challengeId, String postId, String commentId, String userId) {
+    // 경계/권한 검증
+    requireMemberAny(challengeId, userId);
+    requirePostInChallenge(challengeId, postId);
+    requireCommentInPost(commentId, postId);
+
+    if (commentLikeMapper.exists(commentId, userId)) {
+      commentLikeMapper.delete(commentId, userId);
+      commentMapper.decreaseLikeCount(commentId);
+      return false;
     }
 
-    public com.woorido.post.dto.response.UpdateCommentResponse updateComment(String challengeId, String postId,
-            String commentId, String userId, com.woorido.post.dto.request.UpdateCommentRequest request) {
-        // 1. Find Comment
-        Comment comment = commentMapper.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
+    commentLikeMapper.save(CommentLike.builder()
+        .id(UUID.randomUUID().toString())
+        .commentId(commentId)
+        .userId(userId)
+        .createdAt(LocalDateTime.now())
+        .build());
+    commentMapper.increaseLikeCount(commentId);
+    return true;
+  }
 
-        // 2. Validate Membership & Post
-        if (!comment.getPostId().equals(postId)) {
-            throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
-        }
-
-        // 3. Check Author
-        if (!comment.getCreatedBy().equals(userId)) {
-            throw new IllegalArgumentException("COMMENT_003: 수정 권한이 없습니다");
-        }
-
-        // 4. Update using Visitor
-        com.woorido.post.domain.CommentUpdateVisitor visitor = new com.woorido.post.domain.CommentUpdateVisitor(
-                request);
-        comment.accept(visitor);
-
-        // 5. Update DB
-        commentMapper.update(comment);
-
-        return com.woorido.post.dto.response.UpdateCommentResponse.builder()
-                .commentId(comment.getId())
-                .content(comment.getContent())
-                .updatedAt(comment.getUpdatedAt())
-                .build();
+  /**
+   * 게시글 댓글 목록 조회.
+   * 루트 댓글을 기준으로 답글 트리를 재귀적으로 구성한다.
+   */
+  @Transactional(readOnly = true)
+  public List<CommentResponse> getComments(String postId) {
+    List<Comment> comments = commentMapper.findAllByPostId(postId);
+    if (comments.isEmpty()) {
+      return new ArrayList<>();
     }
 
-    @Transactional(readOnly = true)
-    public List<CommentResponse> getComments(String postId) {
-        List<Comment> comments = commentMapper.findAllByPostId(postId);
-        if (comments.isEmpty()) {
-            return new ArrayList<>();
-        }
+    List<String> userIds = comments.stream()
+        .map(Comment::getCreatedBy)
+        .distinct()
+        .collect(Collectors.toList());
 
-        // Fetch authors
-        List<String> userIds = comments.stream()
-                .map(Comment::getCreatedBy)
-                .distinct()
-                .collect(Collectors.toList());
-
-        // Assuming UserMapper has a method to get multiple users or we fetch
-        // individually.
-        // For optimization, we should have findAllByIds, but relying on findById for
-        // now if not available or looping.
-        // Actually, let's use a loop for now or fetch author info.
-        // Better: UserMapper needs findById.
-
-        Map<String, AuthorInfo> authorMap = new HashMap<>();
-        for (String userId : userIds) {
-            // Reusing AuthorInfo logic from UserMapper/UserService usually
-            // But here we might just query User table.
-            // Let's assume userMapper.findById returns User domain.
-            // We need to map User to AuthorInfo.
-            // Or better, let's fetch AuthorInfo directly if possible or map it manually.
-
-            // We need to use UserMapper to get User entity
-            User user = userMapper.findById(userId);
-            if (user != null) {
-                authorMap.put(userId, AuthorInfo.builder()
-                        .userId(user.getId())
-                        .nickname(user.getNickname())
-                        .profileImage(user.getProfileImageUrl())
-                        .build());
-            }
-        }
-
-        // Map to DTO and handle nesting
-        List<CommentResponse> roots = new ArrayList<>();
-        Map<String, CommentResponse> dtos = new HashMap<>();
-
-        for (Comment comment : comments) {
-            CommentResponse dto = CommentResponse.from(comment, authorMap.get(comment.getCreatedBy()));
-            dtos.put(comment.getId(), dto);
-
-            if (comment.getParentId() == null) {
-                roots.add(dto);
-            }
-        }
-
-        // Second pass for nesting
-        for (Comment comment : comments) {
-            if (comment.getParentId() != null) {
-                CommentResponse parent = dtos.get(comment.getParentId());
-                if (parent != null) {
-                    if (parent.getReplies() == null) {
-                        // We need to modify the DTO to have a mutable list or add a setter.
-                        // Since CommentResponse uses Builder which creates immutable usually,
-                        // actually looking at my DTO, it has List<CommentResponse> replies.
-                        // I need to handle this.
-                        // Let's use a method in DTO or just reflection/re-building.
-                        // Wait, creating DTOs first then linking is hard with immutable pattern.
-
-                        // Let's perform a tree build.
-                        // Actually, doing it simple:
-                        // No setter in DTO.
-                        // I'll leave the nesting logic for now or implement a simpler flat list if the
-                        // UI handles it,
-                        // but the requirement implies structure.
-                        // Let's assume flat list for now or simple "replies" field population via a
-                        // separate method if I adding one.
-
-                        // Adjusting plan: I will just return the list sorted by creation time for now
-                        // as per "getComments" basic requirement.
-                        // The UI can thread it or I can add threading logic if I added `replies` field.
-                        // I added `replies` field in DTO.
-                        // I'll use reflection or add a method to add reply if I can modify DTO.
-                        // I will modify DTO to have @Setter or a helper method `addReply`.
-                    }
-                }
-            }
-        }
-
-        // Re-reading DTO: It has `private List<CommentResponse> replies;` and @Builder.
-        // I cannot add to it easily.
-        // Let's just return flat list for MVP Phase 2 and let FE handle threading or
-        // just return roots with populated replies.
-
-        // Simpler approach for Phase 2:
-        // Group by parentId.
-
-        Map<String, List<CommentResponse>> childrenMap = new HashMap<>();
-        for (Comment c : comments) {
-            String pId = c.getParentId();
-            if (pId != null) {
-                childrenMap.computeIfAbsent(pId, k -> new ArrayList<>())
-                        .add(CommentResponse.from(c, authorMap.get(c.getCreatedBy())));
-            }
-        }
-
-        // Build tree structure
-        return comments.stream().filter(c -> c.getParentId() == null)
-                .map(c -> {
-                    List<CommentResponse> replies = getReplies(c.getId(), comments, authorMap);
-                    return CommentResponse.builder()
-                            .id(c.getId())
-                            .content(c.getContent())
-                            .author(authorMap.get(c.getCreatedBy()))
-                            .likeCount(c.getLikeCount())
-                            .createdAt(c.getCreatedAt())
-                            .updatedAt(c.getUpdatedAt())
-                            .parentId(null)
-                            .replies(replies)
-                            .build();
-                })
-                .collect(Collectors.toList());
+    Map<String, AuthorInfo> authorMap = new HashMap<>();
+    for (String userId : userIds) {
+      // 현재는 사용자 정보를 개별 조회(N+1)한다.
+      // 트래픽이 커지면 IN 조회 방식으로 최적화할 수 있다.
+      User user = userMapper.findById(userId);
+      if (user != null) {
+        authorMap.put(userId, AuthorInfo.builder()
+            .userId(user.getId())
+            .nickname(user.getNickname())
+            .profileImage(user.getProfileImageUrl())
+            .build());
+      }
     }
 
-    private List<CommentResponse> getReplies(String parentId, List<Comment> allComments,
-            Map<String, AuthorInfo> authorMap) {
-        return allComments.stream()
-                .filter(c -> parentId.equals(c.getParentId()))
-                .map(c -> CommentResponse.builder()
-                        .id(c.getId())
-                        .content(c.getContent())
-                        .author(authorMap.get(c.getCreatedBy()))
-                        .likeCount(c.getLikeCount())
-                        .createdAt(c.getCreatedAt())
-                        .updatedAt(c.getUpdatedAt())
-                        .parentId(parentId)
-                        .replies(getReplies(c.getId(), allComments, authorMap)) // Recursive
-                        .build())
-                .collect(Collectors.toList());
+    return comments.stream()
+        .filter(c -> c.getParentId() == null)
+        .map(c -> CommentResponse.builder()
+            .id(c.getId())
+            .content(c.getContent())
+            .author(authorMap.get(c.getCreatedBy()))
+            .likeCount(c.getLikeCount())
+            .createdAt(c.getCreatedAt())
+            .updatedAt(c.getUpdatedAt())
+            .parentId(null)
+            .replies(getReplies(c.getId(), comments, authorMap))
+            .build())
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * 댓글 수정.
+   * 작성자 본인만 수정 가능하며 Visitor로 변경값을 반영한다.
+   */
+  public UpdateCommentResponse updateComment(String challengeId, String postId,
+      String commentId, String userId, UpdateCommentRequest request) {
+
+    requireMemberAny(challengeId, userId);
+    requirePostInChallenge(challengeId, postId);
+
+    Comment comment = requireCommentInPost(commentId, postId);
+    if (!userId.equals(comment.getCreatedBy())) {
+      throw new IllegalArgumentException("COMMENT_003: 수정 권한이 없습니다");
     }
 
-    public com.woorido.post.dto.response.DeleteCommentResponse deleteComment(String challengeId, String postId,
-            String commentId, String userId) {
-        // 1. Find Comment
-        Comment comment = commentMapper.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
+    CommentUpdateVisitor visitor = new CommentUpdateVisitor(request);
+    comment.accept(visitor);
+    commentMapper.update(comment);
 
-        if (!comment.getPostId().equals(postId)) {
-            throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
-        }
+    return UpdateCommentResponse.builder()
+        .commentId(comment.getId())
+        .content(comment.getContent())
+        .updatedAt(comment.getUpdatedAt())
+        .build();
+  }
 
-        // 2. Fetch User Role
-        Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-        String role = (memberInfo != null) ? (String) memberInfo.get("ROLE") : null;
+  /**
+   * 댓글 삭제.
+   * 자식 댓글이 있으면 소프트 삭제, 없으면 물리 삭제를 적용한다.
+   */
+  public DeleteCommentResponse deleteComment(String challengeId, String postId, String commentId, String userId) {
+    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
+    requirePostInChallenge(challengeId, postId);
 
-        // 3. Validate Permission (Strategy)
-        commentDeleteStrategy.validate(comment, userId, role);
+    Comment comment = requireCommentInPost(commentId, postId);
+    String role = memberInfo != null ? asString(memberInfo.get("ROLE")) : null;
 
-        // 4. Check Children
-        int childCount = commentMapper.countByParentId(commentId);
+    commentDeleteStrategy.validate(comment, userId, role);
 
-        if (childCount > 0) {
-            // 5-A. Soft Delete using Visitor
-            com.woorido.post.domain.CommentDeleteVisitor visitor = new com.woorido.post.domain.CommentDeleteVisitor();
-            comment.accept(visitor);
-            commentMapper.update(comment);
-        } else {
-            // 5-B. Hard Delete (Physical)
-            // Need to remove Likes first due to FK if cascading is not set
-            // Ideally we should delete likes. Spec says "Complete Delete".
-            // Let's safe guard by deleting likes first.
-            commentLikeMapper.deleteByCommentId(commentId);
-            commentMapper.deletePhysical(commentId);
-        }
-
-        return com.woorido.post.dto.response.DeleteCommentResponse.builder()
-                .commentId(commentId)
-                .deletedAt(LocalDateTime.now())
-                .build();
+    int childCount = commentMapper.countByParentId(commentId);
+    if (childCount > 0) {
+      comment.accept(new com.woorido.post.domain.CommentDeleteVisitor());
+      commentMapper.update(comment);
+    } else {
+      commentLikeMapper.deleteByCommentId(commentId);
+      commentMapper.deletePhysical(commentId);
     }
+
+    return DeleteCommentResponse.builder()
+        .commentId(commentId)
+        .deletedAt(LocalDateTime.now())
+        .build();
+  }
+
+  /**
+   * 답글 트리 구성용 재귀 함수.
+   */
+  private List<CommentResponse> getReplies(String parentId, List<Comment> allComments, Map<String, AuthorInfo> authorMap) {
+    // 재귀 종료 조건은 "더 이상 자식이 없을 때(empty list)"다.
+    return allComments.stream()
+        .filter(c -> parentId.equals(c.getParentId()))
+        .map(c -> CommentResponse.builder()
+            .id(c.getId())
+            .content(c.getContent())
+            .author(authorMap.get(c.getCreatedBy()))
+            .likeCount(c.getLikeCount())
+            .createdAt(c.getCreatedAt())
+            .updatedAt(c.getUpdatedAt())
+            .parentId(parentId)
+            .replies(getReplies(c.getId(), allComments, authorMap))
+            .build())
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * 챌린지 멤버 검증(LEFT 제외).
+   */
+  private Map<String, Object> requireMemberAny(String challengeId, String userId) {
+    Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+    if (memberInfo == null || "LEFT".equals(asString(memberInfo.get("STATUS")))) {
+      throw new IllegalArgumentException("MEMBER_001: 챌린지 멤버가 아닙니다");
+    }
+    return memberInfo;
+  }
+
+  /**
+   * 게시글 존재 여부 + 챌린지 경계 검증.
+   */
+  private Post requirePostInChallenge(String challengeId, String postId) {
+    Post post = postMapper.findById(postId);
+    if (post == null || !challengeId.equals(post.getChallengeId())) {
+      throw new IllegalArgumentException("POST_001: 게시글을 찾을 수 없습니다");
+    }
+    return post;
+  }
+
+  /**
+   * 댓글 존재 여부 + 게시글 경계 검증.
+   */
+  private Comment requireCommentInPost(String commentId, String postId) {
+    Optional<Comment> commentOpt = commentMapper.findById(commentId);
+    if (commentOpt.isEmpty()) {
+      throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
+    }
+
+    Comment comment = commentOpt.get();
+    if (!postId.equals(comment.getPostId())) {
+      throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
+    }
+    return comment;
+  }
+
+  /**
+   * null-safe 문자열 변환 유틸.
+   */
+  private String asString(Object value) {
+    return value == null ? null : value.toString();
+  }
 }

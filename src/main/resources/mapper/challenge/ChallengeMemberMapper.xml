@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.challenge.repository.ChallengeMemberMapper">
+  <!-- Learning note: SQL ids in this mapper must match Java Mapper method names. -->
 
   <insert id="insert">
     INSERT INTO woorido.challenge_members (
@@ -42,6 +43,32 @@
     WHERE user_id = #{userId, jdbcType=VARCHAR}
     AND challenge_id = #{challengeId, jdbcType=VARCHAR}
   </select>
+
+  <update id="updateRejoinMember" parameterType="com.woorido.challenge.domain.ChallengeMember">
+    UPDATE woorido.challenge_members
+    SET challenge_id = #{challengeId},
+        user_id = #{userId},
+        role = #{role},
+        joined_at = #{joinedAt},
+        privilege_status = 'ACTIVE',
+        deposit_status = #{depositStatus},
+        entry_fee_amount = #{entryFeeAmount},
+        total_support_paid = #{totalSupportPaid},
+        auto_pay_enabled = #{autoPayEnabled},
+        left_at = NULL
+    WHERE id = #{id}
+  </update>
+
+  <update id="updateLeaveMember">
+    UPDATE woorido.challenge_members
+    SET privilege_status = 'LEFT',
+        left_at = CURRENT_TIMESTAMP,
+        leave_reason = #{leaveReason},
+        deposit_status = 'RELEASED'
+    WHERE challenge_id = #{challengeId}
+      AND user_id = #{userId}
+      AND privilege_status != 'LEFT'
+  </update>
 
   <select id="countByChallengeId" resultType="int">
     SELECT COUNT(*)
