@@ -26,18 +26,18 @@ public class PasswordResetService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
-    // ??쑬?甕곕뜇????苑??筌띻낱寃??醫륁뒞 ??볦퍢 (30??= 1800??
+    // 비밀번호 재설정 토큰 만료 시간 (30분 = 1800초)
     private static final int RESET_TOKEN_EXPIRES_IN = 1800;
 
     /**
-     * ??쑬?甕곕뜇????苑???遺욧퍕 筌ｌ꼶??
-     * - ??李??곗쨮 ?????鈺곕똻???類ㅼ뵥
-     * - ??苑???醫뤾쿃 ??밴쉐 獄?????
-     * - ??쇱젫 ??곸겫??띻펾?癒?퐣????李??獄쏆뮇??嚥≪뮇彛??袁⑹뒄
+     * 비밀번호 재설정 요청을 처리한다.
+     * - 이메일로 사용자 존재 여부를 확인한다.
+     * - 재설정 토큰과 만료 시각을 생성한다.
+     * - 토큰 정보를 DB에 저장한다.
      */
     // [학습] 비밀번호 재설정 토큰을 발급한다.
     public PasswordResetResponse requestPasswordReset(String email) {
-        // 1. ??李??곗쨮 ?????鈺곌퀬??
+        // 1. 이메일로 사용자 조회
         User user = userMapper.findByEmail(email);
 
         if (user == null) {
@@ -46,31 +46,31 @@ public class PasswordResetService {
 
         log.info("Password reset requested - userId: {}, email: {}", user.getId(), email);
 
-        // 2. ??苑???醫뤾쿃 ??밴쉐
+        // 2. 재설정 토큰 생성
         String resetToken = UUID.randomUUID().toString();
         LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(RESET_TOKEN_EXPIRES_IN);
 
-        // 3. ?醫뤾쿃??DB??????
+        // 3. 토큰 정보를 DB에 저장
         userMapper.updatePasswordResetToken(user.getId(), resetToken, expiresAt);
 
-        // 4. TODO: ??쇱젫 ??곸겫??띻펾?癒?퐣????李??獄쏆뮇??
+        // 4. TODO: 실제 메일 발송 연동 시 이메일 전송
         // emailService.sendPasswordResetEmail(email, resetToken);
         log.info("Password reset token issued - userId: {}, expiresAt: {}", user.getId(), expiresAt);
 
-        // 5. ?臾먮뼗 ??밴쉐
+        // 5. 응답 생성
         return PasswordResetResponse.of(email, RESET_TOKEN_EXPIRES_IN);
     }
 
     /**
-     * ??쑬?甕곕뜇????苑????쎈뻬
-     * - ?醫뤾쿃 ?醫륁뒞??野꺜筌?
-     * - ????쑬?甕곕뜇???酉???獄???낅쑓??꾨뱜
-     * - ?醫뤾쿃 筌띾슢利?筌ｌ꼶??
+     * 비밀번호를 재설정한다.
+     * - 토큰 유효성 검증
+     * - 새 비밀번호 일치 여부 확인
+     * - 비밀번호 업데이트 및 토큰 제거
      */
     @Transactional
     // [학습] 재설정 토큰 검증 후 비밀번호를 변경한다.
     public PasswordResetExecuteResponse resetPassword(PasswordResetExecuteRequest request) {
-        // 1. ?醫뤾쿃??곗쨮 ?????鈺곌퀬??獄??醫륁뒞??野꺜筌?
+        // 1. 토큰으로 사용자 조회 및 유효성 검증
         User user = userMapper.findByPasswordResetToken(request.getToken());
 
         if (user == null) {
@@ -81,15 +81,15 @@ public class PasswordResetService {
             throw new RuntimeException("AUTH_009:Reset token has expired");
         }
 
-        // 2. ??쑬?甕곕뜇???類ㅼ뵥
+        // 2. 새 비밀번호 확인
         if (!request.getNewPassword().equals(request.getNewPasswordConfirm())) {
             throw new RuntimeException("VALIDATION_001:비밀번호가 일치하지 않습니다");
         }
 
-        // 3. ??쑬?甕곕뜇???酉???
+        // 3. 새 비밀번호 인코딩
         String encodedPassword = passwordEncoder.encode(request.getNewPassword());
 
-        // 4. ??쑬?甕곕뜇????낅쑓??꾨뱜 獄??醫뤾쿃 ?λ뜃由??
+        // 4. 비밀번호 업데이트 후 재설정 토큰 제거
         userMapper.updatePassword(user.getId(), encodedPassword);
         userMapper.clearPasswordResetToken(user.getId());
 

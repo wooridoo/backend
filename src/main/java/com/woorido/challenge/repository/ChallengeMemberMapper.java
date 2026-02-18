@@ -51,6 +51,9 @@ public interface ChallengeMemberMapper {
         int updateRole(@Param("newRole") String newRole, @Param("memberId") String memberId,
                         @Param("challengeId") String challengeId);
 
+        Map<String, Object> findTopBrixActiveMemberExcludingUser(@Param("challengeId") String challengeId,
+                        @Param("excludedUserId") String excludedUserId);
+
         void leaveChallenge(@Param("challengeId") String challengeId, @Param("userId") String userId);
 
         // 멤버 권한 상태 조회 (ACTIVE, REVOKED)

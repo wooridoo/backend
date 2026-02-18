@@ -167,6 +167,8 @@ public class MeetingController {
           return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("이미 지난 모임입니다"));
         if (message.startsWith("MEETING_003"))
           return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("이미 참석 의사를 표시했습니다"));
+        if (message.startsWith("MEETING_006"))
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("모임 참석 투표가 종료되었습니다"));
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));

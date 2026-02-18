@@ -9,12 +9,22 @@
       challenge_id,
       user_id,
       role,
+      deposit_status,
+      entry_fee_amount,
+      privilege_status,
+      total_support_paid,
+      auto_pay_enabled,
       joined_at
     ) VALUES (
       #{id},
       #{challengeId},
       #{userId},
       #{role},
+      #{depositStatus},
+      #{entryFeeAmount},
+      #{privilegeStatus},
+      #{totalSupportPaid},
+      #{autoPayEnabled},
       #{joinedAt}
     )
   </insert>
@@ -152,6 +162,23 @@
     WHERE id = #{memberId, jdbcType=VARCHAR}
       AND challenge_id = #{challengeId, jdbcType=VARCHAR}
   </update>
+
+  <select id="findTopBrixActiveMemberExcludingUser" resultType="java.util.Map">
+    SELECT * FROM (
+      SELECT
+        cm.id AS MEMBER_ID,
+        cm.user_id AS USER_ID,
+        cm.joined_at AS JOINED_AT,
+        NVL(us.total_score, 12) AS BRIX
+      FROM woorido.challenge_members cm
+      LEFT JOIN woorido.user_scores us ON us.user_id = cm.user_id
+      WHERE cm.challenge_id = #{challengeId}
+        AND cm.privilege_status = 'ACTIVE'
+        AND cm.user_id != #{excludedUserId}
+      ORDER BY NVL(us.total_score, 12) DESC, cm.joined_at ASC
+    )
+    WHERE ROWNUM = 1
+  </select>
 
   <select id="getPrivilegeStatus" resultType="String">
     SELECT privilege_status

@@ -50,7 +50,7 @@ public class ChallengeController {
   private final ChallengeService challengeService;
 
   /**
-   * 梨뚮┛吏 紐⑸줉 議고쉶 API (API 023)
+   * 챌린지 목록 조회 API (API 023)
    * GET /challenges
    */
   @GetMapping
@@ -68,7 +68,7 @@ public class ChallengeController {
   }
 
   /**
-   * ??梨뚮┛吏 紐⑸줉 議고쉶 API (API 027)
+   * 내 챌린지 목록 조회 API (API 027)
    * GET /challenges/me
    */
   @GetMapping("/me")
@@ -89,7 +89,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 ?곸꽭 議고쉶 API (API 024)
+   * 챌린지 상세 조회 API (API 024)
    * GET /challenges/{challengeId}
    */
   @GetMapping("/{challengeId}")
@@ -114,7 +114,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 ?댁뭅?댄듃 議고쉶 API (API 028)
+   * 챌린지 계좌 조회 API (API 028)
    * GET /challenges/{challengeId}/account
    */
   @GetMapping("/{challengeId}/account")
@@ -138,7 +138,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 媛??API (API 030)
+   * 챌린지 가입 API (API 030)
    * POST /challenges/{challengeId}/join
    */
   @PostMapping("/{challengeId}/join")
@@ -170,7 +170,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 ?섏젙 API (API 025)
+   * 챌린지 수정 API (API 025)
    * PUT /challenges/{challengeId}
    */
   @PutMapping("/{challengeId}")
@@ -210,7 +210,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 ?앹꽦 API (API 022)
+   * 챌린지 생성 API (API 022)
    * POST /challenges
    */
   @PostMapping
@@ -250,7 +250,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 ?덊눜 API (API 031)
+   * 챌린지 탈퇴 API (API 031)
    * DELETE /challenges/{challengeId}/leave
    */
   @DeleteMapping("/{challengeId}/leave")
@@ -277,7 +277,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 硫ㅻ쾭 紐⑸줉 議고쉶 API (API 032)
+   * 챌린지 멤버 목록 조회 API (API 032)
    * GET /challenges/{challengeId}/members
    */
   @GetMapping("/{challengeId}/members")
@@ -303,7 +303,7 @@ public class ChallengeController {
   }
 
   /**
-   * 梨뚮┛吏 ??젣 API (API 026)
+   * 챌린지 해산 API (API 026)
    * DELETE /challenges/{challengeId}
    */
   @DeleteMapping("/{challengeId}")
@@ -333,7 +333,7 @@ public class ChallengeController {
   }
 
   /**
-   * ?먮룞 ?⑹엯 ?ㅼ젙 API (API 029)
+   * 자동 후원 설정 API (API 029)
    * PUT /challenges/{challengeId}/support/settings
    */
   @PutMapping("/{challengeId}/support/settings")
@@ -364,7 +364,7 @@ public class ChallengeController {
   }
 
   /**
-   * API 033: 梨뚮┛吏 硫ㅻ쾭 ?곸꽭 議고쉶
+   * API 033: 챌린지 멤버 상세 조회
    * GET /challenges/{challengeId}/members/{memberId}
    */
   @GetMapping("/{challengeId}/members/{memberId}")
@@ -396,36 +396,41 @@ public class ChallengeController {
     }
   }
 
-  // API 034: 由щ뜑 ?꾩엫
-  // API 034: 由щ뜑 ?꾩엫
+  // API 034: 리더 위임
   @PostMapping("/{challengeId}/delegate")
-  public ResponseEntity<DelegateLeaderResponse> delegateLeader(
+  public ResponseEntity<ApiResponse<DelegateLeaderResponse>> delegateLeader(
       @RequestHeader("Authorization") String authorization,
       @PathVariable("challengeId") String challengeId,
       @RequestBody DelegateLeaderRequest request) {
 
-    // ?좏겙?먯꽌 userId 異붿텧 (?ㅻⅨ API? ?쇨????좎?)
-    String token = authorization;
-    if (token != null && token.startsWith("Bearer ")) {
-      token = token.substring(7);
-    }
-    // Controller?먮뒗 JwtUtil??二쇱엯?섏뼱 ?덉? ?딆쑝誘濡? Service???좏겙怨?濡쒖쭅???꾩엫?섎뒗 寃껋씠 媛??源붾걫??
-    // ?섏?留?Service ?쒓렇?덉쿂 蹂寃쎌? 踰덇굅濡쒖?.
-    // ?꾩떆濡??ш린???뚯떛...???섎젮硫?JwtUtil???꾩슂??
-    // ChallengeController ?곷떒??JwtUtil 二쇱엯 肄붾뱶媛 蹂댁씠吏 ?딆쓬 (`private final
-    // ChallengeService challengeService;` 留?蹂댁엫)
-    // ?곕씪?? 媛???뺤떎??諛⑸쾿? Service??硫붿꽌?쒕? ?섎굹 ??留뚮뱾嫄곕굹(?ㅻ쾭濡쒕뵫), Service ?쒓렇?덉쿂瑜?蹂寃쏀븯??寃껋엫.
-    // 湲곗〈 Service 硫붿꽌?? delegateLeader(challengeId, userId, targetMemberId)
-    // 蹂寃? delegateLeader(challengeId, token, targetMemberId) -> Service ?대??먯꽌
-    // parsing.
+    try {
+      String token = authorization;
+      if (token != null && token.startsWith("Bearer ")) {
+        token = token.substring(7);
+      }
 
-    // Service 蹂寃쎌씠 ?ル떎. (Controller 蹂듭옟??媛먯냼)
+      String targetId = request.getTargetUserId();
+      if (targetId == null) {
+        targetId = request.getTargetMemberId();
+      }
 
-    String targetId = request.getTargetUserId();
-    if (targetId == null) {
-      targetId = request.getTargetMemberId();
+      DelegateLeaderResponse response = challengeService.delegateLeaderWithToken(challengeId, token, targetId);
+      return ResponseEntity.ok(ApiResponse.success(response));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("AUTH_")) {
+          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+        }
+        if (message.startsWith("CHALLENGE_001")) {
+          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(message));
+        }
+        if (message.startsWith("CHALLENGE_003") || message.startsWith("CHALLENGE_004")) {
+          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
+        }
+      }
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+          .body(ApiResponse.error(message != null ? message : "Invalid request"));
     }
-    DelegateLeaderResponse response = challengeService.delegateLeaderWithToken(challengeId, token, targetId);
-    return ResponseEntity.ok(response);
   }
 }

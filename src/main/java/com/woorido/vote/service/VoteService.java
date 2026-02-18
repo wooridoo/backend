@@ -1,6 +1,7 @@
 package com.woorido.vote.service;
 
 import com.woorido.challenge.domain.Challenge;
+import com.woorido.challenge.domain.LeaveReason;
 import com.woorido.challenge.repository.ChallengeMapper;
 import com.woorido.challenge.repository.ChallengeMemberMapper;
 import com.woorido.challenge.service.ChallengeService;
@@ -8,7 +9,9 @@ import com.woorido.common.dto.PageInfo;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
 import com.woorido.expense.domain.ExpenseRequest;
+import com.woorido.expense.domain.PaymentBarcode;
 import com.woorido.expense.repository.ExpenseRequestMapper;
+import com.woorido.expense.repository.PaymentBarcodeMapper;
 import com.woorido.meeting.domain.Meeting;
 import com.woorido.meeting.repository.MeetingMapper;
 import com.woorido.vote.domain.ExpenseVote;
@@ -56,6 +59,7 @@ public class VoteService {
   private final MeetingMapper meetingMapper;
   private final ChallengeService challengeService;
   private final ExpenseRequestMapper expenseRequestMapper;
+  private final PaymentBarcodeMapper paymentBarcodeMapper;
 
   @Transactional
   // [학습] 투표를 생성하고 정족수를 계산한다.
@@ -76,9 +80,13 @@ public class VoteService {
     VoteType type = request.getType();
     String role = asString(memberInfo.get("ROLE"));
     String privilegeStatus = asString(memberInfo.get("STATUS"));
+    String targetUserId = resolveGeneralVoteTargetId(type, challengeId, request.getTargetId());
 
-    validateProposerPermission(type, role, userId, request.getTargetId());
+    validateSupportedVoteType(type);
+    validateProposerPermission(type, role, userId, targetUserId);
     validateRevokedPolicy(type, request.getMeetingId(), privilegeStatus);
+    validateKickTarget(type, challengeId, targetUserId);
+    validateLeaderKickPolicy(type, challengeId, targetUserId);
 
     int activeMemberCount = challengeMemberMapper.findAllActiveMembers(challengeId).size();
     if (activeMemberCount < 1) {
@@ -159,17 +167,17 @@ public class VoteService {
       expenseVoteMapper.insert(expenseVote);
 
     } else {
-      eligibleCount = calculateGeneralEligibleCount(type, challengeId, activeMemberCount, request.getTargetId());
+      eligibleCount = calculateGeneralEligibleCount(type, challengeId, activeMemberCount, targetUserId);
       requiredCount = calculateRequiredCount(type, eligibleCount);
 
       GeneralVote generalVote = GeneralVote.builder()
           .id(voteId)
           .challengeId(challengeId)
           .createdBy(userId)
-          .type(GeneralVoteType.valueOf(type.name()))
+          .type(toGeneralVoteType(type))
           .title(request.getTitle())
           .description(request.getDescription())
-          .targetUserId(request.getTargetId())
+          .targetUserId(targetUserId)
           .requiredCount(requiredCount)
           .eligibleCount(eligibleCount)
           .status(VoteStatus.PENDING)
@@ -281,6 +289,15 @@ public class VoteService {
         targetInfo.put("meetingId", expenseRequest.getMeetingId());
         targetInfo.put("amount", expenseRequest.getAmount());
         targetInfo.put("receiptUrl", expenseRequest.getReceiptUrl());
+        targetInfo.put("expenseRequestStatus", expenseRequest.getStatus());
+
+        PaymentBarcode barcode = paymentBarcodeMapper.findByExpenseRequestId(expenseRequest.getId());
+        if (barcode != null) {
+          targetInfo.put("barcodeId", barcode.getId());
+          targetInfo.put("barcodeNumber", barcode.getBarcodeNumber());
+          targetInfo.put("barcodeStatus", barcode.getStatus());
+          targetInfo.put("barcodeExpiresAt", barcode.getExpiresAt());
+        }
       }
       myVote = normalizeExpenseChoice(expenseVoteMapper.findMyVote(voteId, userId));
 
@@ -371,6 +388,7 @@ public class VoteService {
       throw new RuntimeException("VOTE_005:투표가 이미 종료되었습니다");
     }
     if (deadline != null && LocalDateTime.now().isAfter(deadline)) {
+      expireVote(voteId, type);
       throw new RuntimeException("VOTE_005:투표가 이미 종료되었습니다");
     }
 
@@ -429,13 +447,27 @@ public class VoteService {
       Map<String, Object> counts = expenseVoteMapper.findVoteCounts(voteId);
       int eligibleCount = expenseVote.getEligibleCount() != null ? expenseVote.getEligibleCount() : toInt(basicInfo.get("ELIGIBLE_COUNT"));
       int requiredCount = expenseVote.getRequiredCount() != null ? expenseVote.getRequiredCount() : toInt(basicInfo.get("REQUIRED_COUNT"));
-      updateVoteStatusByCounts(voteId, counts, eligibleCount, requiredCount, expenseVoteMapper::updateStatus);
+      VoteStatus finalizedStatus = determineVoteStatusByCounts(counts, eligibleCount, requiredCount);
+      if (finalizedStatus != null) {
+        expenseVoteMapper.updateStatus(voteId, finalizedStatus.name());
+        finalizeExpenseVote(challengeId, expenseRequest, finalizedStatus);
+      }
 
       return buildCastResponse(voteId, choice, counts);
     }
 
     if (generalVoteMapper.checkRecordExisting(voteId, userId) > 0) {
       throw new RuntimeException("VOTE_006:이미 투표했습니다");
+    }
+
+    GeneralVote generalVote = generalVoteMapper.findById(voteId);
+    if (generalVote == null) {
+      throw new RuntimeException("VOTE_001:투표를 찾을 수 없습니다");
+    }
+    if ((type == VoteType.KICK || type == VoteType.LEADER_KICK)
+        && hasText(generalVote.getTargetUserId())
+        && generalVote.getTargetUserId().equals(userId)) {
+      throw new RuntimeException("VOTE_007:강퇴 대상자는 투표할 수 없습니다");
     }
 
     GeneralVoteRecord record = GeneralVoteRecord.builder()
@@ -448,29 +480,35 @@ public class VoteService {
     generalVoteMapper.insertRecord(record);
 
     Map<String, Object> counts = generalVoteMapper.findVoteCounts(voteId);
-    GeneralVote generalVote = generalVoteMapper.findById(voteId);
-    if (generalVote == null) {
-      throw new RuntimeException("VOTE_001:투표를 찾을 수 없습니다");
-    }
 
     int agree = toInt(counts.get("AGREE"));
     int disagree = toInt(counts.get("DISAGREE"));
     int eligibleCount = generalVote.getEligibleCount() != null ? generalVote.getEligibleCount() : toInt(basicInfo.get("ELIGIBLE_COUNT"));
     int requiredCount = generalVote.getRequiredCount() != null ? generalVote.getRequiredCount() : toInt(basicInfo.get("REQUIRED_COUNT"));
 
+    boolean approved = false;
     if (type == VoteType.DISSOLVE) {
       if (disagree > 0) {
         generalVoteMapper.updateStatus(voteId, VoteStatus.REJECTED.name());
       } else if (agree >= requiredCount) {
         generalVoteMapper.updateStatus(voteId, VoteStatus.APPROVED.name());
+        approved = true;
         challengeService.dissolveChallenge(challengeId);
       }
     } else {
       if (agree >= requiredCount) {
         generalVoteMapper.updateStatus(voteId, VoteStatus.APPROVED.name());
+        approved = true;
       } else if (disagree > eligibleCount - requiredCount) {
         generalVoteMapper.updateStatus(voteId, VoteStatus.REJECTED.name());
       }
+    }
+
+    if (approved && type == VoteType.KICK) {
+      executeMemberKickIfApproved(challengeId, generalVote.getTargetUserId());
+    }
+    if (approved && type == VoteType.LEADER_KICK) {
+      executeLeaderKickIfApproved(challengeId, generalVote.getTargetUserId());
     }
 
     return buildCastResponse(voteId, choice, counts);
@@ -517,8 +555,11 @@ public class VoteService {
     if (type == VoteType.MEETING_ATTENDANCE || type == VoteType.EXPENSE) {
       return safeEligible / 2 + 1;
     }
-    if (type == VoteType.KICK || type == VoteType.LEADER_KICK) {
+    if (type == VoteType.KICK) {
       return Math.max(1, (int) Math.ceil(safeEligible * 0.7));
+    }
+    if (type == VoteType.LEADER_KICK) {
+      return Math.max(1, (int) Math.ceil(safeEligible * 0.5));
     }
     if (type == VoteType.DISSOLVE) {
       return safeEligible;
@@ -530,14 +571,10 @@ public class VoteService {
   private void validateProposerPermission(VoteType type, String role, String userId, String targetUserId) {
     boolean isLeader = "LEADER".equals(role);
 
-    if (type == VoteType.EXPENSE || type == VoteType.MEETING_ATTENDANCE || type == VoteType.DISSOLVE) {
+    if (type == VoteType.KICK) {
       if (!isLeader) {
         throw new RuntimeException("VOTE_003:투표 생성 권한이 없습니다");
       }
-      return;
-    }
-
-    if (type == VoteType.KICK) {
       if (!hasText(targetUserId)) {
         throw new RuntimeException("VOTE_004:퇴출 대상이 필요합니다");
       }
@@ -551,10 +588,82 @@ public class VoteService {
       if (isLeader) {
         throw new RuntimeException("VOTE_003:리더는 리더 강퇴 투표를 발의할 수 없습니다");
       }
+      return;
+    }
+
+    if (type == VoteType.EXPENSE || type == VoteType.MEETING_ATTENDANCE || type == VoteType.DISSOLVE) {
+      if (!isLeader) {
+        throw new RuntimeException("VOTE_003:투표 생성 권한이 없습니다");
+      }
+      return;
     }
   }
 
   // [학습] 권한 박탈(REVOKED) 사용자 정책을 검증한다.
+  private String resolveGeneralVoteTargetId(VoteType type, String challengeId, String targetUserId) {
+    if (type != VoteType.KICK && type != VoteType.LEADER_KICK) {
+      return targetUserId;
+    }
+    if (hasText(targetUserId)) {
+      return targetUserId;
+    }
+
+    if (type == VoteType.LEADER_KICK) {
+      List<Map<String, Object>> activeMembers = challengeMemberMapper.findAllActiveMembers(challengeId);
+      for (Map<String, Object> member : activeMembers) {
+        if ("LEADER".equals(asString(member.get("ROLE")))) {
+          return asString(member.get("USER_ID"));
+        }
+      }
+    }
+    return targetUserId;
+  }
+
+  private void validateKickTarget(VoteType type, String challengeId, String targetUserId) {
+    if (type != VoteType.KICK && type != VoteType.LEADER_KICK) {
+      return;
+    }
+    if (!hasText(targetUserId)) {
+      throw new RuntimeException("VOTE_004:퇴출 대상이 필요합니다");
+    }
+
+    Map<String, Object> targetMember = challengeMemberMapper.findByUserIdAndChallengeId(targetUserId, challengeId);
+    if (targetMember == null || !"ACTIVE".equals(asString(targetMember.get("STATUS")))) {
+      throw new RuntimeException("VOTE_004:퇴출 대상이 유효하지 않습니다");
+    }
+    if (type == VoteType.KICK && "LEADER".equals(asString(targetMember.get("ROLE")))) {
+      throw new RuntimeException("VOTE_004:일반 강퇴 투표 대상은 리더가 될 수 없습니다");
+    }
+    if (type == VoteType.LEADER_KICK && !"LEADER".equals(asString(targetMember.get("ROLE")))) {
+      throw new RuntimeException("VOTE_004:리더 강퇴는 리더를 대상으로 해야 합니다");
+    }
+  }
+
+  private void validateLeaderKickPolicy(VoteType type, String challengeId, String targetLeaderUserId) {
+    if (type != VoteType.LEADER_KICK) {
+      return;
+    }
+    LocalDateTime since = LocalDateTime.now().minusDays(30);
+    Challenge challenge = challengeMapper.findById(challengeId);
+    LocalDateTime lastActiveAt = challenge != null ? challenge.getLeaderLastActiveAt() : null;
+
+    if (lastActiveAt != null && !lastActiveAt.isBefore(since)) {
+      throw new RuntimeException("VOTE_010:최근 30일 내 리더 활동이 있어 리더 강퇴 투표를 생성할 수 없습니다");
+    }
+    if (lastActiveAt == null) {
+      int recentMeetings = meetingMapper.countCompletedMeetingsSince(challengeId, targetLeaderUserId, since);
+      int recentExpenses = expenseRequestMapper.countApprovedExpensesSince(challengeId, targetLeaderUserId, since);
+      if (recentMeetings > 0 || recentExpenses > 0) {
+        throw new RuntimeException("VOTE_010:최근 30일 내 리더 활동이 있어 리더 강퇴 투표를 생성할 수 없습니다");
+      }
+    }
+
+    Map<String, Object> candidate = challengeMemberMapper.findTopBrixActiveMemberExcludingUser(challengeId, targetLeaderUserId);
+    if (candidate == null) {
+      throw new RuntimeException("VOTE_009:리더 승계 가능한 멤버가 없습니다");
+    }
+  }
+
   private void validateRevokedPolicy(VoteType type, String meetingId, String privilegeStatus) {
     boolean meetingRelated = type == VoteType.MEETING_ATTENDANCE || (type == VoteType.EXPENSE && hasText(meetingId));
     if (meetingRelated && "REVOKED".equals(privilegeStatus)) {
@@ -580,6 +689,120 @@ public class VoteService {
   }
 
   // [학습] 조회 결과 Map을 VoteDto로 변환한다.
+  private void finalizeExpenseVote(String challengeId, ExpenseRequest expenseRequest, VoteStatus status) {
+    if (status == VoteStatus.APPROVED) {
+      expenseRequestMapper.updateStatus(expenseRequest.getId(), "APPROVED", LocalDateTime.now());
+      challengeMapper.touchLeaderLastActiveAt(challengeId, expenseRequest.getCreatedBy());
+      issueBarcodeIfAbsent(challengeId, expenseRequest);
+      return;
+    }
+    if (status == VoteStatus.REJECTED) {
+      expenseRequestMapper.updateStatus(expenseRequest.getId(), "REJECTED", null);
+    }
+  }
+
+  private void issueBarcodeIfAbsent(String challengeId, ExpenseRequest expenseRequest) {
+    PaymentBarcode existing = paymentBarcodeMapper.findByExpenseRequestId(expenseRequest.getId());
+    if (existing != null) {
+      return;
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    PaymentBarcode barcode = PaymentBarcode.builder()
+        .id(UUID.randomUUID().toString())
+        .expenseRequestId(expenseRequest.getId())
+        .challengeId(challengeId)
+        .barcodeNumber(generateBarcodeNumber())
+        .amount(expenseRequest.getAmount() != null ? expenseRequest.getAmount() : 0L)
+        .status("ACTIVE")
+        .expiresAt(now.plusMinutes(10))
+        .createdAt(now)
+        .build();
+    paymentBarcodeMapper.insert(barcode);
+  }
+
+  private String generateBarcodeNumber() {
+    String random = UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
+    return "WD-" + random;
+  }
+
+  private void executeMemberKickIfApproved(String challengeId, String targetUserId) {
+    if (!hasText(targetUserId)) {
+      return;
+    }
+    int updated = challengeMemberMapper.updateLeaveMember(targetUserId, challengeId, LeaveReason.KICKED.name());
+    if (updated > 0) {
+      challengeMapper.decrementCurrentMembers(challengeId);
+    }
+  }
+
+  private void executeLeaderKickIfApproved(String challengeId, String leaderUserId) {
+    if (!hasText(leaderUserId)) {
+      return;
+    }
+    Map<String, Object> leaderMember = challengeMemberMapper.findByUserIdAndChallengeId(leaderUserId, challengeId);
+    if (leaderMember == null) {
+      return;
+    }
+    if (!"ACTIVE".equals(asString(leaderMember.get("STATUS"))) || !"LEADER".equals(asString(leaderMember.get("ROLE")))) {
+      return;
+    }
+    Map<String, Object> nextLeader = challengeMemberMapper.findTopBrixActiveMemberExcludingUser(challengeId, leaderUserId);
+    if (nextLeader == null) {
+      return;
+    }
+
+    String leaderMemberId = asString(leaderMember.get("MEMBER_ID"));
+    String nextLeaderMemberId = asString(nextLeader.get("MEMBER_ID"));
+    if (!hasText(leaderMemberId) || !hasText(nextLeaderMemberId)) {
+      return;
+    }
+
+    challengeMemberMapper.updateRole("FOLLOWER", leaderMemberId, challengeId);
+    challengeMemberMapper.updateRole("LEADER", nextLeaderMemberId, challengeId);
+    challengeMapper.touchLeaderLastActiveAt(challengeId, asString(nextLeader.get("USER_ID")));
+  }
+
+  private void validateSupportedVoteType(VoteType type) {
+    if (type == VoteType.MEETING_ATTENDANCE
+        || type == VoteType.EXPENSE
+        || type == VoteType.KICK
+        || type == VoteType.LEADER_KICK
+        || type == VoteType.DISSOLVE) {
+      return;
+    }
+    throw new RuntimeException("VOTE_004:지원하지 않는 투표 유형입니다");
+  }
+
+  private GeneralVoteType toGeneralVoteType(VoteType type) {
+    if (type == VoteType.KICK) {
+      return GeneralVoteType.KICK;
+    }
+    if (type == VoteType.LEADER_KICK) {
+      return GeneralVoteType.LEADER_KICK;
+    }
+    if (type == VoteType.DISSOLVE) {
+      return GeneralVoteType.DISSOLVE;
+    }
+    throw new RuntimeException("VOTE_004:일반 투표 유형이 아닙니다");
+  }
+
+  private void expireVote(String voteId, VoteType type) {
+    if (type == VoteType.MEETING_ATTENDANCE) {
+      voteMapper.updateStatus(voteId, VoteStatus.EXPIRED.name());
+      return;
+    }
+    if (type == VoteType.EXPENSE) {
+      expenseVoteMapper.updateStatus(voteId, VoteStatus.EXPIRED.name());
+      ExpenseVote expenseVote = expenseVoteMapper.findById(voteId);
+      if (expenseVote != null) {
+        expenseRequestMapper.updateStatus(expenseVote.getExpenseRequestId(), "REJECTED", null);
+      }
+      return;
+    }
+    generalVoteMapper.updateStatus(voteId, VoteStatus.EXPIRED.name());
+  }
+
   private VoteDto mapToVoteDto(Map<String, Object> map) {
     VoteDto dto = new VoteDto();
     dto.setVoteId(asString(map.get("VOTE_ID")));
@@ -636,19 +859,24 @@ public class VoteService {
       int eligibleCount,
       int requiredCount,
       VoteStatusUpdater updater) {
+    VoteStatus status = determineVoteStatusByCounts(counts, eligibleCount, requiredCount);
+    if (status != null) {
+      updater.update(voteId, status.name());
+    }
+  }
 
+  private VoteStatus determineVoteStatusByCounts(Map<String, Object> counts, int eligibleCount, int requiredCount) {
     int agree = toInt(counts.get("AGREE"));
     int disagree = toInt(counts.get("DISAGREE"));
     int safeEligibleCount = Math.max(eligibleCount, requiredCount);
 
     if (agree >= requiredCount) {
-      updater.update(voteId, VoteStatus.APPROVED.name());
-      return;
+      return VoteStatus.APPROVED;
     }
-
     if (disagree > safeEligibleCount - requiredCount) {
-      updater.update(voteId, VoteStatus.REJECTED.name());
+      return VoteStatus.REJECTED;
     }
+    return null;
   }
 
   // [학습] 현재 투표 상태가 투표 가능한지 판별한다.

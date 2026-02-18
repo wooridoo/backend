@@ -137,5 +137,15 @@
     ORDER BY mvr.attendance_confirmed_at ASC
   </select>
 
+  <select id="countCompletedMeetingsSince" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meetings
+    WHERE challenge_id = #{challengeId}
+      AND created_by = #{userId}
+      AND status = 'COMPLETED'
+      AND completed_at IS NOT NULL
+      AND completed_at &gt;= #{since}
+  </select>
+
 </mapper>
 

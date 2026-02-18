@@ -76,4 +76,7 @@ public interface ChallengeMapper {
 
         // 챌린지 멤버 수 감소
         int decrementCurrentMembers(@Param("challengeId") String challengeId);
+
+        // 리더 활동 시각 갱신
+        int touchLeaderLastActiveAt(@Param("challengeId") String challengeId, @Param("userId") String userId);
 }

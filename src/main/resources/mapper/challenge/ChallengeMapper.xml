@@ -299,4 +299,19 @@
           AND current_members > 0
     </update>
 
+    <update id="touchLeaderLastActiveAt">
+        UPDATE woorido.challenges c
+        SET leader_last_active_at = SYSTIMESTAMP,
+            updated_at = SYSTIMESTAMP
+        WHERE c.id = #{challengeId}
+          AND EXISTS (
+            SELECT 1
+            FROM woorido.challenge_members cm
+            WHERE cm.challenge_id = c.id
+              AND cm.user_id = #{userId}
+              AND cm.role = 'LEADER'
+              AND cm.privilege_status = 'ACTIVE'
+          )
+    </update>
+
 </mapper>

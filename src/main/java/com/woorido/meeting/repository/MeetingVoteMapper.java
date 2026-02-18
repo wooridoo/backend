@@ -23,4 +23,6 @@ public interface MeetingVoteMapper {
 
   // 투표 기록 수정 (참석 상태 변경 등)
   void updateRecord(MeetingVoteRecord record);
+
+  int updateVoteStatus(@Param("voteId") String voteId, @Param("status") String status);
 }

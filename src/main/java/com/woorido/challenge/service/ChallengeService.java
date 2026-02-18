@@ -65,34 +65,35 @@ public class ChallengeService {
   private final LedgerMapper ledgerMapper;
 
   /**
-   * ???????? ???꾩룆???(API 022)
+   * 챌린지를 생성하고 생성자를 리더 멤버로 등록한다.
+   * - 토큰 인증
+   * - 리더 생성 개수 제한(최대 3개)
+   * - 이름 중복/요청값 검증
+   * - 보증금 잠금(선택)
    */
   @Transactional
   // [학습] 챌린지를 생성하고 리더 멤버를 등록한다.
   public CreateChallengeResponse createChallenge(String accessToken, CreateChallengeRequest request) {
 
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
     String token = extractToken(accessToken);
     if (!jwtUtil.validateToken(token)) {
       throw new RuntimeException("AUTH_001:Invalid access token");
     }
     String userId = jwtUtil.getUserIdFromToken(token);
 
-    // 2. ??잙갭큔筌?????????? ??嶺뚮㉡????癲ル슢캉????(?꿔꺂????쭍? 3??
     int leaderCount = challengeMapper.countLeaderChallenges(userId);
     if (leaderCount >= MAX_LEADER_CHALLENGES) {
       throw new RuntimeException("CHALLENGE_007:리더는 동시에 최대 3개의 챌린지만 생성할 수 있습니다");
     }
 
-    // 3. ????ъ군????嚥▲굧????    validateRequest(request);
+    validateRequest(request);
 
-    // 4. ??????????嚥싳쉶瑗??꾧틚???癲ル슢캉????
+
     String normalizedName = request.getName().trim();
     if (challengeMapper.countByName(normalizedName) > 0) {
       throw new RuntimeException("CHALLENGE_011:이미 동일한 이름의 챌린지가 존재합니다");
     }
 
-    // 5. ???????? ???꾩룆???
     LocalDateTime now = LocalDateTime.now();
     String challengeId = UUID.randomUUID().toString();
     Challenge challenge = Challenge.builder()
@@ -101,7 +102,7 @@ public class ChallengeService {
         .description(request.getDescription())
         .category(ChallengeCategory.valueOf(request.getCategory()))
         .creatorId(userId)
-        .currentMembers(1) // ??잙갭큔筌??????
+        .currentMembers(1)
         .minMembers(3)
         .maxMembers(request.getMaxMembers())
         .balance(0L)
@@ -113,7 +114,6 @@ public class ChallengeService {
 
     challengeMapper.insert(challenge);
 
-    // 6. ???????? ?꿔꺂????蹂λ?????꾩룆???(??잙갭큔筌??
     String memberId = UUID.randomUUID().toString();
     DepositStatus depositStatus = request.getDepositAmount() > 0 ? DepositStatus.LOCKED : DepositStatus.NONE;
     LocalDateTime depositLockedAt = request.getDepositAmount() > 0 ? LocalDateTime.now() : null;
@@ -134,12 +134,10 @@ public class ChallengeService {
 
     challengeMemberMapper.insert(member);
 
-    // 7. ??⑤슢???節띾짆??룸쮤?????ャ렑???꿔꺂??節뉖き??
     if (request.getDepositAmount() > 0) {
       lockDeposit(userId, challengeId, request.getDepositAmount());
     }
 
-    // 8. ??????????꾩룆???
     return CreateChallengeResponse.builder()
         .challengeId(challengeId)
         .name(normalizedName)
@@ -155,7 +153,7 @@ public class ChallengeService {
   }
 
   /**
-   * Authorization ????諛몄??????Bearer ????ｋ?????ㅻ쿋驪??
+   * Authorization 헤더에서 Bearer 토큰을 추출한다.
    */
   // [학습] Authorization 헤더에서 Bearer 토큰을 추출한다.
   private String extractToken(String authorization) {
@@ -166,21 +164,35 @@ public class ChallengeService {
   }
 
   /**
-   * ???됰Ŋ???????ъ군????嚥▲굧????
+   * Authorization 헤더(Bearer) 또는 토큰 문자열에서 userId를 추출한다.
+   */
+  private String resolveUserId(String accessToken) {
+    if (accessToken == null || accessToken.isBlank()) {
+      throw new RuntimeException("AUTH_001:Authorization header is required");
+    }
+    String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
+    if (!jwtUtil.validateToken(token)) {
+      throw new RuntimeException("AUTH_001:Invalid access token");
+    }
+    return jwtUtil.getUserIdFromToken(token);
+  }
+
+  /**
+   * 챌린지 생성 요청값을 정책 기준으로 검증한다.
+   * - 후원금: 10,000원 단위
+   * - 보증금: 후원금과 동일
+   * - 시작일: 오늘 기준 최소 7일 이후
    */
   // [학습] 챌린지 생성 요청값의 정책을 검증한다.
   private void validateRequest(CreateChallengeRequest request) {
-    // supportAmount??10,000??????숈춹??????
     if (request.getSupportAmount() % 10000 != 0) {
       throw new RuntimeException("VALIDATION_001:Support amount must be in units of 10000");
     }
 
-    // depositAmount??supportAmount?? ??醫딆┻??貫?????
     if (!request.getDepositAmount().equals(request.getSupportAmount())) {
       throw new RuntimeException("VALIDATION_001:Deposit amount must match support amount");
     }
 
-    // startDate??7?????????壤?
     LocalDate startDate = LocalDate.parse(request.getStartDate());
     LocalDate minStartDate = LocalDate.now().plusDays(7);
     if (startDate.isBefore(minStartDate)) {
@@ -189,7 +201,7 @@ public class ChallengeService {
   }
 
   /**
-   * ??⑤슢???節띾짆??룸쮤?????ャ렑???꿔꺂??節뉖き??
+   * 계좌 잔액에서 보증금을 잠금 처리하고 거래 내역을 기록한다.
    */
   // [학습] 가입 보증금을 계좌에서 잠금 처리한다.
   private void lockDeposit(String userId, String challengeId, Long depositAmount) {
@@ -198,27 +210,21 @@ public class ChallengeService {
       throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
     }
 
-    // ???됰Ŋ?좂춯??癲ル슢캉????
     if (account.getBalance() < depositAmount) {
       throw new RuntimeException("ACCOUNT_002:잔액이 부족합니다");
     }
 
-    // ????⑥쥓猷??????
     Long balanceBefore = account.getBalance();
     Long lockedBefore = account.getLockedBalance();
 
-    // ???됰Ŋ?좂춯???⑤슢堉?????????ャ렑??
     account.setBalance(balanceBefore - depositAmount);
     account.setLockedBalance(lockedBefore + depositAmount);
 
-    // ?????????????????욍걛???ш끽維??
     int updated = accountMapper.update(account);
     if (updated == 0) {
       throw new RuntimeException("ACCOUNT_003:잔액 업데이트에 실패했습니다. 다시 시도해주세요");
     }
 
-    // ?癲ル슢??????????뚯????덈춣?
-    // ?癲ル슢??????????뚯????덈춣?
     AccountTransaction transaction = accountTransactionFactory.createLockTransaction(
         account.getId(),
         depositAmount,
@@ -233,13 +239,12 @@ public class ChallengeService {
   }
 
   /**
-   * ???????? ?꿔꺂??袁ㅻ븶筌믠뫀萸???됰슦????(API 023)
+   * 필터/정렬/페이지 조건으로 챌린지 목록을 조회한다.
    */
   @Transactional(readOnly = true)
   // [학습] 챌린지 목록을 필터/정렬 조건으로 조회한다.
   public ChallengeListResponse getChallengeList(ChallengeListRequest request) {
 
-    // 1. ?꿔꺂??袁ㅻ븶筌믠뫀萸???됰슦????
     List<Map<String, Object>> challenges = challengeMapper.findAllWithFilter(
         request.getStatus(),
         request.getCategory(),
@@ -248,12 +253,10 @@ public class ChallengeService {
         request.getOffset(),
         request.getSize());
 
-    // 2. ????醫딆┻?????됰슦????
     long totalElements = challengeMapper.countAllWithFilter(
         request.getStatus(),
         request.getCategory());
 
-    // 3. ?嚥▲굧??????⑤슢堉???
     List<ChallengeListResponse.ChallengeItem> content = new ArrayList<>();
     for (Map<String, Object> row : challenges) {
       ChallengeListResponse.ChallengeItem item = ChallengeListResponse.ChallengeItem.builder()
@@ -278,7 +281,6 @@ public class ChallengeService {
       content.add(item);
     }
 
-    // 4. ????볥궙?袁р뵾???? ?癲ル슢???ъ쒜???影??낟??
     int totalPages = (int) Math.ceil((double) totalElements / request.getSize());
 
     return ChallengeListResponse.builder()
@@ -331,48 +333,40 @@ public class ChallengeService {
   }
 
   /**
-   * ???????? ????노듋????됰슦????(API 024)
+   * 챌린지 상세를 조회한다.
+   * 토큰이 유효하면 현재 사용자 멤버십 정보도 함께 내려준다.
    */
   @Transactional(readOnly = true)
   // [학습] 챌린지 상세 정보를 조회한다.
   public ChallengeDetailResponse getChallengeDetail(String challengeId, String accessToken) {
 
-    // 1. ???????? ????노듋????됰슦????
     Map<String, Object> challenge = challengeMapper.findDetailById(challengeId);
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
     }
 
-    // 2. ????ｋ???????????ID ???ㅻ쿋驪??(????ｋ???
     String userId = null;
     Boolean isMember = false;
     ChallengeDetailResponse.MyMembership myMembership = null;
 
-    if (accessToken != null && accessToken.startsWith("Bearer ")) {
-      try {
-        String token = accessToken.substring(7);
-        if (jwtUtil.validateToken(token)) {
-          userId = jwtUtil.getUserIdFromToken(token);
+    if (accessToken != null && !accessToken.isBlank()) {
+      String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
+      if (jwtUtil.validateToken(token)) {
+        userId = jwtUtil.getUserIdFromToken(token);
 
-          // 3. ??????꿔꺂????蹂λ?????됰슦????
-          Map<String, Object> membership = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-          if (membership != null) {
-            isMember = true;
-            myMembership = ChallengeDetailResponse.MyMembership.builder()
-                .memberId(getString(membership, "MEMBER_ID"))
-                .role(getString(membership, "ROLE"))
-                .joinedAt(formatTimestamp(membership.get("JOINED_AT")))
-                .status(getString(membership, "STATUS"))
-                .build();
-          }
+        Map<String, Object> membership = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+        if (membership != null) {
+          isMember = true;
+          myMembership = ChallengeDetailResponse.MyMembership.builder()
+              .memberId(getString(membership, "MEMBER_ID"))
+              .role(getString(membership, "ROLE"))
+              .joinedAt(formatTimestamp(membership.get("JOINED_AT")))
+              .status(getString(membership, "STATUS"))
+              .build();
         }
-      } catch (Exception e) {
-        // ????ｋ???嚥▲굧?????????곌숯?????????嶺뚮ㅏ諭???꿔꺂??節뉖き??
-        // ????ｋ???嚥▲굧?????????곌숯?????????嶺뚮ㅏ諭???꿔꺂??節뉖き??
       }
     }
 
-    // 4. ??????????꾩룆???
     return ChallengeDetailResponse.builder()
         .challengeId(getString(challenge, "CHALLENGE_ID"))
         .name(getString(challenge, "NAME"))
@@ -402,14 +396,14 @@ public class ChallengeService {
   }
 
   /**
-   * ???????? ????볥궚??(API 025)
+   * 리더 권한으로 챌린지 정보를 수정한다.
+   * 이름 중복과 최대 인원 정책을 먼저 검증한 뒤 업데이트한다.
    */
   @Transactional
   // [학습] 리더 권한으로 챌린지 정보를 수정한다.
   public UpdateChallengeResponse updateChallenge(String challengeId, String accessToken,
       UpdateChallengeRequest request) {
 
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
     if (accessToken == null || !accessToken.startsWith("Bearer ")) {
       throw new RuntimeException("AUTH_001:Authorization header is required");
     }
@@ -419,19 +413,16 @@ public class ChallengeService {
     }
     String userId = jwtUtil.getUserIdFromToken(token);
 
-    // 2. ???????? ??됰슦????
     Challenge challenge = challengeMapper.findById(challengeId);
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
     }
 
-    // 3. ??잙갭큔筌??????????癲ル슢캉????
     int isLeader = challengeMapper.isLeader(challengeId, userId);
     if (isLeader == 0) {
       throw new RuntimeException("CHALLENGE_004:리더만 접근할 수 있습니다");
     }
 
-    // 4. ??????????嚥싳쉶瑗??꾧틚???癲ル슢캉????(???????⑤슢堉?????
     if (request.getName() != null) {
       String normalizedName = request.getName().trim();
       if (challengeMapper.countByNameExcludingId(normalizedName, challengeId) > 0) {
@@ -439,7 +430,6 @@ public class ChallengeService {
       }
     }
 
-    // 5. maxMembers ?嚥▲굧????(????썹땟???癲ル슢?????????壤? ?꿔꺂?ｉ뜮?뚮쑏?????醫딆쓧???
     if (request.getMaxMembers() != null) {
       if (request.getMaxMembers() < challenge.getCurrentMembers()) {
         throw new RuntimeException("VALIDATION_001:Max members must be greater than or equal to current members(" + challenge.getCurrentMembers() + ")");
@@ -449,7 +439,6 @@ public class ChallengeService {
       }
     }
 
-    // 6. ????볥궚???????썹땟??????繹먮냱??(null??????썹땟?????醫딆┫?傭??????욍걛???ш끽維??
     if (request.getName() != null) {
       challenge.setName(request.getName());
     }
@@ -466,7 +455,6 @@ public class ChallengeService {
       challenge.setMaxMembers(request.getMaxMembers());
     }
 
-    // 7. ?????욍걛???ш끽維???????덊떀
     challengeMapper.update(challenge);
 
     return UpdateChallengeResponse.builder()
@@ -480,20 +468,16 @@ public class ChallengeService {
   }
 
   /**
-   * API 027: ?????????? ?꿔꺂??袁ㅻ븶筌믠뫀萸???됰슦????
+   * 현재 로그인 사용자가 속한 챌린지 목록과 요약 통계를 조회한다.
    */
   // [학습] 내가 속한 챌린지 목록을 조회한다.
   public MyChallengesResponse getMyChallenges(String accessToken, MyChallengesRequest request) {
 
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
-    String token = accessToken.replace("Bearer ", "");
-    String userId = jwtUtil.getUserIdFromToken(token);
+    String userId = resolveUserId(accessToken);
 
-    // 2. ?????????? ?꿔꺂??袁ㅻ븶筌믠뫀萸???됰슦????
     List<Map<String, Object>> myChallenges = challengeMapper.findMyChallenges(
         userId, request.getRole(), request.getStatus());
 
-    // 3. ??????????????????⑤슢堉???
     List<MyChallengesResponse.MyChallengeItem> challengeItems = new ArrayList<>();
     int leaderCount = 0;
     int followerCount = 0;
@@ -502,7 +486,6 @@ public class ChallengeService {
     for (Map<String, Object> row : myChallenges) {
       String role = row.get("MY_ROLE") != null ? row.get("MY_ROLE").toString() : null;
 
-      // Summary ??影??낟??
       if ("LEADER".equals(role)) {
         leaderCount++;
       } else if ("FOLLOWER".equals(role)) {
@@ -530,7 +513,6 @@ public class ChallengeService {
       challengeItems.add(item);
     }
 
-    // 4. Summary ???꾩룆???
     MyChallengesResponse.Summary summary = MyChallengesResponse.Summary.builder()
         .totalChallenges(challengeItems.size())
         .asLeader(leaderCount)
@@ -545,28 +527,24 @@ public class ChallengeService {
   }
 
   /**
-   * API 028: ???????? ????ㅿ폎????ш끽維????됰슦????
+   * 챌린지 계좌(잔액/원장/납부상태)를 조회한다.
+   * 멤버만 조회 가능하다.
    */
   // [학습] 챌린지 계정(잔액/원장) 정보를 조회한다.
   public ChallengeAccountResponse getChallengeAccount(String challengeId, String accessToken) {
 
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
-    String token = accessToken.replace("Bearer ", "");
-    String userId = jwtUtil.getUserIdFromToken(token);
+    String userId = resolveUserId(accessToken);
 
-    // 2. ???????? ??됰슦?????癲ル슢캉????
     Map<String, Object> accountData = challengeMapper.findChallengeAccount(challengeId);
     if (accountData == null) {
       throw new IllegalArgumentException("CHALLENGE_001");
     }
 
-    // 3. ?꿔꺂????蹂λ????? ?癲ル슢캉????
     int isMember = challengeMapper.countMemberByChallengeIdAndUserId(challengeId, userId);
     if (isMember == 0) {
       throw new SecurityException("CHALLENGE_003");
     }
 
-    // 4. ?꿔꺂????쭍???꿸쑨?????????ㅿ폎????됰슦????
     List<Map<String, Object>> recentEntries = challengeMapper.findRecentLedgerEntries(challengeId, 10);
     List<ChallengeAccountResponse.Transaction> transactions = new ArrayList<>();
 
@@ -581,7 +559,6 @@ public class ChallengeService {
       transactions.add(tx);
     }
 
-    // 5. ???됰Ŋ?좂춯??癲ル슢???ъ쒜????ㅻ쿋驪??
     Long balance = getLong(accountData, "BALANCE");
     if (balance == null)
       balance = 0L;
@@ -606,15 +583,13 @@ public class ChallengeService {
     if (currentMembers == null)
       currentMembers = 0;
 
-    // 6. Stats ??影??낟??
     ChallengeAccountResponse.Stats stats = ChallengeAccountResponse.Stats.builder()
         .totalSupport(totalIncome)
         .totalExpense(totalExpense)
-        .totalFee(0L) // ??嶺뚮슣?쒒뜮??猷몄굣?????⑤슢???????影??낟??????썹땟??
+        .totalFee(0L)
         .monthlyAverage(monthlyFee * currentMembers)
         .build();
 
-    // 7. SupportStatus (???繹먮냱議???? ????꾣뤃????影??낟??
     List<ChallengeMember> members = challengeMemberMapper.findAllByChallengeId(challengeId);
     int paidCount = 0;
     int unpaidCount = 0;
@@ -647,7 +622,7 @@ public class ChallengeService {
         .challengeId(challengeId)
         .balance(balance)
         .lockedDeposits(lockedDeposits)
-        .availableBalance(balance) // ??????醫딆쓧??????됰Ŋ?좂춯?= ???됰Ŋ?좂춯?
+        .availableBalance(balance)
         .stats(stats)
         .recentTransactions(transactions)
         .supportStatus(supportStatus)
@@ -655,28 +630,27 @@ public class ChallengeService {
   }
 
   /**
-   * API 030: ???????? ??醫딆쓧???
+   * 챌린지 가입을 처리한다.
+   * - 가입 가능 상태 검증
+   * - 가입 비용(가입비/보증금/첫 후원) 검증 및 차감
+   * - 멤버 등록(재가입 포함)
+   * - 챌린지 잔액/원장 반영
    */
   @Transactional
   // [학습] 챌린지 가입 및 가입금/보증금/첫 후원을 처리한다.
   public JoinChallengeResponse joinChallenge(String challengeId, String accessToken) {
 
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
-    String token = accessToken.replace("Bearer ", "");
-    String userId = jwtUtil.getUserIdFromToken(token);
+    String userId = resolveUserId(accessToken);
 
-    // 2. ???????? ??됰슦?????癲ル슢캉????
     Challenge challenge = challengeMapper.findById(challengeId);
     if (challenge == null) {
       throw new IllegalArgumentException("CHALLENGE_001");
     }
 
-    // 3. ?꿔꺂??袁ㅻ븶?ⓥ뫚留?嚥싳쉶瑗??꾧틡???????????癲? ?癲ル슢캉????
     if (ChallengeStatus.RECRUITING != challenge.getStatus()) {
       throw new IllegalStateException("CHALLENGE_006");
     }
 
-    // 4. ?꿔꺂????蹂λ???????븐뻤???癲ル슢캉????(????ャ렑?????????????醫딆쓧??????곗뒩泳??
     Map<String, Object> existingMember = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
     boolean isRejoin = false;
     String existingMemberId = null;
@@ -686,46 +660,37 @@ public class ChallengeService {
       if ("ACTIVE".equals(status)) {
         throw new IllegalStateException("CHALLENGE_002");
       }
-      // ?????낅뻘 ????븐뻤??쒖뱽????????꿔꺂????紐꾩뗄?
       isRejoin = true;
       existingMemberId = (String) existingMember.get("MEMBER_ID");
     }
 
-    // 5. ?癲ル슢캉????潁????癲ル슢캉????
     if (challenge.getCurrentMembers() >= challenge.getMaxMembers()) {
       throw new IllegalStateException("CHALLENGE_005");
     }
 
-    // 6. ???????影??낟渦???됰슦????
     Account account = accountMapper.findByUserId(userId);
     if (account == null) {
       throw new IllegalArgumentException("ACCOUNT_001");
     }
 
-    // 7. ???????影??낟??
     Long deposit = challenge.getDepositAmount() != null ? challenge.getDepositAmount() : 0L;
 
-    // ?????レ???= ???????? ???됰Ŋ?좂춯?/ (?꿔꺂????蹂λ???- 1) = ???됰Ŧ?뤻툣??????????낇뀘????繹먮굝鍮?
-    // ??잙갭큔筌????筌??節꾪렭癰?鍮???蹂κ텥???熬곣뫖利?猷몃뢾??????살깓???????????????잙갭큔筌????嶺뚮????
-    int followerCount = challenge.getCurrentMembers() - 1; // ??잙갭큔筌????嶺뚮????
+    int followerCount = challenge.getCurrentMembers() - 1;
     if (followerCount < 1)
-      followerCount = 1; // 0 ?熬곣뫖?삥납? (????醫딆쓧?????⑤㈇猿?
+      followerCount = 1;
     Long entryFee = (challenge.getBalance() != null && challenge.getBalance() > 0)
         ? challenge.getBalance() / followerCount
         : 0L;
-    Long firstSupport = 0L; // ????????7?????????寃??욱맪????????猷??????썹땟??(??嶺뚮ㅎ???
+    Long firstSupport = 0L;
     Long totalCost = deposit + entryFee + firstSupport;
 
-    // 8. ???됰Ŋ?좂춯??癲ル슢캉????
     if (account.getBalance() < totalCost) {
       throw new IllegalStateException("ACCOUNT_004");
     }
 
-    // 9. ???됰Ŋ?좂춯??꿔꺂?볟젆怨ㅼ춻??뮻?????⑤슢???節띾짆??룸쮤?????ャ렑??
     Long balanceBefore = account.getBalance();
     Long lockedBefore = account.getLockedBalance();
 
-    // ??????꿔꺂?볟젆怨ㅼ춻??뮻?(??醫딆쓧??????됰Ŋ?좂춯??????꿔꺂?볟젆怨ㅼ춻??뮻?
     if (entryFee > 0) {
       account.setBalance(account.getBalance() - entryFee);
     }
@@ -733,7 +698,6 @@ public class ChallengeService {
       account.setBalance(account.getBalance() - firstSupport);
     }
 
-    // ??⑤슢???節띾짆??룸쮤?????ャ렑??(??醫딆쓧??????됰Ŋ?좂춯??꿔꺂?볟젆怨ㅼ춻??뮻???????ャ렑????꿔꺂?ｉ뜮?뚮쑏?)
     if (deposit > 0) {
       account.setBalance(account.getBalance() - deposit);
       account.setLockedBalance(account.getLockedBalance() + deposit);
@@ -741,11 +705,9 @@ public class ChallengeService {
 
     int updateResult = accountMapper.update(account);
     if (updateResult == 0) {
-      throw new RuntimeException("Failed to update account balance");
+      throw new RuntimeException("ACCOUNT_014:동시 요청으로 계좌 처리에 실패했습니다. 다시 시도해주세요.");
     }
 
-    // Transaction ???뚯????덈춣?
-    // 9-1. ????⑤㈇???(ENTRY_FEE)
     if (entryFee > 0) {
       AccountTransaction entryFeeTx = AccountTransaction.builder()
           .id(UUID.randomUUID().toString())
@@ -761,10 +723,9 @@ public class ChallengeService {
           .createdAt(LocalDateTime.now())
           .build();
       accountMapper.saveTransaction(entryFeeTx);
-      balanceBefore -= entryFee; // ???繹먮굞???癲ル슢????????????꾣뤃????醫딆┣???
+      balanceBefore -= entryFee;
     }
 
-    // 9-2. ???????猷??(SUPPORT)
     if (firstSupport > 0) {
       AccountTransaction supportTx = AccountTransaction.builder()
           .id(UUID.randomUUID().toString())
@@ -783,13 +744,12 @@ public class ChallengeService {
       balanceBefore -= firstSupport;
     }
 
-    // 9-3. ??⑤슢???節띾짆??룸쮤?????ャ렑??(LOCK)
     if (deposit > 0) {
       AccountTransaction lockTx = AccountTransaction.builder()
           .id(UUID.randomUUID().toString())
           .accountId(account.getId())
           .type(TransactionType.LOCK)
-          .amount(-deposit) // ??醫딆쓧???????????醫딆┫???
+          .amount(-deposit)
           .balanceBefore(balanceBefore)
           .balanceAfter(balanceBefore - deposit)
           .lockedBefore(lockedBefore)
@@ -801,8 +761,6 @@ public class ChallengeService {
       accountMapper.saveTransaction(lockTx);
     }
 
-    // 10. ???????? ?꿔꺂????蹂λ???嚥싲갭큔?댁쉩??
-    // 10. ???????? ?꿔꺂????蹂λ???嚥싲갭큔?댁쉩??
     String memberId = isRejoin ? existingMemberId : UUID.randomUUID().toString();
     ChallengeMember member = ChallengeMember.builder()
         .id(memberId)
@@ -823,13 +781,11 @@ public class ChallengeService {
       challengeMemberMapper.insert(member);
     }
 
-    // 11. ???????? ?꿔꺂????蹂λ?????꿔꺂?ｉ뜮?뚮쑏?
     int incResult = challengeMapper.incrementCurrentMembers(challengeId);
     if (incResult == 0) {
       throw new IllegalStateException("CHALLENGE_005"); // current_members 증가 실패
     }
 
-    // [NEW] 12. ???????? ?熬곣뫖利당춯??????逆?(Ledger) ?????욍걛???ш끽維??
     Long totalIncome = 0L;
     if (entryFee > 0)
       totalIncome += entryFee;
@@ -878,7 +834,6 @@ public class ChallengeService {
       }
     }
 
-    // 13. ??????????꾩룆???
     JoinChallengeResponse.Breakdown breakdown = JoinChallengeResponse.Breakdown.builder()
         .entryFee(entryFee)
         .deposit(deposit)
@@ -900,39 +855,33 @@ public class ChallengeService {
   }
 
   /**
-   * API 031: ???????? ?????낅뻘
+   * 챌린지 탈퇴를 처리한다.
+   * 리더는 탈퇴할 수 없으며, 보증금은 환급 처리한다.
    */
   @Transactional
   // [학습] 챌린지 탈퇴 및 보증금 환급을 처리한다.
   public LeaveChallengeResponse leaveChallenge(String challengeId, String accessToken) {
 
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??(Bearer ???곌퇈?뗦틦?
-    String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
-    String userId = jwtUtil.getUserIdFromToken(token);
+    String userId = resolveUserId(accessToken);
 
-    // 2. ??잙갭큔筌??????????癲ル슢캉????
     int isLeader = challengeMapper.isLeader(challengeId, userId);
     if (isLeader > 0) {
       throw new RuntimeException("MEMBER_002:리더는 챌린지를 탈퇴할 수 없습니다");
     }
 
-    // 3. ???????? ??됰슦??????? ?癲ル슢캉????
     Challenge challenge = challengeMapper.findById(challengeId);
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
     }
 
-    // 4. ?꿔꺂????蹂λ????? ?癲ル슢캉????
     int isMember = challengeMapper.countMemberByChallengeIdAndUserId(challengeId, userId);
     if (isMember == 0) {
       throw new RuntimeException("CHALLENGE_003:챌린지 멤버가 아닙니다");
     }
 
-    // 5. ???β넄??????궰????덈????影??낟??
     Long deposit = challenge.getDepositAmount() != null ? challenge.getDepositAmount() : 0L;
-    Long netRefund = deposit; // ?꿔꺂?볟젆怨ㅼ춻??뮻?????ㅼ굡????醫딆쓧???
+    Long netRefund = deposit;
 
-    // 6. ???????影??낟渦????β넄????꿔꺂??節뉖き??
     Account account = accountMapper.findByUserId(userId);
     if (account == null) {
       throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
@@ -942,7 +891,6 @@ public class ChallengeService {
       Long balanceBefore = account.getBalance();
       Long lockedBefore = account.getLockedBalance();
 
-      // ???됰Ŋ?좂춯??꿔꺂?ｉ뜮?뚮쑏?, ????ャ렑?????醫딆┫???
       account.setBalance(balanceBefore + netRefund);
       account.setLockedBalance(lockedBefore - deposit);
 
@@ -951,7 +899,6 @@ public class ChallengeService {
         throw new RuntimeException("ACCOUNT_003:잔액 업데이트에 실패했습니다. 다시 시도해주세요");
       }
 
-      // 7. Transaction ???뚯????덈춣?(REFUND)
       AccountTransaction refundTx = AccountTransaction.builder()
           .id(UUID.randomUUID().toString())
           .accountId(account.getId())
@@ -968,13 +915,10 @@ public class ChallengeService {
       accountMapper.saveTransaction(refundTx);
     }
 
-    // 8. ???????? ?꿔꺂????蹂λ??????醫딆┫???(Optional, trigger might handle it)
     challengeMapper.decrementCurrentMembers(challengeId);
 
-    // 9. ?????낅뻘 ?꿔꺂??節뉖き??(Soft Delete)
     challengeMemberMapper.leaveChallenge(challengeId, userId);
 
-    // 10. ??????????꾩룆???
     LeaveChallengeResponse.Refund refund = LeaveChallengeResponse.Refund.builder()
         .deposit(deposit)
         .deducted(0L)
@@ -991,31 +935,25 @@ public class ChallengeService {
   }
 
   /**
-   * API 032: ???????? ?꿔꺂????蹂λ???꿔꺂??袁ㅻ븶筌믠뫀萸???됰슦????
+   * 챌린지 멤버 목록과 요약 통계를 조회한다.
    */
   // [학습] 챌린지 멤버 목록과 요약 통계를 조회한다.
   public ChallengeMemberListResponse getChallengeMembers(String challengeId, String accessToken, String filterStatus) {
 
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
-    String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
-    String requestUserId = jwtUtil.getUserIdFromToken(token);
+    String requestUserId = resolveUserId(accessToken);
 
-    // 2. ???????? ??됰슦??????? ?癲ル슢캉????
     Challenge challenge = challengeMapper.findById(challengeId);
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
     }
 
-    // 3. ???됰Ŋ????? ?꿔꺂????蹂λ??癲? ?癲ル슢캉????(?꿔꺂????蹂λ??鶯???됰슦??????醫딆쓧???
     int isMember = challengeMapper.countMemberByChallengeIdAndUserId(challengeId, requestUserId);
     if (isMember == 0) {
       throw new RuntimeException("CHALLENGE_003:챌린지 멤버가 아닙니다");
     }
 
-    // 4. ?꿔꺂????蹂λ???꿔꺂??袁ㅻ븶筌믠뫀萸???됰슦????(User Join)
     List<Map<String, Object>> membersData = challengeMemberMapper.findMembersWithUserInfo(challengeId, filterStatus);
 
-    // 5. Response ?꿔꺂?????몃??
     List<ChallengeMemberListResponse.MemberInfo> memberList = new ArrayList<>();
     int activeCount = 0;
     int overdueCount = 0;
@@ -1095,37 +1033,28 @@ public class ChallengeService {
   }
 
   /**
-   * API 026: ???????? ????
-   * - ??잙갭큔筌??????????醫딆쓧???
-   * - ?꿔꺂??袁ㅻ븶?ⓥ뫚留?嚥?RECRUITING) ????븐뻤?????影?쀫븸???????醫딆쓧???
-   * - Soft Delete (status -> DISSOLVED, deleted_at ???繹먮냱??
+   * 모집 중인 챌린지를 삭제(soft delete) 상태로 전환한다.
    */
   @Transactional
   // [학습] 챌린지를 삭제 상태로 전환한다.
   public ChallengeDeleteResponse deleteChallenge(String accessToken,
       String challengeId) {
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
-    String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
-    String userId = jwtUtil.getUserIdFromToken(token);
+    String userId = resolveUserId(accessToken);
 
-    // 2. ???????? ??됰슦????
     Challenge challenge = challengeMapper.findById(challengeId);
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
     }
 
-    // 3. ??잙갭큔筌??????????癲ル슢캉????(creatorId??醫딆쓧? ????썹땟???????썹땟????잙갭큔筌??????????癲ル슢캉????
     int isLeader = challengeMapper.isLeader(challengeId, userId);
     if (isLeader == 0) {
       throw new RuntimeException("CHALLENGE_004:리더만 접근할 수 있습니다");
     }
 
-    // 4. ????븐뻤???癲ル슢캉????(RECRUITING ????븐뻤??쒖뱽????????醫딆쓧???
     if (ChallengeStatus.RECRUITING != challenge.getStatus()) {
       throw new RuntimeException("CHALLENGE_010:모집 중 상태의 챌린지만 삭제할 수 있습니다");
     }
 
-    // 5. Soft Delete ?꿔꺂??節뉖き??
     challenge.setStatus(ChallengeStatus.COMPLETED);
     challenge.setDeletedAt(LocalDateTime.now());
 
@@ -1138,36 +1067,30 @@ public class ChallengeService {
   }
 
   /**
-   * API 029: ???嶺???????????繹먮냱??
+   * 챌린지 멤버의 자동 납입 설정을 변경한다.
    */
   @Transactional
   // [학습] 자동 납입 설정을 변경한다.
   public UpdateSupportSettingsResponse updateSupportSettings(String challengeId,
       String accessToken, UpdateSupportSettingsRequest request) {
-    // 1. ????ｋ???嚥▲굧???????????ID ???ㅻ쿋驪??
-    String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
-    String userId = jwtUtil.getUserIdFromToken(token);
+    String userId = resolveUserId(accessToken);
 
-    // 2. ???????? ??됰슦????
     Challenge challenge = challengeMapper.findById(challengeId);
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
     }
 
-    // 3. ?꿔꺂????蹂λ????癲ル슢캉????
     Map<String, Object> membership = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
     if (membership == null || !"ACTIVE".equals(getString(membership, "STATUS"))) {
       throw new RuntimeException("CHALLENGE_003:챌린지 멤버가 아닙니다");
     }
 
-    // 4. ???嶺???????????繹먮냱???????욍걛???ш끽維??
     String autoPayValue = request.getAutoPayEnabled() ? "Y" : "N";
     int result = challengeMemberMapper.updateAutoPayEnabled(userId, challengeId, autoPayValue);
     if (result == 0) {
       throw new RuntimeException("ERROR:자동 납입 설정 업데이트에 실패했습니다");
     }
 
-    // 5. ???繹먮굞????????????影??낟??(???類ㅺ퉻??嚥??????繹먮굞????1??
     LocalDate nextDate = LocalDate.now().plusMonths(1).withDayOfMonth(1);
 
     return UpdateSupportSettingsResponse.builder()
@@ -1179,47 +1102,38 @@ public class ChallengeService {
   }
 
   /**
-   * API 033: ???????? ?꿔꺂????蹂λ??????노듋????됰슦????
+   * 특정 멤버의 상세 통계/후원 이력을 조회한다.
    */
   // [학습] 특정 멤버의 상세 통계 정보를 조회한다.
   public com.woorido.challenge.dto.response.ChallengeMemberDetailResponse getMemberDetail(String challengeId,
       String memberId, String accessToken) {
-    // 1. ????ｋ???嚥▲굧????
-    String token = accessToken.startsWith("Bearer ") ? accessToken.substring(7) : accessToken;
-    String requestUserId = jwtUtil.getUserIdFromToken(token);
+    String requestUserId = resolveUserId(accessToken);
 
-    // 2. ???????? ??됰슦??????? ?癲ル슢캉????
     Challenge challenge = challengeMapper.findById(challengeId);
     if (challenge == null) {
       throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
     }
 
-    // 3. ???됰Ŋ????? ???????? ?꿔꺂????蹂λ??癲? ?癲ル슢캉????
     int isMember = challengeMapper.countMemberByChallengeIdAndUserId(challengeId, requestUserId);
     if (isMember == 0) {
       throw new RuntimeException("CHALLENGE_003:챌린지 멤버가 아닙니다");
     }
 
-    // 4. ??됰슦?????????꿔꺂????蹂λ??????노듋???癲ル슢???ъ쒜???됰슦????
     Map<String, Object> memberData = challengeMemberMapper.findMemberDetail(challengeId, memberId);
 
     if (memberData == null) {
       throw new RuntimeException("MEMBER_001:멤버 정보를 찾을 수 없습니다");
     }
 
-    // ????????????ㅻ쿋驪??
     String targetUserId = (String) memberData.get("USER_ID");
     Long totalSupportPaid = memberData.get("TOTAL_SUPPORT_PAID") != null
         ? Long.parseLong(memberData.get("TOTAL_SUPPORT_PAID").toString())
         : 0L;
 
-    // 5. ???????影??낟??
-    // 5-1. ?癲????꿔꺂??袁ㅻ븶?????Β?ы닎??얜Ŋ逾η춯?(?????????壤굿?怨룻뱺??癲ル슢?뤸뤃?????붺몭?겹럷???- 0????Β?????쒙쭫??
     int meetingsTotal = 0; // meetingMapper.countTotalMeetings(challengeId);
     int meetingsAttended = 0; // meetingMapper.countAttendedMeetings(challengeId, targetUserId);
-    Double attendanceRate = 0.0; // meetingsTotal > 0 ? (double) meetingsAttended / meetingsTotal * 100 : 0.0;
+    Double attendanceRate = 0.0;
 
-    // 5-2. ?????猷??????嶺?(????썹땟戮녹춿??汝??吏?癒곕㎦? 100.0 ???쒙쭫??or ????????뚯???維◈?
     Double supportRate = totalSupportPaid > 0 ? 100.0 : 0.0;
 
     com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.Stats stats = com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.Stats
@@ -1231,7 +1145,6 @@ public class ChallengeService {
         .meetingsTotal(meetingsTotal)
         .build();
 
-    // 6. ?????猷?????????됰슦????
     List<LedgerEntry> ledgerEntries = ledgerMapper.findSupportHistory(challengeId, targetUserId);
 
     List<com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.SupportHistory> supportHistory = new ArrayList<>();
@@ -1247,7 +1160,6 @@ public class ChallengeService {
           .build());
     }
 
-    // 7. Response ???꾩룆???
     com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.UserInfo userInfo = com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.UserInfo
         .builder()
         .userId(targetUserId)
@@ -1268,12 +1180,11 @@ public class ChallengeService {
   }
 
   // ------------------------------------------------------------------------------------------------
-  // [NEW] API 034: ??잙갭큔筌??????썹땟?④덩?(Transaction Required)
   // ------------------------------------------------------------------------------------------------
   @Transactional
   // [학습] 토큰 기반으로 리더 위임을 수행한다.
   public DelegateLeaderResponse delegateLeaderWithToken(String challengeId, String token, String targetUserId) {
-    String userId = jwtUtil.getUserIdFromToken(token);
+    String userId = resolveUserId(token);
     return delegateLeader(challengeId, userId, targetUserId);
   }
 
@@ -1281,10 +1192,8 @@ public class ChallengeService {
   // [학습] 현재 리더를 다른 멤버에게 위임한다.
   public DelegateLeaderResponse delegateLeader(String challengeId, String userId,
       String targetUserId) {
-    // 1. ????썹땟????잙갭큔筌???? ?嚥▲굧????
     Map<String, Object> myMemberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
 
-    // ???됰Ŧ???븍툖異??????汝??吏??(????볥굜???????
 
     if (myMemberInfo == null ||
         (!"LEADER".equals(myMemberInfo.get("ROLE")) && !"LEADER".equals(myMemberInfo.get("role")))) {
@@ -1294,7 +1203,6 @@ public class ChallengeService {
     if (myMemberId == null)
       myMemberId = (String) myMemberInfo.get("member_id"); // Fallback
 
-    // 2. ?????꿔꺂????蹂λ???嚥▲굧????(UserId????됰슦????
     if (userId.equals(targetUserId)) {
       throw new RuntimeException("본인에게는 리더를 위임할 수 없습니다.");
     }
@@ -1315,7 +1223,6 @@ public class ChallengeService {
       throw new RuntimeException("ACTIVE 상태의 멤버에게만 리더를 위임할 수 있습니다. (현재 상태: " + targetMember.getPrivilegeStatus() + ")");
     }
 
-    // 3. ??????????(Atomic Update)
     int count1 = challengeMemberMapper.updateRole("FOLLOWER", myMemberId, challengeId);
     if (count1 == 0) {
       throw new RuntimeException("ERROR: Failed to update current leader role. ID mismatch? " + myMemberId);
@@ -1326,7 +1233,6 @@ public class ChallengeService {
       throw new RuntimeException("ERROR: Failed to update new leader role. ID mismatch? " + targetMemberId);
     }
 
-    // 4. ??????????꾩룆???(????ㅼ뒭筌????됰슦????????꾣뤃??findMemberDetail ??嶺뚮??↑짆?
     Map<String, Object> myDetail = challengeMemberMapper.findMemberDetail(challengeId, myMemberId);
     Map<String, Object> targetDetail = challengeMemberMapper.findMemberDetail(challengeId, targetMemberId);
 
@@ -1355,7 +1261,10 @@ public class ChallengeService {
   }
 
   /**
-   * ???????? ????ㅻ샑??(??癲??嚥▲굧????100% ???????癲ル슢????
+   * 챌린지를 해산 처리한다.
+   * - 잔액이 있으면 원장에 EXPENSE로 기록 후 0으로 정리
+   * - 챌린지 상태를 COMPLETED로 변경
+   * - 활성 멤버를 탈퇴 처리
    */
   @org.springframework.transaction.annotation.Transactional
   // [학습] 챌린지를 해산하고 멤버 상태를 정리한다.
@@ -1364,22 +1273,15 @@ public class ChallengeService {
     if (challenge == null)
       return;
 
-    // 1. ???됰Ŋ?좂춯??꿔꺂??節뉖き??(??嶺뚮쮳?놂폇????????
-    Long balance = challenge.getBalance();
+    Long balance = challenge.getBalance() != null ? challenge.getBalance() : 0L;
 
     if (balance > 0) {
-      // ?逆? ???뚯????덈춣?(?꿔꺂?????- ??嶺뚮쮳?놂폇????????
       LedgerEntry ledgerEntry = LedgerEntry.builder()
           .id(java.util.UUID.randomUUID().toString())
           .challengeId(challengeId)
           .type(com.woorido.challenge.domain.LedgerEntryType.EXPENSE)
-          .amount(-balance) // ?꿔꺂??????Β?ы닎? ??????용뮋? ???뚯?????癲ル슢캉????????썹땟????????⑤슢?????꿔꺂??????Β?ы닎? amount < 0 or logic handles it.
-                            // LedgerMapper logic usually sums based on type or sign.
-                            // Existing ledger logic uses negative for expense?
-                            // Let's look at `ChallengeService.updateChallenge` logic for reference or
-                            // adjust.
-                            // Creating `EXPENSE` usually means spending money.
-                            // If I set balance to 0, I should record where it went.
+          .amount(-balance)
+          // 해산 시 남은 잔액을 지출로 기록해 원장 합계가 맞도록 맞춘다.
           .balanceBefore(balance)
           .balanceAfter(0L)
           .description("Challenge dissolved - remaining balance")
@@ -1388,13 +1290,8 @@ public class ChallengeService {
       ledgerMapper.insert(ledgerEntry);
 
       challenge.setBalance(0L);
-      // Update challenge balance in DB is handled by updateStatusAndDeletedAt? No,
-      // that updates status.
-      // Need to update balance separately or add it to update query.
-      // challengeMapper.updateBalance(challenge); // This method exists.
     }
 
-    // 2. ???????? ????븐뻤????⑤슢堉???
     challenge.setStatus(ChallengeStatus.COMPLETED);
     challenge.setDeletedAt(LocalDateTime.now());
     challengeMapper.updateStatusAndDeletedAt(challenge);
@@ -1404,7 +1301,6 @@ public class ChallengeService {
       challengeMapper.updateBalance(challenge);
     }
 
-    // 3. ?꿔꺂????蹂λ??????븐뻤????⑤슢堉???
     List<Map<String, Object>> members = challengeMemberMapper.findAllActiveMembers(challengeId);
     for (Map<String, Object> member : members) {
       String userId = (String) member.get("USER_ID");
@@ -1413,11 +1309,9 @@ public class ChallengeService {
   }
 
   /**
-   * ??⑤슢???節띾짆??룸쮤????嶺???롪퍓梨띄댚??(???嚥싳쉶瑗ч뇡癒?낄???????癲ル슢????
-   * - ?????猷?????붺몭?겹럷??댁뮏?????⑤슢???節띾짆??룸쮤???⑥쥓援?????嶺??꿔꺂?볟젆怨ㅼ춻??뮻?
-   * - ?꿔꺂?볟젆怨ㅼ춻??뮻???????????熬곣뫖利당뵓寃밸???(REVOKED)
-   * 
-   * @return true if deduction occurred, false otherwise
+   * 연체 발생 시 보증금에서 월 후원금을 자동 차감한다.
+   *
+   * @return 실제 차감이 발생하면 true, 조건 미충족이면 false
    */
   @org.springframework.transaction.annotation.Transactional
   // [학습] 연체된 후원금을 보증금에서 자동 차감한다.
@@ -1434,27 +1328,21 @@ public class ChallengeService {
     if (monthlyFee <= 0)
       return false;
 
-    // ??醫딆쓧??????됰Ŋ?좂춯??癲ル슢캉????
     if (account.getBalance() >= monthlyFee) {
-      // ??롪퍓梨띄댚????????癲ル슢캉??낆춹?????????꿔꺂??節뉖き??(???꿔꺂???熬곊삳튉??嶺뚮㉡??㎘????붺몭?겹럷??댁뮏???嶺뚮Ĳ????癲ル슢?????嶺뚮슣??땻????
       return false;
     }
 
-    // ??⑤슢???節띾짆??룸쮤????됰Ŋ?좂춯??癲ル슢캉????
     Long lockedBalance = account.getLockedBalance();
     if (lockedBalance < monthlyFee) {
-      // ??⑤슢???節띾짆??룸쮤????ㅻ덫 ???낇뀘???- ???ㅻ쿋?? ??됰슦????????썹땟??(60???????嶺??????낅뻘 ??
       return false;
     }
 
-    // ??⑤슢???節띾짆??룸쮤???⑥쥓援???꿔꺂?볟젆怨ㅼ춻??뮻?
     long balanceBefore = account.getBalance();
     long lockedBefore = lockedBalance;
 
     account.setLockedBalance(lockedBalance - monthlyFee);
     accountMapper.update(account);
 
-    // ?癲ル슢??????????뚯????덈춣?
     AccountTransaction tx = AccountTransaction.builder()
         .id(java.util.UUID.randomUUID().toString())
         .accountId(account.getId())
@@ -1470,12 +1358,10 @@ public class ChallengeService {
         .build();
     accountMapper.saveTransaction(tx);
 
-    // ???????? ??影??낟渦??????⒱닪??
     Long chBalance = challenge.getBalance() != null ? challenge.getBalance() : 0L;
     challenge.setBalance(chBalance + monthlyFee);
     challengeMapper.updateBalance(challenge);
 
-    // ?꿔꺂????蹂λ??????븐뻤???????욍걛???ш끽維?? ??⑤슢???節띾짆??룸쮤??????+ ????????熬곣뫖利당뵓寃밸???
     challengeMemberMapper.updateDepositStatus(challengeId, userId, "USED");
     challengeMemberMapper.updatePrivilegeStatus(challengeId, userId, "REVOKED");
 

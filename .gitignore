@@ -17,3 +17,6 @@ server.log
 api-smoke.ps1
 api-smoke-server.out.log
 api-smoke-server.err.log
+
+# local upload artifacts from API smoke
+uploads/attachments/*

@@ -24,4 +24,6 @@ public interface ExpenseVoteMapper {
   String findMyVote(@Param("voteId") String voteId, @Param("userId") String userId);
 
   int updateStatus(@Param("voteId") String voteId, @Param("status") String status);
+
+  int expirePendingVotes();
 }

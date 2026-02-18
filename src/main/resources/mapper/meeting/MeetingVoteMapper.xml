@@ -58,4 +58,11 @@
         WHERE id = #{id}
   </update>
 
+  <update id="updateVoteStatus">
+        UPDATE woorido.meeting_votes
+        SET status = #{status},
+            closed_at = SYSTIMESTAMP
+        WHERE id = #{voteId}
+  </update>
+
 </mapper>

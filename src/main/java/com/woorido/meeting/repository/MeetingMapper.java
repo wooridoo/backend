@@ -2,6 +2,7 @@ package com.woorido.meeting.repository;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -43,4 +44,9 @@ public interface MeetingMapper {
 
         // 모임 참석자 목록 조회 (AGREE 상태)
         List<Map<String, Object>> findAttendeesByMeetingId(@Param("meetingId") String meetingId);
+
+        // 특정 유저가 최근 완료한 모임 수(리더 강퇴 활성 조건 확인용)
+        int countCompletedMeetingsSince(@Param("challengeId") String challengeId,
+                        @Param("userId") String userId,
+                        @Param("since") LocalDateTime since);
 }

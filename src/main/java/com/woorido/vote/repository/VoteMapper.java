@@ -38,4 +38,6 @@ public interface VoteMapper {
       @Param("choice") String choice);
 
   int updateStatus(@Param("voteId") String voteId, @Param("status") String status);
+
+  int expirePendingVotes();
 }

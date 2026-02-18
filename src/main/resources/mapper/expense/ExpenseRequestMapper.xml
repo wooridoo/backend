@@ -20,4 +20,35 @@
     WHERE id = #{id}
   </select>
 
+  <update id="updateStatus">
+    UPDATE woorido.expense_requests
+    SET status = #{status},
+        approved_at = #{approvedAt, jdbcType=TIMESTAMP}
+    WHERE id = #{id}
+  </update>
+
+  <update id="markExpiredVotingAsRejected">
+    UPDATE woorido.expense_requests er
+    SET status = 'REJECTED',
+        approved_at = NULL
+    WHERE status = 'VOTING'
+      AND EXISTS (
+        SELECT 1
+        FROM woorido.expense_votes ev
+        WHERE ev.expense_request_id = er.id
+          AND ev.status = 'EXPIRED'
+      )
+  </update>
+
+  <select id="countApprovedExpensesSince" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.expense_requests er
+    JOIN woorido.meetings m ON m.id = er.meeting_id
+    WHERE m.challenge_id = #{challengeId}
+      AND er.created_by = #{userId}
+      AND er.status = 'APPROVED'
+      AND er.approved_at IS NOT NULL
+      AND er.approved_at &gt;= #{since}
+  </select>
+
 </mapper>

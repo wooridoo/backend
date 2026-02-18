@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.woorido.expense.repository.PaymentBarcodeMapper">
+
+  <insert id="insert" parameterType="com.woorido.expense.domain.PaymentBarcode">
+    INSERT INTO woorido.payment_barcodes (
+      id, expense_request_id, challenge_id, barcode_number, amount,
+      status, expires_at, created_at
+    ) VALUES (
+      #{id}, #{expenseRequestId}, #{challengeId}, #{barcodeNumber}, #{amount},
+      #{status}, #{expiresAt}, #{createdAt}
+    )
+  </insert>
+
+  <select id="findByExpenseRequestId" resultType="com.woorido.expense.domain.PaymentBarcode">
+    SELECT
+      id,
+      expense_request_id AS expenseRequestId,
+      challenge_id AS challengeId,
+      barcode_number AS barcodeNumber,
+      amount,
+      status,
+      used_at AS usedAt,
+      used_merchant_name AS usedMerchantName,
+      used_merchant_category AS usedMerchantCategory,
+      pg_tx_id AS pgTxId,
+      expires_at AS expiresAt,
+      created_at AS createdAt
+    FROM woorido.payment_barcodes
+    WHERE expense_request_id = #{expenseRequestId}
+  </select>
+
+</mapper>

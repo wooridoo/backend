@@ -327,6 +327,15 @@ public class MeetingService {
     MeetingVote vote = meetingVoteMapper.findByMeetingId(meetingId)
         .orElseThrow(() -> new RuntimeException("MEETING_001:모임 투표를 찾을 수 없습니다"));
 
+    LocalDateTime now = LocalDateTime.now();
+    if (!isAttendanceVoteCastable(vote.getStatus())) {
+      throw new RuntimeException("MEETING_006:모임 참석 투표가 종료되었습니다");
+    }
+    if (vote.getExpiresAt() != null && now.isAfter(vote.getExpiresAt())) {
+      meetingVoteMapper.updateVoteStatus(vote.getId(), "EXPIRED");
+      throw new RuntimeException("MEETING_006:모임 참석 투표가 종료되었습니다");
+    }
+
     // 기존 응답 레코드가 없으면 PENDING 기본 레코드를 생성한다.
     MeetingVoteRecord record = meetingVoteMapper.findRecord(vote.getId(), userId).orElse(null);
     if (record == null) {
@@ -336,19 +345,19 @@ public class MeetingService {
       record.setUserId(userId);
       record.setChoice("PENDING");
       record.setActualAttendance("PENDING");
-      record.setCreatedAt(LocalDateTime.now());
+      record.setCreatedAt(now);
       meetingVoteMapper.insertRecord(record);
     }
 
     LocalDateTime meetingDate = toLocalDateTime(meetingMap.get("MEETING_DATE"));
-    if (meetingDate != null && meetingDate.isBefore(LocalDateTime.now())) {
+    if (meetingDate != null && meetingDate.isBefore(now)) {
       throw new RuntimeException("MEETING_002:이미 지난 모임입니다");
     }
 
     // 하위 호환: 과거 클라이언트는 status 필드를, 최신 클라이언트는 choice 필드를 사용한다.
     String choice = request.getChoice() != null ? request.getChoice() : request.getStatus();
     record.setChoice(choice);
-    record.setAttendanceConfirmedAt(LocalDateTime.now());
+    record.setAttendanceConfirmedAt(now);
     meetingVoteMapper.updateRecord(record);
 
     Map<String, Object> updatedMeeting = meetingMapper.findById(meetingId);
@@ -357,7 +366,7 @@ public class MeetingService {
         .meetingId(meetingId)
         .myAttendance(AttendanceResponseResponse.MyAttendanceInfo.builder()
             .status(choice)
-            .respondedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+            .respondedAt(now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
             .build())
         .attendance(AttendanceResponseResponse.AttendanceStats.builder()
             .confirmed(toInt(updatedMeeting.get("CONFIRMED_COUNT")))
@@ -425,6 +434,7 @@ public class MeetingService {
     meetingUpdate.setCompletedAt(now);
     meetingUpdate.setUpdatedAt(now);
     meetingMapper.complete(meetingUpdate);
+    challengeMapper.touchLeaderLastActiveAt(challengeId, userId);
 
     int totalMembers = toInt(meetingMap.get("TOTAL_MEMBERS"));
 
@@ -434,8 +444,8 @@ public class MeetingService {
         .attendance(CompleteMeetingResponse.AttendanceStats.builder()
             .actual(actualAttendCount)
             // totalMembers가 0인 비정상 데이터에서도 0으로 나누지 않도록 방어한다.
-            .total(totalMembers > 0 ? totalMembers : 1)
-            .rate(totalMembers > 0 ? (double) actualAttendCount / totalMembers * 100 : 100.0)
+            .total(Math.max(totalMembers, 0))
+            .rate(totalMembers > 0 ? (double) actualAttendCount / totalMembers * 100 : 0.0)
             .build())
         .benefit(null)
         .completedAt(now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
@@ -533,6 +543,16 @@ public class MeetingService {
   /**
    * null-safe 문자열 변환.
    */
+  private boolean isAttendanceVoteCastable(String status) {
+    if (status == null) {
+      return true;
+    }
+    String normalized = status.trim().toUpperCase();
+    return "PENDING".equals(normalized)
+        || "OPEN".equals(normalized)
+        || "IN_PROGRESS".equals(normalized);
+  }
+
   private String asString(Object value) {
     return value == null ? null : value.toString();
   }

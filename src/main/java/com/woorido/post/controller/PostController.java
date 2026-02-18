@@ -41,7 +41,7 @@ public class PostController {
                                                                                               // membership
 
   /**
-   * 野껊슣?녷묾? ?臾믨쉐 API
+   * 게시글 작성 API
    * POST /challenges/{challengeId}/posts
    */
   @PostMapping
@@ -89,12 +89,12 @@ public class PostController {
       }
       log.error("Create Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("??뺤쒔 ??살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
   }
 
   /**
-   * 野껊슣?녷묾? ?怨멸쉭 鈺곌퀬??API
+   * 게시글 상세 조회 API
    * GET /challenges/{challengeId}/posts/{postId}
    */
   @GetMapping("/{postId}")
@@ -135,12 +135,12 @@ public class PostController {
       }
       log.error("Get Post Detail Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("??뺤쒔 ??살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
   }
 
   /**
-   * 野껊슣?녷묾? 筌뤴뫖以?鈺곌퀬??API
+   * 게시글 목록 조회 API
    * GET /challenges/{challengeId}/posts
    */
   @GetMapping
@@ -181,12 +181,12 @@ public class PostController {
       }
       log.error("Get Post List Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("??뺤쒔 ??살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
   }
 
   /**
-   * 野껊슣?녷묾? ??륁젟 API
+   * 게시글 수정 API
    * PUT /challenges/{challengeId}/posts/{postId}
    */
   @PutMapping("/{postId}")
@@ -227,12 +227,12 @@ public class PostController {
       }
       log.error("Update Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("??뺤쒔 ??살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
   }
 
   /**
-   * 野껊슣?녷묾? ?ル뿭釉???醫? API
+   * 게시글 좋아요 토글 API
    * POST /challenges/{challengeId}/posts/{postId}/like
    */
   @PostMapping("/{postId}/like")
@@ -269,12 +269,12 @@ public class PostController {
       }
       log.error("Toggle Post Like Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("??뺤쒔 ??살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄"));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
   /**
-   * 野껊슣?녷묾? ????API
+   * 게시글 삭제 API
    * DELETE /challenges/{challengeId}/posts/{postId}
    */
   @DeleteMapping("/{postId}")
@@ -310,12 +310,12 @@ public class PostController {
       }
       log.error("Delete Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("??뺤쒔 ??살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄"));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
   /**
-   * ???뵬 ??낆쨮??API
+   * 파일 업로드 API
    * POST /challenges/{challengeId}/posts/upload
    */
   @PostMapping("/upload")
@@ -359,7 +359,7 @@ public class PostController {
           .contentType(file.getContentType())
           .build();
 
-      return ResponseEntity.ok(ApiResponse.success(response, "???뵬????낆쨮??뺣┷??됰뮸??덈뼄"));
+      return ResponseEntity.ok(ApiResponse.success(response, "파일이 업로드되었습니다"));
 
     } catch (IllegalArgumentException e) {
       String message = e.getMessage();
@@ -373,7 +373,7 @@ public class PostController {
       }
       log.error("File Upload Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("??뺤쒔 ??살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
   }
 }
