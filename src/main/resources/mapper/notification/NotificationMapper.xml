@@ -17,6 +17,24 @@
         <result property="createdAt" column="CREATED_AT"/>
     </resultMap>
 
+    <resultMap id="NotificationSettingsResultMap" type="com.woorido.notification.domain.NotificationSettings">
+        <id property="id" column="ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="pushEnabled" column="PUSH_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="emailEnabled" column="EMAIL_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="smsEnabled" column="SMS_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="voteNotification" column="VOTE_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="meetingNotification" column="MEETING_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="expenseNotification" column="EXPENSE_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="snsNotification" column="SNS_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="systemNotification" column="SYSTEM_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="quietHoursEnabled" column="QUIET_HOURS_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="quietHoursStart" column="QUIET_HOURS_START"/>
+        <result property="quietHoursEnd" column="QUIET_HOURS_END"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+    </resultMap>
+
     <insert id="save" parameterType="com.woorido.notification.domain.Notification">
         INSERT INTO WOORIDO.NOTIFICATIONS (
             ID, USER_ID, TYPE, TITLE, CONTENT, LINK_URL,
@@ -47,11 +65,74 @@
         WHERE ID = #{id}
     </update>
 
+    <update id="markAllAsReadByUserId">
+        UPDATE WOORIDO.NOTIFICATIONS
+        SET IS_READ = 'Y',
+            READ_AT = CURRENT_TIMESTAMP
+        WHERE USER_ID = #{userId}
+          AND IS_READ = 'N'
+    </update>
+
     <select id="countUnreadByUserId" resultType="int">
         SELECT COUNT(*)
         FROM WOORIDO.NOTIFICATIONS
         WHERE USER_ID = #{userId}
         AND IS_READ = 'N'
     </select>
+
+    <select id="findSettingsByUserId" resultMap="NotificationSettingsResultMap">
+        SELECT *
+        FROM WOORIDO.NOTIFICATION_SETTINGS
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <insert id="insertSettings" parameterType="com.woorido.notification.domain.NotificationSettings">
+        INSERT INTO WOORIDO.NOTIFICATION_SETTINGS (
+            ID, USER_ID, CREATED_AT, UPDATED_AT
+        ) VALUES (
+            #{id}, #{userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="updateSettings" parameterType="com.woorido.notification.domain.NotificationSettings">
+        UPDATE WOORIDO.NOTIFICATION_SETTINGS
+        <set>
+            UPDATED_AT = CURRENT_TIMESTAMP,
+            <if test="pushEnabled != null">
+                PUSH_ENABLED = #{pushEnabled, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="emailEnabled != null">
+                EMAIL_ENABLED = #{emailEnabled, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="smsEnabled != null">
+                SMS_ENABLED = #{smsEnabled, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="voteNotification != null">
+                VOTE_NOTIFICATION = #{voteNotification, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="meetingNotification != null">
+                MEETING_NOTIFICATION = #{meetingNotification, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="expenseNotification != null">
+                EXPENSE_NOTIFICATION = #{expenseNotification, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="snsNotification != null">
+                SNS_NOTIFICATION = #{snsNotification, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="systemNotification != null">
+                SYSTEM_NOTIFICATION = #{systemNotification, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="quietHoursEnabled != null">
+                QUIET_HOURS_ENABLED = #{quietHoursEnabled, javaType=java.lang.Boolean, jdbcType=CHAR, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            </if>
+            <if test="quietHoursStart != null">
+                QUIET_HOURS_START = #{quietHoursStart},
+            </if>
+            <if test="quietHoursEnd != null">
+                QUIET_HOURS_END = #{quietHoursEnd},
+            </if>
+        </set>
+        WHERE USER_ID = #{userId}
+    </update>
 
 </mapper>

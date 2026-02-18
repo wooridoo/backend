@@ -25,6 +25,7 @@ import com.woorido.vote.dto.request.CreateVoteRequest;
 import com.woorido.vote.dto.response.CastVoteResponse;
 import com.woorido.vote.dto.response.VoteDetailResponse;
 import com.woorido.vote.dto.response.VoteListResponse;
+import com.woorido.vote.dto.response.VoteResultResponse;
 import com.woorido.vote.repository.ExpenseVoteMapper;
 import com.woorido.vote.repository.GeneralVoteMapper;
 import com.woorido.vote.repository.VoteMapper;
@@ -337,6 +338,49 @@ public class VoteService {
         .requiredApproval(requiredApproval)
         .deadline(deadline)
         .createdAt(createdAt)
+        .build();
+  }
+
+  @Transactional(readOnly = true)
+  // [?숈뒿] ?ы몴 寃곌낵瑜?泥④꼍?먯꽌 ?묐떟?쒕떎.
+  public VoteResultResponse getVoteResult(String voteId, String userId) {
+    Map<String, Object> basicInfo = voteQueryMapper.findByIdBasic(voteId);
+    if (basicInfo == null) {
+      throw new RuntimeException("VOTE_001:?ы몴瑜?李얠쓣 ???놁뒿?덈떎");
+    }
+
+    String challengeId = asString(basicInfo.get("CHALLENGE_ID"));
+    requireMemberAny(challengeId, userId);
+
+    VoteType type = parseVoteType(asString(basicInfo.get("TYPE")));
+    VoteStatus status = parseVoteStatus(asString(basicInfo.get("STATUS")));
+
+    Map<String, Object> counts;
+    if (type == VoteType.MEETING_ATTENDANCE) {
+      counts = voteMapper.findVoteCounts(voteId);
+    } else if (type == VoteType.EXPENSE) {
+      counts = expenseVoteMapper.findVoteCounts(voteId);
+    } else {
+      counts = generalVoteMapper.findVoteCounts(voteId);
+    }
+
+    int eligibleVoters = Math.max(0, toInt(basicInfo.get("ELIGIBLE_COUNT")));
+    int requiredApproval = Math.max(1, toInt(basicInfo.get("REQUIRED_COUNT")));
+    VoteDto.VoteCountDto voteCount = toVoteCount(counts);
+
+    int agree = voteCount.getAgree();
+    boolean passed = status == VoteStatus.APPROVED || (status == VoteStatus.PENDING && agree >= requiredApproval);
+    double approvalRate = eligibleVoters > 0 ? (agree * 100.0) / eligibleVoters : 0.0;
+
+    return VoteResultResponse.builder()
+        .voteId(voteId)
+        .type(type)
+        .status(status)
+        .voteCount(voteCount)
+        .eligibleVoters(eligibleVoters)
+        .requiredApproval(requiredApproval)
+        .passed(passed)
+        .approvalRate(approvalRate)
         .build();
   }
 

@@ -20,4 +20,98 @@
     WHERE id = #{id}
   </select>
 
+  <select id="findAllByChallengeId" resultType="map">
+    SELECT * FROM (
+      SELECT E1.*, ROWNUM AS RNUM
+      FROM (
+        SELECT
+          er.id AS EXPENSE_ID,
+          m.challenge_id AS CHALLENGE_ID,
+          er.meeting_id AS MEETING_ID,
+          er.created_by AS CREATED_BY,
+          u.nickname AS CREATED_BY_NICKNAME,
+          u.profile_image_url AS CREATED_BY_PROFILE_IMAGE,
+          er.title AS TITLE,
+          er.amount AS AMOUNT,
+          er.description AS DESCRIPTION,
+          er.receipt_url AS RECEIPT_URL,
+          er.status AS STATUS,
+          er.created_at AS CREATED_AT,
+          er.approved_at AS APPROVED_AT
+        FROM woorido.expense_requests er
+        JOIN woorido.meetings m ON er.meeting_id = m.id
+        LEFT JOIN woorido.users u ON er.created_by = u.id
+        WHERE m.challenge_id = #{challengeId}
+          <if test="status != null and status != ''">
+            AND er.status = #{status}
+          </if>
+        ORDER BY er.created_at DESC
+      ) E1
+      WHERE ROWNUM &lt;= #{offset} + #{limit}
+    )
+    WHERE RNUM &gt; #{offset}
+  </select>
+
+  <select id="countAllByChallengeId" resultType="long">
+    SELECT COUNT(*)
+    FROM woorido.expense_requests er
+    JOIN woorido.meetings m ON er.meeting_id = m.id
+    WHERE m.challenge_id = #{challengeId}
+      <if test="status != null and status != ''">
+        AND er.status = #{status}
+      </if>
+  </select>
+
+  <select id="sumAmountByChallengeId" resultType="long">
+    SELECT NVL(SUM(er.amount), 0)
+    FROM woorido.expense_requests er
+    JOIN woorido.meetings m ON er.meeting_id = m.id
+    WHERE m.challenge_id = #{challengeId}
+      <if test="status != null and status != ''">
+        AND er.status = #{status}
+      </if>
+  </select>
+
+  <select id="findByIdWithChallenge" resultType="map">
+    SELECT
+      er.id AS EXPENSE_ID,
+      m.challenge_id AS CHALLENGE_ID,
+      er.meeting_id AS MEETING_ID,
+      er.created_by AS CREATED_BY,
+      u.nickname AS CREATED_BY_NICKNAME,
+      u.profile_image_url AS CREATED_BY_PROFILE_IMAGE,
+      er.title AS TITLE,
+      er.amount AS AMOUNT,
+      er.description AS DESCRIPTION,
+      er.receipt_url AS RECEIPT_URL,
+      er.status AS STATUS,
+      er.created_at AS CREATED_AT,
+      er.approved_at AS APPROVED_AT
+    FROM woorido.expense_requests er
+    JOIN woorido.meetings m ON er.meeting_id = m.id
+    LEFT JOIN woorido.users u ON er.created_by = u.id
+    WHERE er.id = #{id}
+      AND m.challenge_id = #{challengeId}
+  </select>
+
+  <update id="update" parameterType="com.woorido.expense.domain.ExpenseRequest">
+    UPDATE woorido.expense_requests
+    <set>
+      <if test="title != null">title = #{title},</if>
+      <if test="amount != null">amount = #{amount},</if>
+      <if test="description != null">description = #{description},</if>
+      <if test="receiptUrl != null">receipt_url = #{receiptUrl},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="approvedAt != null">approved_at = #{approvedAt},</if>
+    </set>
+    WHERE id = #{id}
+  </update>
+
+  <update id="updateStatus">
+    UPDATE woorido.expense_requests
+    SET status = #{status},
+        approved_at = #{approvedAt}
+    WHERE id = #{id}
+  </update>
+
 </mapper>

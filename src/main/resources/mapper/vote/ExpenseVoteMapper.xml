@@ -29,6 +29,22 @@
     WHERE id = #{id}
   </select>
 
+  <select id="findByExpenseRequestId" resultType="com.woorido.vote.domain.ExpenseVote">
+    SELECT id,
+           expense_request_id AS expenseRequestId,
+           eligible_count AS eligibleCount,
+           required_count AS requiredCount,
+           approve_count AS approveCount,
+           reject_count AS rejectCount,
+           status,
+           version,
+           created_at AS createdAt,
+           expires_at AS expiresAt,
+           closed_at AS closedAt
+    FROM woorido.expense_votes
+    WHERE expense_request_id = #{expenseRequestId}
+  </select>
+
   <insert id="insertRecord">
     INSERT INTO woorido.expense_vote_records (
       id, expense_vote_id, user_id, choice, created_at

@@ -3,8 +3,11 @@ package com.woorido.notification.controller;
 import com.woorido.common.dto.ApiResponse;
 import com.woorido.common.util.JwtUtil;
 import com.woorido.notification.domain.Notification;
+import com.woorido.notification.domain.NotificationSettings;
 import com.woorido.notification.dto.NotificationListResponse;
 import com.woorido.notification.dto.NotificationResponse;
+import com.woorido.notification.dto.NotificationSettingsResponse;
+import com.woorido.notification.dto.UpdateNotificationSettingsRequest;
 import com.woorido.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -66,6 +70,58 @@ public class NotificationController {
       String userId = validateAndGetUserId(authHeader);
       notificationService.markAsRead(id, userId);
       return ResponseEntity.ok(ApiResponse.success(null));
+    } catch (RuntimeException e) {
+      return handleError(e);
+    }
+  }
+
+  @GetMapping("/{id}")
+  public ResponseEntity<ApiResponse<NotificationResponse>> getNotification(
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      @PathVariable String id) {
+
+    try {
+      String userId = validateAndGetUserId(authHeader);
+      Notification notification = notificationService.getNotification(id, userId);
+      return ResponseEntity.ok(ApiResponse.success(NotificationResponse.from(notification)));
+    } catch (RuntimeException e) {
+      return handleError(e);
+    }
+  }
+
+  @PutMapping("/read-all")
+  public ResponseEntity<ApiResponse<Void>> markAllAsRead(
+      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+    try {
+      String userId = validateAndGetUserId(authHeader);
+      notificationService.markAllAsRead(userId);
+      return ResponseEntity.ok(ApiResponse.success(null));
+    } catch (RuntimeException e) {
+      return handleError(e);
+    }
+  }
+
+  @GetMapping("/settings")
+  public ResponseEntity<ApiResponse<NotificationSettingsResponse>> getSettings(
+      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+    try {
+      String userId = validateAndGetUserId(authHeader);
+      NotificationSettings settings = notificationService.getSettings(userId);
+      return ResponseEntity.ok(ApiResponse.success(NotificationSettingsResponse.from(settings)));
+    } catch (RuntimeException e) {
+      return handleError(e);
+    }
+  }
+
+  @PutMapping("/settings")
+  public ResponseEntity<ApiResponse<NotificationSettingsResponse>> updateSettings(
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      @RequestBody UpdateNotificationSettingsRequest request) {
+    try {
+      String userId = validateAndGetUserId(authHeader);
+      NotificationSettings updated = notificationService.updateSettings(userId, request);
+      return ResponseEntity.ok(ApiResponse.success(NotificationSettingsResponse.from(updated)));
     } catch (RuntimeException e) {
       return handleError(e);
     }

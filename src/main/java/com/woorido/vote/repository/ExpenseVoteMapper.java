@@ -15,6 +15,8 @@ public interface ExpenseVoteMapper {
 
   ExpenseVote findById(String id);
 
+  ExpenseVote findByExpenseRequestId(@Param("expenseRequestId") String expenseRequestId);
+
   void insertRecord(ExpenseVoteRecord record);
 
   int checkRecordExisting(@Param("voteId") String voteId, @Param("userId") String userId);
