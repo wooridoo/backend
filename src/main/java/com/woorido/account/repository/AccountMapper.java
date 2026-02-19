@@ -38,5 +38,9 @@ public interface AccountMapper {
 
     long sumWithdrawalsThisMonth(String accountId);
 
+    long sumOutgoingToday(String accountId);
+
+    long sumOutgoingThisMonth(String accountId);
+
     void saveTransaction(AccountTransaction transaction);
 }

@@ -21,17 +21,13 @@ public class TransactionHistoryResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class TransactionItem {
-        private Long transactionId; // API 스펙상 Long (실제로는 UUID일 수 있으나 일단 Long으로 정의)
-        // TODO: UUID -> Long 매핑 이슈 해결 필요. 현재는 임시로 해시나 변환 로직이 필요하거나 스펙 변경 필요.
-        // 여기서는 일단 String id를 Long으로 변환하지 못하므로, 차후에 String으로 변경될 가능성 높음.
-        // 하지만 일단은 스펙대로 Long으로 둠.
-
+        private String transactionId;
         private String type;
         private Long amount;
-        private Long balance; // balanceAfter
+        private Long balance;
         private String description;
         private RelatedChallenge relatedChallenge;
-        private String createdAt; // ISO 8601 format
+        private String createdAt;
     }
 
     @Getter
@@ -39,7 +35,7 @@ public class TransactionHistoryResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class RelatedChallenge {
-        private Long challengeId; // API 스펙상 Long
+        private String challengeId;
         private String name;
     }
 
@@ -69,7 +65,7 @@ public class TransactionHistoryResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Period {
-        private String startDate; // YYYY-MM-DD
-        private String endDate; // YYYY-MM-DD
+        private String startDate;
+        private String endDate;
     }
 }

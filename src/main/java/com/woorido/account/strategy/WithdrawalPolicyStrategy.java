@@ -6,4 +6,8 @@ public interface WithdrawalPolicyStrategy {
     void validate(Account account, long amount, long dailyTotal, long monthlyTotal);
 
     long calculateFee(long amount);
+
+    long getDailyLimit();
+
+    long getMonthlyLimit();
 }

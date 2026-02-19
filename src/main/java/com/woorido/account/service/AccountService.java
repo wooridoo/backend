@@ -75,7 +75,17 @@ public class AccountService {
             throw new RuntimeException("ACCOUNT_001:계좌 정보를 찾을 수 없습니다");
         }
 
-        return MyAccountResponse.from(account);
+        long usedToday = accountMapper.sumOutgoingToday(account.getId());
+        long usedThisMonth = accountMapper.sumOutgoingThisMonth(account.getId());
+        long dailyLimit = withdrawalPolicyStrategy.getDailyLimit();
+        long monthlyLimit = withdrawalPolicyStrategy.getMonthlyLimit();
+
+        return MyAccountResponse.from(
+                account,
+                dailyLimit,
+                monthlyLimit,
+                usedToday,
+                usedThisMonth);
     }
 
     /**
@@ -144,12 +154,12 @@ public class AccountService {
         TransactionHistoryResponse.RelatedChallenge related = null;
         if (tx.getRelatedChallengeId() != null) {
             related = TransactionHistoryResponse.RelatedChallenge.builder()
-                    .challengeId(null)
+                    .challengeId(tx.getRelatedChallengeId())
                     .name(null)
                     .build();
         }
 
-        Long transactionId = Math.abs((long) tx.getId().hashCode());
+        String transactionId = tx.getId();
 
         return TransactionHistoryResponse.TransactionItem.builder()
                 .transactionId(transactionId)

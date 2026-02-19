@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.account.repository.AccountMapper">
 
@@ -16,7 +16,7 @@
     </resultMap>
 
     <select id="findByUserId" parameterType="string" resultMap="AccountResultMap">
-        SELECT 
+        SELECT
             id,
             user_id,
             balance,
@@ -41,7 +41,7 @@
 
     <update id="update" parameterType="com.woorido.account.domain.Account">
         UPDATE woorido.accounts
-        SET 
+        SET
             balance = #{balance},
             locked_balance = #{lockedBalance},
             version = version + 1,
@@ -49,7 +49,6 @@
         WHERE id = #{id} AND version = #{version}
     </update>
 
-    <!-- ResultMap for AccountTransaction -->
     <resultMap id="AccountTransactionResultMap" type="com.woorido.account.domain.AccountTransaction">
         <id property="id" column="id" />
         <result property="accountId" column="account_id" />
@@ -68,11 +67,10 @@
         <result property="createdAt" column="created_at" />
     </resultMap>
 
-    <!-- 거래 내역 조회 (페이지네이션) -->
     <select id="findTransactions" parameterType="com.woorido.account.dto.request.TransactionSearchRequest" resultMap="AccountTransactionResultMap">
         SELECT * FROM (
             SELECT t.*, ROWNUM AS rn FROM (
-                SELECT 
+                SELECT
                     at.id,
                     at.account_id,
                     at.type,
@@ -90,22 +88,22 @@
                     at.created_at
                 FROM woorido.account_transactions at
                 WHERE at.account_id = #{accountId}
-        <if test="type != null and type != ''">
+                <if test="type != null and type != ''">
                     AND at.type = #{type}
-        </if>
-        <if test="startDate != null and startDate != ''">
+                </if>
+                <if test="startDate != null and startDate != ''">
                     AND at.created_at >= TO_TIMESTAMP(#{startDate} || ' 00:00:00', 'YYYY-MM-DD HH24:MI:SS')
-        </if>
-        <if test="endDate != null and endDate != ''">
+                </if>
+                <if test="endDate != null and endDate != ''">
                     AND at.created_at &lt;= TO_TIMESTAMP(#{endDate} || ' 23:59:59', 'YYYY-MM-DD HH24:MI:SS')
-        </if>
+                </if>
                 ORDER BY at.created_at DESC
             ) t
             WHERE ROWNUM &lt;= (#{page} + 1) * #{size}
-        ) WHERE rn > #{page} * #{size}
+        )
+        WHERE rn &gt; #{page} * #{size}
     </select>
 
-    <!-- 거래 내역 총 개수 -->
     <select id="countTransactions" parameterType="com.woorido.account.dto.request.TransactionSearchRequest" resultType="long">
         SELECT COUNT(*)
         FROM woorido.account_transactions at
@@ -121,10 +119,9 @@
         </if>
     </select>
 
-    <!-- 총 수입/지출 합계 -->
     <select id="sumAmountsByDirection" parameterType="com.woorido.account.dto.request.TransactionSearchRequest" resultType="java.util.HashMap">
-        SELECT 
-            NVL(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS totalIncome,
+        SELECT
+            NVL(SUM(CASE WHEN amount &gt; 0 THEN amount ELSE 0 END), 0) AS totalIncome,
             NVL(SUM(CASE WHEN amount &lt; 0 THEN ABS(amount) ELSE 0 END), 0) AS totalExpense
         FROM woorido.account_transactions at
         WHERE at.account_id = #{accountId}
@@ -139,24 +136,42 @@
         </if>
     </select>
 
-    <!-- 오늘 출금 합계 -->
     <select id="sumWithdrawalsToday" parameterType="string" resultType="long">
-        SELECT NVL(SUM(ABS(amount)), 0) FROM woorido.account_transactions
-        WHERE account_id = #{accountId} AND type = 'WITHDRAW'
-        AND created_at >= TRUNC(SYSTIMESTAMP)
-        AND created_at &lt; TRUNC(SYSTIMESTAMP) + 1
+        SELECT NVL(SUM(ABS(amount)), 0)
+        FROM woorido.account_transactions
+        WHERE account_id = #{accountId}
+          AND type = 'WITHDRAW'
+          AND created_at &gt;= TRUNC(SYSTIMESTAMP)
+          AND created_at &lt; TRUNC(SYSTIMESTAMP) + 1
     </select>
 
-    <!-- 이번달 출금 합계 -->
     <select id="sumWithdrawalsThisMonth" parameterType="string" resultType="long">
-        SELECT NVL(SUM(ABS(amount)), 0) FROM woorido.account_transactions
-        WHERE account_id = #{accountId} AND type = 'WITHDRAW'
-        AND created_at >= TRUNC(SYSTIMESTAMP, 'MM')
-        AND created_at &lt; ADD_MONTHS(TRUNC(SYSTIMESTAMP, 'MM'), 1)
+        SELECT NVL(SUM(ABS(amount)), 0)
+        FROM woorido.account_transactions
+        WHERE account_id = #{accountId}
+          AND type = 'WITHDRAW'
+          AND created_at &gt;= TRUNC(SYSTIMESTAMP, 'MM')
+          AND created_at &lt; ADD_MONTHS(TRUNC(SYSTIMESTAMP, 'MM'), 1)
     </select>
 
+    <select id="sumOutgoingToday" parameterType="string" resultType="long">
+        SELECT NVL(SUM(ABS(amount)), 0)
+        FROM woorido.account_transactions
+        WHERE account_id = #{accountId}
+          AND amount &lt; 0
+          AND created_at &gt;= TRUNC(SYSTIMESTAMP)
+          AND created_at &lt; TRUNC(SYSTIMESTAMP) + 1
+    </select>
 
-    <!-- 거래 내역 저장 -->
+    <select id="sumOutgoingThisMonth" parameterType="string" resultType="long">
+        SELECT NVL(SUM(ABS(amount)), 0)
+        FROM woorido.account_transactions
+        WHERE account_id = #{accountId}
+          AND amount &lt; 0
+          AND created_at &gt;= TRUNC(SYSTIMESTAMP, 'MM')
+          AND created_at &lt; ADD_MONTHS(TRUNC(SYSTIMESTAMP, 'MM'), 1)
+    </select>
+
     <insert id="saveTransaction" parameterType="com.woorido.account.domain.AccountTransaction">
         INSERT INTO woorido.account_transactions (
             id, account_id, type, amount, balance_before, balance_after,
@@ -169,17 +184,15 @@
         )
     </insert>
 
-    <!-- 이번달 서포트 횟수 조회 -->
     <select id="countSupportByMonth" resultType="int">
         SELECT COUNT(*)
         FROM woorido.account_transactions
         WHERE account_id = #{accountId}
           AND type = 'SUPPORT'
           AND related_challenge_id = #{challengeId}
-          AND created_at >= TRUNC(SYSTIMESTAMP, 'MM')
+          AND created_at &gt;= TRUNC(SYSTIMESTAMP, 'MM')
     </select>
 
-    <!-- 전체 기간 서포트 횟수 조회 (첫 서포트 여부) -->
     <select id="countTotalSupport" resultType="int">
         SELECT COUNT(*)
         FROM woorido.account_transactions

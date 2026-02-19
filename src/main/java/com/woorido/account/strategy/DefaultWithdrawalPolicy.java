@@ -12,24 +12,31 @@ public class DefaultWithdrawalPolicy implements WithdrawalPolicyStrategy {
 
     @Override
     public void validate(Account account, long amount, long dailyTotal, long monthlyTotal) {
-        // 1. 잔액 체크 (잔액 < 출금액)
         if (account.getBalance() < amount) {
-            throw new RuntimeException("ACCOUNT_003:출금 가능 금액을 초과했습니다");
+            throw new RuntimeException("ACCOUNT_003:Insufficient balance for withdrawal");
         }
 
-        // 2. 일일 한도 체크
         if (dailyTotal + amount > DAILY_LIMIT) {
-            throw new RuntimeException("ACCOUNT_005:일일 출금 한도를 초과했습니다");
+            throw new RuntimeException("ACCOUNT_005:Daily withdrawal limit exceeded");
         }
 
-        // 3. 월간 한도 체크
         if (monthlyTotal + amount > MONTHLY_LIMIT) {
-            throw new RuntimeException("ACCOUNT_006:월간 출금 한도를 초과했습니다");
+            throw new RuntimeException("ACCOUNT_006:Monthly withdrawal limit exceeded");
         }
     }
 
     @Override
     public long calculateFee(long amount) {
-        return 0L; // 수수료 무료 정책
+        return 0L;
+    }
+
+    @Override
+    public long getDailyLimit() {
+        return DAILY_LIMIT;
+    }
+
+    @Override
+    public long getMonthlyLimit() {
+        return MONTHLY_LIMIT;
     }
 }
