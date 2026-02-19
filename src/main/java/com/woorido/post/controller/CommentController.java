@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -56,9 +57,11 @@ public class CommentController {
   @GetMapping
   public ResponseEntity<ApiResponse<List<CommentResponse>>> getComments(
       @PathVariable("challengeId") String challengeId,
-      @PathVariable("postId") String postId) {
+      @PathVariable("postId") String postId,
+      @RequestParam(value = "page", defaultValue = "0") int page,
+      @RequestParam(value = "size", defaultValue = "50") int size) {
 
-    List<CommentResponse> comments = commentService.getComments(postId);
+    List<CommentResponse> comments = commentService.getComments(postId, page, size);
     return ResponseEntity.ok(ApiResponse.success(comments));
   }
 

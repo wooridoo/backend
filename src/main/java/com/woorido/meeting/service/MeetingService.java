@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -451,6 +452,88 @@ public class MeetingService {
         .completedAt(now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
         .message("모임 완료 처리되었습니다")
         .build();
+  }
+
+  /**
+   * 모임 삭제.
+   * 리더 권한 검증 후 모임/참석 투표 데이터를 정리한다.
+   */
+  @Transactional
+  public Map<String, Object> deleteMeeting(String meetingId, String accessToken) {
+    String userId = resolveUserId(accessToken);
+
+    Map<String, Object> meetingMap = meetingMapper.findById(meetingId);
+    if (meetingMap == null) {
+      throw new RuntimeException("MEETING_001:모임을 찾을 수 없습니다");
+    }
+
+    String challengeId = asString(meetingMap.get("CHALLENGE_ID"));
+    requireLeader(challengeId, userId);
+
+    if ("COMPLETED".equals(asString(meetingMap.get("STATUS")))) {
+      throw new RuntimeException("MEETING_005:이미 완료된 모임입니다");
+    }
+
+    MeetingVote vote = meetingVoteMapper.findByMeetingId(meetingId).orElse(null);
+    if (vote != null) {
+      meetingVoteMapper.deleteRecordsByMeetingVoteId(vote.getId());
+      meetingVoteMapper.deleteVoteById(vote.getId());
+    }
+
+    meetingMapper.deleteById(meetingId);
+
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put("meetingId", meetingId);
+    response.put("deletedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    return response;
+  }
+
+  /**
+   * 모임 참석 의사 취소.
+   */
+  @Transactional
+  public Map<String, Object> cancelAttendance(String meetingId, String accessToken) {
+    String userId = resolveUserId(accessToken);
+
+    Map<String, Object> meetingMap = meetingMapper.findById(meetingId);
+    if (meetingMap == null) {
+      throw new RuntimeException("MEETING_001:모임을 찾을 수 없습니다");
+    }
+
+    String challengeId = asString(meetingMap.get("CHALLENGE_ID"));
+    requireMemberActive(challengeId, userId);
+
+    LocalDateTime meetingDate = toLocalDateTime(meetingMap.get("MEETING_DATE"));
+    if (meetingDate != null && meetingDate.isBefore(LocalDateTime.now())) {
+      throw new RuntimeException("MEETING_002:이미 지난 모임입니다");
+    }
+
+    MeetingVote vote = meetingVoteMapper.findByMeetingId(meetingId)
+        .orElseThrow(() -> new RuntimeException("MEETING_001:모임 투표를 찾을 수 없습니다"));
+
+    MeetingVoteRecord record = meetingVoteMapper.findRecord(vote.getId(), userId).orElse(null);
+    if (record == null || "PENDING".equalsIgnoreCase(asString(record.getChoice()))) {
+      throw new RuntimeException("MEETING_006:참석 의사를 표시하지 않았습니다");
+    }
+
+    record.setChoice("PENDING");
+    record.setActualAttendance("PENDING");
+    record.setAttendanceConfirmedAt(null);
+    meetingVoteMapper.updateRecord(record);
+
+    Map<String, Object> updatedMeeting = meetingMapper.findById(meetingId);
+    Map<String, Object> attendance = new LinkedHashMap<>();
+    attendance.put("confirmed", toInt(updatedMeeting.get("CONFIRMED_COUNT")));
+    attendance.put("declined", toInt(updatedMeeting.get("DECLINED_COUNT")));
+    attendance.put("pending", toInt(updatedMeeting.get("PENDING_COUNT")));
+    attendance.put("total", toInt(updatedMeeting.get("TOTAL_MEMBERS")));
+
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put("meetingId", meetingId);
+    response.put("myAttendance", null);
+    response.put("attendance", attendance);
+    response.put("cancelledAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    return response;
   }
 
   /**

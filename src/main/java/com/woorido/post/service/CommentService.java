@@ -112,7 +112,7 @@ public class CommentService {
    * 루트 댓글을 기준으로 답글 트리를 재귀적으로 구성한다.
    */
   @Transactional(readOnly = true)
-  public List<CommentResponse> getComments(String postId) {
+  public List<CommentResponse> getComments(String postId, int page, int size) {
     List<Comment> comments = commentMapper.findAllByPostId(postId);
     if (comments.isEmpty()) {
       return new ArrayList<>();
@@ -137,7 +137,7 @@ public class CommentService {
       }
     }
 
-    return comments.stream()
+    List<CommentResponse> rootComments = comments.stream()
         .filter(c -> c.getParentId() == null)
         .map(c -> CommentResponse.builder()
             .id(c.getId())
@@ -150,6 +150,12 @@ public class CommentService {
             .replies(getReplies(c.getId(), comments, authorMap))
             .build())
         .collect(Collectors.toList());
+
+    int safePage = Math.max(page, 0);
+    int safeSize = Math.max(size, 1);
+    int fromIndex = Math.min(safePage * safeSize, rootComments.size());
+    int toIndex = Math.min(fromIndex + safeSize, rootComments.size());
+    return rootComments.subList(fromIndex, toIndex);
   }
 
   /**

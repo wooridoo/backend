@@ -274,6 +274,45 @@ public class PostController {
   }
 
   /**
+   * 게시글 좋아요 취소 API
+   * DELETE /challenges/{challengeId}/posts/{postId}/like
+   */
+  @DeleteMapping("/{postId}/like")
+  public ResponseEntity<ApiResponse<com.woorido.post.dto.response.PostLikeResponse>> unlikePost(
+      @PathVariable("challengeId") String challengeId,
+      @PathVariable("postId") String postId,
+      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+    try {
+      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("AUTH_001:Authorization header is required");
+      }
+      String accessToken = authHeader.substring(7);
+
+      if (!jwtUtil.validateToken(accessToken)) {
+        throw new RuntimeException("AUTH_002:Invalid access token");
+      }
+      String userId = jwtUtil.getUserIdFromToken(accessToken);
+
+      com.woorido.post.dto.response.PostLikeResponse response = postService.unlikePost(challengeId, postId, userId);
+      return ResponseEntity.ok(ApiResponse.success(response, "Post like removed"));
+    } catch (IllegalArgumentException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith("MEMBER_001")) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(message));
+    } catch (RuntimeException e) {
+      if (e.getMessage() != null && e.getMessage().startsWith("AUTH_")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
+      }
+      log.error("Unlike Post Error", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
    * 게시글 삭제 API
    * DELETE /challenges/{challengeId}/posts/{postId}
    */

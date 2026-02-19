@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
@@ -201,6 +202,64 @@ public class MeetingController {
           return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("이미 완료된 모임입니다"));
         if (message.startsWith("ACCOUNT_004"))
           return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("챌린지 잔액이 부족하거나 계좌 오류입니다"));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
+   * 모임 삭제 API (API 041)
+   * DELETE /meetings/{meetingId}
+   */
+  @DeleteMapping("/meetings/{meetingId}")
+  public ResponseEntity<ApiResponse<Object>> deleteMeeting(
+      @PathVariable("meetingId") String meetingId,
+      @RequestHeader("Authorization") String authorization) {
+
+    try {
+      Object response = meetingService.deleteMeeting(meetingId, authorization);
+      return ResponseEntity.ok(ApiResponse.success(response, "모임이 삭제되었습니다"));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("AUTH_001"))
+          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+        if (message.startsWith("MEETING_001"))
+          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
+        if (message.startsWith("CHALLENGE_004"))
+          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("리더만 모임을 삭제할 수 있습니다"));
+        if (message.startsWith("MEETING_005"))
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("이미 완료된 모임은 삭제할 수 없습니다"));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
+   * 참석 취소 API (API 092)
+   * DELETE /meetings/{meetingId}/attendance
+   */
+  @DeleteMapping("/meetings/{meetingId}/attendance")
+  public ResponseEntity<ApiResponse<Object>> cancelAttendance(
+      @PathVariable("meetingId") String meetingId,
+      @RequestHeader("Authorization") String authorization) {
+
+    try {
+      Object response = meetingService.cancelAttendance(meetingId, authorization);
+      return ResponseEntity.ok(ApiResponse.success(response, "참석 의사가 취소되었습니다"));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("AUTH_001"))
+          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+        if (message.startsWith("MEETING_001"))
+          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
+        if (message.startsWith("MEETING_002") || message.startsWith("MEETING_006"))
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+        if (message.startsWith("CHALLENGE_003"))
+          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));

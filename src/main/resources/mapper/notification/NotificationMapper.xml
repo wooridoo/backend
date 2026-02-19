@@ -27,11 +27,42 @@
         )
     </insert>
 
-    <select id="findAllByUserId" resultMap="NotificationResultMap">
-        SELECT *
+    <select id="findByUserIdWithFilters" resultMap="NotificationResultMap">
+        SELECT * FROM (
+            SELECT A.*, ROWNUM AS RNUM
+            FROM (
+                SELECT *
+                FROM WOORIDO.NOTIFICATIONS
+                WHERE USER_ID = #{userId}
+                <if test="types != null and types.size() > 0">
+                    AND TYPE IN
+                    <foreach collection="types" item="type" open="(" separator="," close=")">
+                        #{type}
+                    </foreach>
+                </if>
+                <if test="isRead != null">
+                    AND IS_READ = <choose><when test="isRead">'Y'</when><otherwise>'N'</otherwise></choose>
+                </if>
+                ORDER BY CREATED_AT DESC
+            ) A
+            WHERE ROWNUM &lt;= (#{offset} + #{limit})
+        )
+        WHERE RNUM &gt; #{offset}
+    </select>
+
+    <select id="countByUserIdWithFilters" resultType="long">
+        SELECT COUNT(*)
         FROM WOORIDO.NOTIFICATIONS
         WHERE USER_ID = #{userId}
-        ORDER BY CREATED_AT DESC
+        <if test="types != null and types.size() > 0">
+            AND TYPE IN
+            <foreach collection="types" item="type" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+        <if test="isRead != null">
+            AND IS_READ = <choose><when test="isRead">'Y'</when><otherwise>'N'</otherwise></choose>
+        </if>
     </select>
 
     <select id="findById" resultMap="NotificationResultMap">
@@ -45,6 +76,14 @@
         SET IS_READ = 'Y',
             READ_AT = CURRENT_TIMESTAMP
         WHERE ID = #{id}
+    </update>
+
+    <update id="updateAllAsReadByUserId">
+        UPDATE WOORIDO.NOTIFICATIONS
+        SET IS_READ = 'Y',
+            READ_AT = CURRENT_TIMESTAMP
+        WHERE USER_ID = #{userId}
+          AND IS_READ = 'N'
     </update>
 
     <select id="countUnreadByUserId" resultType="int">

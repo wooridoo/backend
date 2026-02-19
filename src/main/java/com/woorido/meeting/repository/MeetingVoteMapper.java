@@ -25,4 +25,8 @@ public interface MeetingVoteMapper {
   void updateRecord(MeetingVoteRecord record);
 
   int updateVoteStatus(@Param("voteId") String voteId, @Param("status") String status);
+
+  int deleteRecordsByMeetingVoteId(@Param("voteId") String voteId);
+
+  int deleteVoteById(@Param("voteId") String voteId);
 }

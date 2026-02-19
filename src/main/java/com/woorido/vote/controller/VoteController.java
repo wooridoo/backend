@@ -7,6 +7,7 @@ import com.woorido.vote.dto.request.CastVoteRequest;
 import com.woorido.vote.dto.request.CreateVoteRequest;
 import com.woorido.vote.dto.response.CastVoteResponse;
 import com.woorido.vote.dto.response.VoteListResponse;
+import com.woorido.vote.dto.response.VoteResultResponse;
 import com.woorido.vote.service.VoteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -86,6 +87,20 @@ public class VoteController {
     try {
       String userId = extractUserId(authorization);
       CastVoteResponse response = voteService.castVote(voteId, userId, request);
+      return ResponseEntity.ok(ApiResponse.success(response));
+    } catch (RuntimeException e) {
+      return handleError(e);
+    }
+  }
+
+  @GetMapping("/votes/{voteId}/result")
+  public ResponseEntity<ApiResponse<VoteResultResponse>> getVoteResult(
+      @PathVariable("voteId") String voteId,
+      @RequestHeader("Authorization") String authorization) {
+
+    try {
+      String userId = extractUserId(authorization);
+      VoteResultResponse response = voteService.getVoteResult(voteId, userId);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
       return handleError(e);

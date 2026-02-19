@@ -1,6 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.woorido.challenge.repository.LedgerMapper">
+  <resultMap id="LedgerEntryResultMap" type="com.woorido.challenge.domain.LedgerEntry">
+    <id property="id" column="id"/>
+    <result property="challengeId" column="challenge_id"/>
+    <result property="type" column="type"/>
+    <result property="amount" column="amount"/>
+    <result property="balanceBefore" column="balance_before"/>
+    <result property="balanceAfter" column="balance_after"/>
+    <result property="description" column="description"/>
+    <result property="relatedUserId" column="related_user_id"/>
+    <result property="relatedMeetingId" column="related_meeting_id"/>
+    <result property="relatedExpenseRequestId" column="related_expense_request_id"/>
+    <result property="relatedBarcodeId" column="related_barcode_id"/>
+    <result property="merchantName" column="merchant_name"/>
+    <result property="merchantCategory" column="merchant_category"/>
+    <result property="pgProvider" column="pg_provider"/>
+    <result property="pgApprovalNumber" column="pg_approval_number"/>
+    <result property="memo" column="memo"/>
+    <result property="memoUpdatedAt" column="memo_updated_at"/>
+    <result property="memoUpdatedBy" column="memo_updated_by"/>
+    <result property="createdAt" column="created_at"/>
+  </resultMap>
+
   <insert id="insert" parameterType="com.woorido.challenge.domain.LedgerEntry">
         INSERT INTO woorido.ledger_entries (
             id, challenge_id, type, amount, description,
@@ -20,12 +42,59 @@
         )
   </insert>
 
-  <select id="findSupportHistory" resultType="com.woorido.challenge.domain.LedgerEntry">
+  <select id="findSupportHistory" resultMap="LedgerEntryResultMap">
     SELECT *
     FROM woorido.ledger_entries
     WHERE challenge_id = #{challengeId}
       AND related_user_id = #{userId}
       AND type = 'SUPPORT'
     ORDER BY created_at DESC
+  </select>
+
+  <select id="findByChallengeId" resultMap="LedgerEntryResultMap">
+    SELECT * FROM (
+      SELECT A.*, ROWNUM AS RNUM
+      FROM (
+        SELECT *
+        FROM woorido.ledger_entries
+        WHERE challenge_id = #{challengeId}
+        ORDER BY created_at DESC
+      ) A
+      WHERE ROWNUM &lt;= (#{offset} + #{limit})
+    )
+    WHERE RNUM &gt; #{offset}
+  </select>
+
+  <select id="countByChallengeId" resultType="long">
+    SELECT COUNT(*)
+    FROM woorido.ledger_entries
+    WHERE challenge_id = #{challengeId}
+  </select>
+
+  <select id="findById" resultMap="LedgerEntryResultMap">
+    SELECT *
+    FROM woorido.ledger_entries
+    WHERE id = #{entryId}
+  </select>
+
+  <update id="updateLedgerEntry" parameterType="com.woorido.challenge.domain.LedgerEntry">
+    UPDATE woorido.ledger_entries
+    <set>
+      <if test="description != null">description = #{description},</if>
+      <if test="memo != null">memo = #{memo},</if>
+      <if test="memoUpdatedAt != null">memo_updated_at = #{memoUpdatedAt},</if>
+      <if test="memoUpdatedBy != null">memo_updated_by = #{memoUpdatedBy}</if>
+    </set>
+    WHERE id = #{id}
+  </update>
+
+  <select id="summarizeByChallengeId" resultType="java.util.Map">
+    SELECT
+      NVL(SUM(CASE WHEN type IN ('SUPPORT', 'ENTRY_FEE', 'REFUND') THEN amount ELSE 0 END), 0) AS TOTAL_INCOME,
+      NVL(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS TOTAL_EXPENSE,
+      NVL(SUM(CASE WHEN type IN ('SUPPORT', 'ENTRY_FEE', 'REFUND') THEN amount ELSE -amount END), 0) AS BALANCE,
+      COUNT(*) AS ENTRY_COUNT
+    FROM woorido.ledger_entries
+    WHERE challenge_id = #{challengeId}
   </select>
 </mapper>

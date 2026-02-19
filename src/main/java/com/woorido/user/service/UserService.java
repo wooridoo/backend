@@ -11,12 +11,16 @@ import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
 import com.woorido.common.util.JwtUtil;
 import com.woorido.user.dto.request.UserUpdateRequest;
+import com.woorido.user.dto.request.UserPasswordChangeRequest;
 import com.woorido.user.dto.response.NicknameCheckResponse;
+import com.woorido.user.dto.response.UserPasswordChangeResponse;
 import com.woorido.user.dto.response.UserProfileResponse;
+import com.woorido.user.dto.response.UserPublicProfileResponse;
 import com.woorido.user.dto.response.UserUpdateResponse;
 import com.woorido.user.dto.response.UserWithdrawResponse;
 
 import lombok.RequiredArgsConstructor;
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
@@ -198,5 +202,78 @@ public class UserService {
             return NicknameCheckResponse.unavailable(nickname);
         }
         return NicknameCheckResponse.available(nickname);
+    }
+
+    /**
+     * 비밀번호 변경.
+     */
+    public UserPasswordChangeResponse changePassword(String accessToken, UserPasswordChangeRequest request) {
+        if (!jwtUtil.validateToken(accessToken)) {
+            throw new RuntimeException("AUTH_001:인증이 필요합니다");
+        }
+
+        String userId = jwtUtil.getUserIdFromToken(accessToken);
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new RuntimeException("AUTH_001:인증이 필요합니다");
+        }
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("USER_003:현재 비밀번호가 일치하지 않습니다");
+        }
+
+        if (!request.getNewPassword().equals(request.getNewPasswordConfirm())) {
+            throw new RuntimeException("VALIDATION_001:새 비밀번호 확인이 일치하지 않습니다");
+        }
+
+        if (!isValidPassword(request.getNewPassword())) {
+            throw new RuntimeException("VALIDATION_001:비밀번호 형식이 올바르지 않습니다");
+        }
+
+        userMapper.updatePassword(userId, passwordEncoder.encode(request.getNewPassword()));
+
+        return UserPasswordChangeResponse.builder()
+                .passwordChanged(true)
+                .build();
+    }
+
+    /**
+     * 사용자 공개 프로필 조회.
+     */
+    public UserPublicProfileResponse getUserProfile(String accessToken, String targetUserId) {
+        if (!jwtUtil.validateToken(accessToken)) {
+            throw new RuntimeException("AUTH_001:인증이 필요합니다");
+        }
+
+        User user = userMapper.findById(targetUserId);
+        if (user == null) {
+            throw new RuntimeException("USER_001:사용자를 찾을 수 없습니다");
+        }
+
+        int completedChallenges = userMapper.countCompletedChallengesByUserId(targetUserId);
+        return UserPublicProfileResponse.builder()
+                .userId(user.getId())
+                .nickname(user.getNickname())
+                .profileImage(user.getProfileImageUrl())
+                .brix(0.0)
+                .stats(UserPublicProfileResponse.Stats.builder()
+                        .completedChallenges(completedChallenges)
+                        .totalMeetings(0)
+                        .build())
+                .commonChallenges(Collections.emptyList())
+                .isVerified(Boolean.TRUE.equals(user.getIsVerified()))
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().format(DATETIME_FORMATTER) : null)
+                .build();
+    }
+
+    private boolean isValidPassword(String password) {
+        if (password == null || password.length() < 8 || password.length() > 20) {
+            return false;
+        }
+
+        boolean hasLetter = password.chars().anyMatch(Character::isLetter);
+        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+        boolean hasSpecial = password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
+        return hasLetter && hasDigit && hasSpecial;
     }
 }
