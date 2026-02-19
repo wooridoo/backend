@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,6 +20,7 @@ import com.woorido.challenge.dto.request.MyChallengesRequest;
 import com.woorido.challenge.dto.request.UpdateChallengeRequest;
 import com.woorido.challenge.dto.response.ChallengeAccountResponse;
 import com.woorido.challenge.dto.response.ChallengeDetailResponse;
+import com.woorido.challenge.dto.response.ChallengeLedgerGraphResponse;
 import com.woorido.challenge.dto.response.ChallengeListResponse;
 import com.woorido.challenge.dto.response.CreateChallengeResponse;
 import com.woorido.challenge.dto.response.ChallengeDeleteResponse;
@@ -124,6 +126,31 @@ public class ChallengeController {
 
     try {
       ChallengeAccountResponse response = challengeService.getChallengeAccount(challengeId, authorization);
+      return ResponseEntity.ok(ApiResponse.success(response));
+    } catch (IllegalArgumentException e) {
+      return ResponseEntity.status(HttpStatus.NOT_FOUND)
+          .body(ApiResponse.error("챌린지를 찾을 수 없습니다"));
+    } catch (SecurityException e) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .body(ApiResponse.error("챌린지 멤버가 아닙니다"));
+    } catch (Exception e) {
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  /**
+   * 챌린지 계좌 그래프 조회 API
+   * GET /challenges/{challengeId}/account/graph
+   */
+  @GetMapping("/{challengeId}/account/graph")
+  public ResponseEntity<ApiResponse<ChallengeLedgerGraphResponse>> getChallengeAccountGraph(
+      @PathVariable("challengeId") String challengeId,
+      @RequestHeader("Authorization") String authorization,
+      @RequestParam(value = "months", required = false) Integer months) {
+
+    try {
+      ChallengeLedgerGraphResponse response = challengeService.getChallengeLedgerGraph(challengeId, authorization, months);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (IllegalArgumentException e) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND)

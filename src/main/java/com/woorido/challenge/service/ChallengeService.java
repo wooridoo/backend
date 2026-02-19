@@ -2,6 +2,7 @@ package com.woorido.challenge.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,7 @@ import com.woorido.challenge.dto.request.MyChallengesRequest;
 import com.woorido.challenge.dto.request.UpdateChallengeRequest;
 import com.woorido.challenge.dto.response.ChallengeAccountResponse;
 import com.woorido.challenge.dto.response.ChallengeDetailResponse;
+import com.woorido.challenge.dto.response.ChallengeLedgerGraphResponse;
 import com.woorido.challenge.dto.response.ChallengeListResponse;
 import com.woorido.challenge.dto.response.CreateChallengeResponse;
 import com.woorido.challenge.dto.response.JoinChallengeResponse;
@@ -46,6 +48,9 @@ import com.woorido.challenge.repository.ChallengeMemberMapper;
 import com.woorido.challenge.repository.LedgerMapper;
 import com.woorido.challenge.domain.LedgerEntry;
 import com.woorido.common.util.JwtUtil;
+import com.woorido.django.ledger.client.DjangoLedgerClient;
+import com.woorido.django.ledger.dto.DjangoLedgerGraphRequest;
+import com.woorido.django.ledger.dto.DjangoLedgerGraphResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -56,6 +61,10 @@ public class ChallengeService {
   // - Read flow as: validate auth/role -> execute domain logic -> persist via Mapper.
 
   private static final int MAX_LEADER_CHALLENGES = 3;
+  private static final int DEFAULT_GRAPH_MONTHS = 6;
+  private static final int MIN_GRAPH_MONTHS = 1;
+  private static final int MAX_GRAPH_MONTHS = 24;
+  private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
 
   private final ChallengeMapper challengeMapper;
   private final ChallengeMemberMapper challengeMemberMapper;
@@ -63,6 +72,7 @@ public class ChallengeService {
   private final AccountTransactionFactory accountTransactionFactory;
   private final JwtUtil jwtUtil;
   private final LedgerMapper ledgerMapper;
+  private final DjangoLedgerClient djangoLedgerClient;
 
   /**
    * 챌린지를 생성하고 생성자를 리더 멤버로 등록한다.
@@ -630,6 +640,104 @@ public class ChallengeService {
   }
 
   /**
+   * 챌린지 장부 그래프(월별 소비/월말 잔액) 데이터를 조회한다.
+   */
+  @Transactional(readOnly = true)
+  public ChallengeLedgerGraphResponse getChallengeLedgerGraph(String challengeId, String accessToken, Integer months) {
+    String userId = resolveUserId(accessToken);
+
+    Map<String, Object> accountData = challengeMapper.findChallengeAccount(challengeId);
+    if (accountData == null) {
+      throw new IllegalArgumentException("CHALLENGE_001");
+    }
+
+    int isMember = challengeMapper.countMemberByChallengeIdAndUserId(challengeId, userId);
+    if (isMember == 0) {
+      throw new SecurityException("CHALLENGE_003");
+    }
+
+    int normalizedMonths = normalizeGraphMonths(months);
+    LocalDateTime startAt = LocalDate.now(KST_ZONE)
+        .minusMonths(normalizedMonths - 1L)
+        .withDayOfMonth(1)
+        .atStartOfDay();
+
+    List<Map<String, Object>> ledgerRows = challengeMapper.findLedgerEntriesForGraph(challengeId, startAt);
+    List<DjangoLedgerGraphRequest.LedgerEntryItem> entries = new ArrayList<>();
+    for (Map<String, Object> row : ledgerRows) {
+      Long amount = getLong(row, "AMOUNT");
+      Long balanceAfter = getLong(row, "BALANCE_AFTER");
+      entries.add(DjangoLedgerGraphRequest.LedgerEntryItem.builder()
+          .createdAt(formatTimestamp(row.get("CREATED_AT")))
+          .type(getString(row, "TYPE"))
+          .amount(amount != null ? amount : 0L)
+          .balanceAfter(balanceAfter)
+          .build());
+    }
+
+    Long currentBalance = getLong(accountData, "BALANCE");
+    if (currentBalance == null) {
+      currentBalance = 0L;
+    }
+
+    DjangoLedgerGraphRequest request = DjangoLedgerGraphRequest.builder()
+        .challengeId(challengeId)
+        .months(normalizedMonths)
+        .currentBalance(currentBalance)
+        .entries(entries)
+        .build();
+
+    DjangoLedgerGraphResponse djangoResponse = djangoLedgerClient.calculateGraph(request);
+
+    List<ChallengeLedgerGraphResponse.MonthlyExpense> monthlyExpenses = new ArrayList<>();
+    if (djangoResponse.getMonthlyExpenses() != null) {
+      for (DjangoLedgerGraphResponse.MonthlyExpense expense : djangoResponse.getMonthlyExpenses()) {
+        if (expense == null) {
+          continue;
+        }
+        monthlyExpenses.add(ChallengeLedgerGraphResponse.MonthlyExpense.builder()
+            .month(expense.getMonth())
+            .expense(expense.getExpense() != null ? expense.getExpense() : 0L)
+            .build());
+      }
+    }
+
+    List<ChallengeLedgerGraphResponse.MonthlyBalance> monthlyBalances = new ArrayList<>();
+    if (djangoResponse.getMonthlyBalances() != null) {
+      for (DjangoLedgerGraphResponse.MonthlyBalance balance : djangoResponse.getMonthlyBalances()) {
+        if (balance == null) {
+          continue;
+        }
+        monthlyBalances.add(ChallengeLedgerGraphResponse.MonthlyBalance.builder()
+            .month(balance.getMonth())
+            .balance(balance.getBalance())
+            .build());
+      }
+    }
+
+    return ChallengeLedgerGraphResponse.builder()
+        .challengeId(challengeId)
+        .months(normalizedMonths)
+        .calculatedAt(djangoResponse.getCalculatedAt())
+        .monthlyExpenses(monthlyExpenses)
+        .monthlyBalances(monthlyBalances)
+        .build();
+  }
+
+  private int normalizeGraphMonths(Integer months) {
+    if (months == null) {
+      return DEFAULT_GRAPH_MONTHS;
+    }
+    if (months < MIN_GRAPH_MONTHS) {
+      return MIN_GRAPH_MONTHS;
+    }
+    if (months > MAX_GRAPH_MONTHS) {
+      return MAX_GRAPH_MONTHS;
+    }
+    return months;
+  }
+
+  /**
    * 챌린지 가입을 처리한다.
    * - 가입 가능 상태 검증
    * - 가입 비용(가입비/보증금/첫 후원) 검증 및 차감
@@ -976,7 +1084,7 @@ public class ChallengeService {
           .userId((String) data.get("USER_ID"))
           .nickname((String) data.get("NICKNAME"))
           .profileImage((String) data.get("PROFILE_IMAGE"))
-          .brix(0.0) // Temporary
+          .brix(data.get("BRIX") != null ? Double.parseDouble(data.get("BRIX").toString()) : 12.0)
           .build();
 
       // Calculate real support status
@@ -1165,7 +1273,7 @@ public class ChallengeService {
         .userId(targetUserId)
         .nickname((String) memberData.get("NICKNAME"))
         .profileImage((String) memberData.get("PROFILE_IMAGE"))
-        .brix(memberData.get("BRIX") != null ? Double.parseDouble(memberData.get("BRIX").toString()) : 0.0)
+        .brix(memberData.get("BRIX") != null ? Double.parseDouble(memberData.get("BRIX").toString()) : 12.0)
         .build();
 
     return com.woorido.challenge.dto.response.ChallengeMemberDetailResponse.builder()

@@ -105,6 +105,7 @@
         cm.id as MEMBER_ID,
         cm.user_id as USER_ID,
         u.nickname as NICKNAME,
+        NVL(us.total_score, 12) as BRIX,
         cm.role as ROLE,
         cm.joined_at as JOINED_AT,
         cm.privilege_status as STATUS,
@@ -113,6 +114,7 @@
         u.profile_image_url as PROFILE_IMAGE
     FROM woorido.challenge_members cm
     JOIN woorido.users u ON cm.user_id = u.id
+    LEFT JOIN woorido.user_scores us ON us.user_id = cm.user_id
     WHERE cm.challenge_id = #{challengeId}
     <if test="status != null and status != ''">
       AND cm.privilege_status = #{status}

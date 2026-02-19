@@ -23,3 +23,7 @@ uploads/attachments/*
 
 # local portfolio/dev log (do not commit)
 local-devlog-2026-02-17-2026-02-18.md
+
+# python cache artifacts (django)
+__pycache__/
+*.pyc

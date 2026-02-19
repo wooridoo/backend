@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.woorido.django.brix.repository.BrixMetricMapper">
+
+  <resultMap id="BrixMetricRowMap" type="com.woorido.django.brix.model.BrixMetricRow">
+    <id property="userId" column="USER_ID" />
+    <result property="attendanceCount" column="ATTENDANCE_COUNT" />
+    <result property="paymentMonths" column="PAYMENT_MONTHS" />
+    <result property="overdueCount" column="OVERDUE_COUNT" />
+    <result property="consecutiveOverdueCount" column="CONSECUTIVE_OVERDUE_COUNT" />
+    <result property="feedCount" column="FEED_COUNT" />
+    <result property="commentCount" column="COMMENT_COUNT" />
+    <result property="likeCount" column="LIKE_COUNT" />
+    <result property="leaderMonths" column="LEADER_MONTHS" />
+    <result property="voteAbsenceCount" column="VOTE_ABSENCE_COUNT" />
+    <result property="reportReceivedCount" column="REPORT_RECEIVED_COUNT" />
+    <result property="kickCount" column="KICK_COUNT" />
+  </resultMap>
+
+  <select id="findMetricsUpTo" resultMap="BrixMetricRowMap">
+    WITH active_users AS (
+      SELECT u.id AS user_id
+      FROM woorido.users u
+      WHERE u.account_status = 'ACTIVE'
+    ),
+    attendance AS (
+      SELECT
+        mvr.user_id,
+        COUNT(*) AS attendance_count
+      FROM woorido.meetings m
+      JOIN woorido.meeting_votes mv ON mv.meeting_id = m.id
+      JOIN woorido.meeting_vote_records mvr ON mvr.meeting_vote_id = mv.id
+      WHERE m.status = 'COMPLETED'
+        AND m.completed_at IS NOT NULL
+        AND m.completed_at &lt;= #{cutoffAt}
+        AND mvr.actual_attendance = 'ATTENDED'
+      GROUP BY mvr.user_id
+    ),
+    vote_absence AS (
+      SELECT
+        mvr.user_id,
+        COUNT(*) AS vote_absence_count
+      FROM woorido.meetings m
+      JOIN woorido.meeting_votes mv ON mv.meeting_id = m.id
+      JOIN woorido.meeting_vote_records mvr ON mvr.meeting_vote_id = mv.id
+      WHERE m.status = 'COMPLETED'
+        AND m.completed_at IS NOT NULL
+        AND m.completed_at &lt;= #{cutoffAt}
+        AND mvr.choice = 'PENDING'
+      GROUP BY mvr.user_id
+    ),
+    payment AS (
+      SELECT
+        a.user_id,
+        COUNT(DISTINCT TO_CHAR(at.created_at, 'YYYY-MM')) AS payment_months
+      FROM woorido.account_transactions at
+      JOIN woorido.accounts a ON a.id = at.account_id
+      WHERE at.type IN ('SUPPORT', 'SUPPORT_AUTO')
+        AND at.created_at &lt;= #{cutoffAt}
+      GROUP BY a.user_id
+    ),
+    overdue_monthly AS (
+      SELECT DISTINCT
+        a.user_id,
+        TRUNC(at.created_at, 'MM') AS month_key
+      FROM woorido.account_transactions at
+      JOIN woorido.accounts a ON a.id = at.account_id
+      WHERE at.type = 'SUPPORT'
+        AND at.balance_before = at.balance_after
+        AND at.locked_before &gt; at.locked_after
+        AND at.created_at &lt;= #{cutoffAt}
+    ),
+    overdue_total AS (
+      SELECT
+        om.user_id,
+        COUNT(*) AS overdue_count
+      FROM overdue_monthly om
+      GROUP BY om.user_id
+    ),
+    overdue_sequence_source AS (
+      SELECT
+        om.user_id,
+        om.month_key,
+        ADD_MONTHS(om.month_key, -ROW_NUMBER() OVER (PARTITION BY om.user_id ORDER BY om.month_key)) AS grp_key
+      FROM overdue_monthly om
+    ),
+    overdue_streak AS (
+      SELECT
+        oss.user_id,
+        COUNT(*) AS streak_len
+      FROM overdue_sequence_source oss
+      GROUP BY oss.user_id, oss.grp_key
+    ),
+    consecutive_overdue AS (
+      SELECT
+        os.user_id,
+        NVL(SUM(CASE WHEN os.streak_len &gt;= 2 THEN os.streak_len ELSE 0 END), 0) AS consecutive_overdue_count
+      FROM overdue_streak os
+      GROUP BY os.user_id
+    ),
+    feed_daily AS (
+      SELECT
+        p.created_by AS user_id,
+        TRUNC(p.created_at) AS day_key,
+        LEAST(COUNT(*), 1) AS daily_count
+      FROM woorido.posts p
+      WHERE p.deleted_at IS NULL
+        AND p.created_at &lt;= #{cutoffAt}
+      GROUP BY p.created_by, TRUNC(p.created_at)
+    ),
+    feed_monthly AS (
+      SELECT
+        fd.user_id,
+        TO_CHAR(fd.day_key, 'YYYY-MM') AS month_key,
+        SUM(fd.daily_count) AS monthly_count
+      FROM feed_daily fd
+      GROUP BY fd.user_id, TO_CHAR(fd.day_key, 'YYYY-MM')
+    ),
+    feed_total AS (
+      SELECT
+        fm.user_id,
+        SUM(LEAST(fm.monthly_count, 30)) AS feed_count
+      FROM feed_monthly fm
+      GROUP BY fm.user_id
+    ),
+    comment_daily AS (
+      SELECT
+        c.created_by AS user_id,
+        TRUNC(c.created_at) AS day_key,
+        LEAST(COUNT(*), 3) AS daily_count
+      FROM woorido.comments c
+      WHERE c.deleted_at IS NULL
+        AND c.created_at &lt;= #{cutoffAt}
+      GROUP BY c.created_by, TRUNC(c.created_at)
+    ),
+    comment_monthly AS (
+      SELECT
+        cd.user_id,
+        TO_CHAR(cd.day_key, 'YYYY-MM') AS month_key,
+        SUM(cd.daily_count) AS monthly_count
+      FROM comment_daily cd
+      GROUP BY cd.user_id, TO_CHAR(cd.day_key, 'YYYY-MM')
+    ),
+    comment_total AS (
+      SELECT
+        cm.user_id,
+        SUM(LEAST(cm.monthly_count, 90)) AS comment_count
+      FROM comment_monthly cm
+      GROUP BY cm.user_id
+    ),
+    likes_union AS (
+      SELECT pl.user_id, pl.created_at
+      FROM woorido.post_likes pl
+      WHERE pl.created_at &lt;= #{cutoffAt}
+      UNION ALL
+      SELECT cl.user_id, cl.created_at
+      FROM woorido.comment_likes cl
+      WHERE cl.created_at &lt;= #{cutoffAt}
+    ),
+    like_daily AS (
+      SELECT
+        lu.user_id,
+        TRUNC(lu.created_at) AS day_key,
+        LEAST(COUNT(*), 5) AS daily_count
+      FROM likes_union lu
+      GROUP BY lu.user_id, TRUNC(lu.created_at)
+    ),
+    like_monthly AS (
+      SELECT
+        ld.user_id,
+        TO_CHAR(ld.day_key, 'YYYY-MM') AS month_key,
+        SUM(ld.daily_count) AS monthly_count
+      FROM like_daily ld
+      GROUP BY ld.user_id, TO_CHAR(ld.day_key, 'YYYY-MM')
+    ),
+    like_total AS (
+      SELECT
+        lm.user_id,
+        SUM(LEAST(lm.monthly_count, 150)) AS like_count
+      FROM like_monthly lm
+      GROUP BY lm.user_id
+    ),
+    kick_total AS (
+      SELECT
+        gv.target_user_id AS user_id,
+        COUNT(*) AS kick_count
+      FROM woorido.general_votes gv
+      WHERE gv.type = 'KICK'
+        AND gv.status = 'APPROVED'
+        AND gv.target_user_id IS NOT NULL
+        AND NVL(gv.closed_at, gv.created_at) &lt;= #{cutoffAt}
+      GROUP BY gv.target_user_id
+    )
+    SELECT
+      au.user_id AS USER_ID,
+      NVL(att.attendance_count, 0) AS ATTENDANCE_COUNT,
+      NVL(pay.payment_months, 0) AS PAYMENT_MONTHS,
+      NVL(ot.overdue_count, 0) AS OVERDUE_COUNT,
+      NVL(co.consecutive_overdue_count, 0) AS CONSECUTIVE_OVERDUE_COUNT,
+      NVL(ft.feed_count, 0) AS FEED_COUNT,
+      NVL(ct.comment_count, 0) AS COMMENT_COUNT,
+      NVL(lt.like_count, 0) AS LIKE_COUNT,
+      0 AS LEADER_MONTHS,
+      NVL(va.vote_absence_count, 0) AS VOTE_ABSENCE_COUNT,
+      0 AS REPORT_RECEIVED_COUNT,
+      NVL(kt.kick_count, 0) AS KICK_COUNT
+    FROM active_users au
+    LEFT JOIN attendance att ON att.user_id = au.user_id
+    LEFT JOIN payment pay ON pay.user_id = au.user_id
+    LEFT JOIN overdue_total ot ON ot.user_id = au.user_id
+    LEFT JOIN consecutive_overdue co ON co.user_id = au.user_id
+    LEFT JOIN feed_total ft ON ft.user_id = au.user_id
+    LEFT JOIN comment_total ct ON ct.user_id = au.user_id
+    LEFT JOIN like_total lt ON lt.user_id = au.user_id
+    LEFT JOIN vote_absence va ON va.user_id = au.user_id
+    LEFT JOIN kick_total kt ON kt.user_id = au.user_id
+    ORDER BY au.user_id
+  </select>
+
+</mapper>

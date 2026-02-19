@@ -1,5 +1,7 @@
 package com.woorido.common.mapper;
 
+import java.time.LocalDateTime;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -71,4 +73,16 @@ public interface UserMapper {
 
         // 사용자의 총 서포트 금액
         long sumTotalSupportAmountByUserId(@Param("userId") String userId);
+
+        // 사용자 당도(브릭스) 조회
+        Double findTotalScoreByUserId(@Param("userId") String userId);
+
+        // 회원가입 시 초기 당도 레코드 생성
+        int insertInitialUserScore(@Param("id") String id, @Param("userId") String userId,
+                        @Param("totalScore") Double totalScore);
+
+        // 당도 점수 업서트 (월 배치 반영)
+        int upsertTotalScoreByUserId(@Param("id") String id, @Param("userId") String userId,
+                        @Param("totalScore") Double totalScore, @Param("calculatedAt") LocalDateTime calculatedAt,
+                        @Param("calculatedMonth") String calculatedMonth);
 }

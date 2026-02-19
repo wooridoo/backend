@@ -164,4 +164,48 @@
         WHERE a.user_id = #{userId} AND at2.type IN ('SUPPORT', 'SUPPORT_AUTO')
     </select>
 
+    <!-- 사용자 당도(브릭스) 조회 -->
+    <select id="findTotalScoreByUserId" resultType="java.lang.Double">
+        SELECT total_score
+        FROM woorido.user_scores
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- 회원가입 시 초기 당도 레코드 생성 -->
+    <insert id="insertInitialUserScore">
+        INSERT INTO woorido.user_scores (
+            id, user_id, total_score, created_at, updated_at
+        ) VALUES (
+            #{id}, #{userId}, #{totalScore}, SYSTIMESTAMP, SYSTIMESTAMP
+        )
+    </insert>
+
+    <!-- 당도 점수 업서트 (월 배치 반영) -->
+    <update id="upsertTotalScoreByUserId">
+        MERGE INTO woorido.user_scores us
+        USING (
+            SELECT
+                #{id} AS id,
+                #{userId} AS user_id,
+                #{totalScore} AS total_score,
+                #{calculatedAt} AS calculated_at,
+                #{calculatedMonth} AS calculated_month
+            FROM dual
+        ) src
+        ON (us.user_id = src.user_id)
+        WHEN MATCHED THEN
+            UPDATE SET
+                us.total_score = src.total_score,
+                us.calculated_at = src.calculated_at,
+                us.calculated_month = src.calculated_month,
+                us.updated_at = SYSTIMESTAMP
+        WHEN NOT MATCHED THEN
+            INSERT (
+                id, user_id, total_score, calculated_at, calculated_month, created_at, updated_at
+            )
+            VALUES (
+                src.id, src.user_id, src.total_score, src.calculated_at, src.calculated_month, SYSTIMESTAMP, SYSTIMESTAMP
+            )
+    </update>
+
 </mapper>

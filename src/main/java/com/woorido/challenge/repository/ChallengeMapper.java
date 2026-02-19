@@ -2,6 +2,7 @@ package com.woorido.challenge.repository;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -67,6 +68,11 @@ public interface ChallengeMapper {
         List<Map<String, Object>> findRecentLedgerEntries(
                         @Param("challengeId") String challengeId,
                         @Param("limit") int limit);
+
+        // 챌린지 장부 그래프용 월 범위 원장 조회
+        List<Map<String, Object>> findLedgerEntriesForGraph(
+                        @Param("challengeId") String challengeId,
+                        @Param("startAt") LocalDateTime startAt);
 
         // 챌린지 상태 및 삭제일시 업데이트 (Soft Delete)
         int updateStatusAndDeletedAt(Challenge challenge);

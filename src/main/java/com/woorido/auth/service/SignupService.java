@@ -93,7 +93,10 @@ public class SignupService {
                     .build();
             accountMapper.save(account);
 
-            // 7. 응답 생성
+            // 7. 초기 브릭스(12.0) 레코드 생성
+            userMapper.insertInitialUserScore(UUID.randomUUID().toString(), user.getId(), 12.0);
+
+            // 8. 응답 생성
             return SignupResponse.from(user);
 
         } catch (Exception e) {

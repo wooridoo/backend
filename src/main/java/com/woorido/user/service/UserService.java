@@ -78,6 +78,7 @@ public class UserService {
         int challengeCount = userMapper.countChallengesByUserId(userId);
         int completedChallenges = userMapper.countCompletedChallengesByUserId(userId);
         long totalSupportAmount = userMapper.sumTotalSupportAmountByUserId(userId);
+        Double brixScore = userMapper.findTotalScoreByUserId(userId);
 
         // 6. 응답 생성
         return UserProfileResponse.builder()
@@ -88,8 +89,7 @@ public class UserService {
                 .birthDate(user.getBirthDate() != null ? user.getBirthDate().format(DATE_FORMATTER) : null)
                 .profileImage(user.getProfileImageUrl())
                 .status(user.getAccountStatus().name())
-                // TODO: 실제 브릭스 계산 로직이 준비되면 하드코딩 값을 교체한다.
-                .brix(12.0) // 기본값 12
+                .brix(brixScore != null ? brixScore : 12.0)
                 .account(accountInfo)
                 .stats(UserProfileResponse.StatsInfo.builder()
                         .challengeCount(challengeCount)

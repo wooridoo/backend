@@ -281,6 +281,19 @@
         ) WHERE ROWNUM                         <![CDATA[<=]]> #{limit}
     </select>
 
+    <!-- 챌린지 장부 그래프용 월 범위 원장 조회 -->
+    <select id="findLedgerEntriesForGraph" resultType="java.util.HashMap">
+        SELECT
+            le.created_at,
+            le.type,
+            le.amount,
+            le.balance_after
+        FROM woorido.ledger_entries le
+        WHERE le.challenge_id = #{challengeId}
+          AND le.created_at <![CDATA[>=]]> #{startAt}
+        ORDER BY le.created_at ASC
+    </select>
+
     <!-- 챌린지 멤버 수 증가 -->
     <update id="incrementCurrentMembers">
         UPDATE woorido.challenges
