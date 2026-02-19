@@ -55,7 +55,7 @@ public class AuthController {
       LoginResponse response = loginService.login(request.getEmail(), request.getPassword());
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
-      log.warn("Login failed: {}", e.getMessage());
+      log.warn("로그인 실패: {}", e.getMessage());
       String message = e.getMessage();
       if (message != null && (message.startsWith("AUTH_001") || message.startsWith("AUTH_002"))) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
@@ -63,7 +63,7 @@ public class AuthController {
       if (message != null && message.startsWith("USER_005")) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error"));
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -72,7 +72,7 @@ public class AuthController {
     try {
       SignupResponse response = signupService.signup(request);
       return ResponseEntity.status(HttpStatus.CREATED)
-          .body(ApiResponse.success(response, "Signup completed"));
+          .body(ApiResponse.success(response, "회원가입이 완료되었습니다"));
     } catch (IllegalArgumentException e) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(e.getMessage()));
     } catch (RuntimeException e) {
@@ -80,7 +80,7 @@ public class AuthController {
       if (message != null && message.startsWith("USER_002")) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message));
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error"));
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -89,7 +89,7 @@ public class AuthController {
       @Valid @RequestBody EmailVerifyRequest request) {
     try {
       EmailVerifyResponse response = emailVerificationService.issueVerifyCode(request.getEmail());
-      return ResponseEntity.ok(ApiResponse.success(response, "Verification code sent"));
+      return ResponseEntity.ok(ApiResponse.success(response, "인증 코드가 발송되었습니다"));
     } catch (RuntimeException e) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(e.getMessage()));
     }
@@ -100,13 +100,13 @@ public class AuthController {
       @Valid @RequestBody EmailConfirmRequest request) {
     try {
       EmailConfirmResponse response = emailVerificationService.confirm(request.getEmail(), request.getCode());
-      return ResponseEntity.ok(ApiResponse.success(response, "Email verified"));
+      return ResponseEntity.ok(ApiResponse.success(response, "이메일 인증이 완료되었습니다"));
     } catch (RuntimeException e) {
       String message = e.getMessage();
       if (message != null && message.startsWith("AUTH_007")) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error"));
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -114,13 +114,13 @@ public class AuthController {
   public ResponseEntity<ApiResponse<LogoutResponse>> logout(@Valid @RequestBody LogoutRequest request) {
     try {
       LogoutResponse response = logoutService.logout(request.getRefreshToken());
-      return ResponseEntity.ok(ApiResponse.success(response, "Logged out"));
+      return ResponseEntity.ok(ApiResponse.success(response, "로그아웃되었습니다"));
     } catch (RuntimeException e) {
       String message = e.getMessage();
       if (message != null && message.startsWith("AUTH_001")) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error"));
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -134,7 +134,7 @@ public class AuthController {
       if (message != null && message.startsWith("AUTH_004")) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error"));
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -144,7 +144,7 @@ public class AuthController {
 
     try {
       PasswordResetResponse response = passwordResetService.requestPasswordReset(request.getEmail());
-      return ResponseEntity.ok(ApiResponse.success(response, "Password reset link sent"));
+      return ResponseEntity.ok(ApiResponse.success(response, "비밀번호 재설정 링크가 발송되었습니다"));
     } catch (RuntimeException e) {
       String message = e.getMessage();
       if (message != null && message.startsWith("USER_001")) {
@@ -153,7 +153,7 @@ public class AuthController {
       if (message != null && message.startsWith("AUTH_010")) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error(message));
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error"));
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -163,14 +163,14 @@ public class AuthController {
 
     try {
       PasswordResetExecuteResponse response = passwordResetService.resetPassword(request);
-      return ResponseEntity.ok(ApiResponse.success(response, "Password reset complete"));
+      return ResponseEntity.ok(ApiResponse.success(response, "비밀번호가 재설정되었습니다"));
 
     } catch (RuntimeException e) {
       String message = e.getMessage();
       if (message != null && (message.startsWith("AUTH_009") || message.startsWith("VALIDATION_001"))) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
       }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Internal server error"));
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 }

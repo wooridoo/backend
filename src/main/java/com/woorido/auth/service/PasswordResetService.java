@@ -44,7 +44,7 @@ public class PasswordResetService {
     public PasswordResetResponse requestPasswordReset(String email) {
         User user = userMapper.findByEmail(email);
         if (user == null) {
-            throw new RuntimeException("USER_001:User not found");
+            throw new RuntimeException("USER_001:사용자를 찾을 수 없습니다");
         }
 
         String resetToken = UUID.randomUUID().toString();
@@ -59,7 +59,7 @@ public class PasswordResetService {
             throw e;
         }
 
-        log.info("Password reset token issued - userId: {}, expiresAt: {}", user.getId(), expiresAt);
+        log.info("비밀번호 재설정 토큰 발급 - userId: {}, expiresAt: {}", user.getId(), expiresAt);
         return PasswordResetResponse.of(email, RESET_TOKEN_EXPIRES_IN);
     }
 
@@ -69,18 +69,18 @@ public class PasswordResetService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);
         message.setTo(email);
-        message.setSubject("[Woorido] Password Reset");
+        message.setSubject("[Woorido] 비밀번호 재설정");
         message.setText(
-                "We received a request to reset your password.\n\n"
-                        + "Reset link: " + resetLink + "\n\n"
-                        + "This link will expire at: " + expiresAt + "\n"
-                        + "If you did not request this, you can ignore this email.");
+                "비밀번호 재설정 요청이 접수되었습니다.\n\n"
+                        + "재설정 링크: " + resetLink + "\n\n"
+                        + "만료 시각: " + expiresAt + "\n"
+                        + "본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다.");
 
         try {
             mailSender.send(message);
         } catch (Exception e) {
-            log.error("Failed to send password reset email - email: {}", email, e);
-            throw new RuntimeException("AUTH_010:Failed to send reset email");
+            log.error("비밀번호 재설정 메일 전송 실패 - email: {}", email, e);
+            throw new RuntimeException("AUTH_010:재설정 메일 전송에 실패했습니다");
         }
     }
 
@@ -102,22 +102,22 @@ public class PasswordResetService {
     public PasswordResetExecuteResponse resetPassword(PasswordResetExecuteRequest request) {
         User user = userMapper.findByPasswordResetToken(request.getToken());
         if (user == null) {
-            throw new RuntimeException("AUTH_009:Invalid reset token");
+            throw new RuntimeException("AUTH_009:유효하지 않은 재설정 토큰입니다");
         }
 
         if (user.getPasswordResetExpires() == null || user.getPasswordResetExpires().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("AUTH_009:Reset token has expired");
+            throw new RuntimeException("AUTH_009:재설정 토큰이 만료되었습니다");
         }
 
         if (!request.getNewPassword().equals(request.getNewPasswordConfirm())) {
-            throw new RuntimeException("VALIDATION_001:Passwords do not match");
+            throw new RuntimeException("VALIDATION_001:비밀번호가 일치하지 않습니다");
         }
 
         String encodedPassword = passwordEncoder.encode(request.getNewPassword());
         userMapper.updatePassword(user.getId(), encodedPassword);
         userMapper.clearPasswordResetToken(user.getId());
 
-        log.info("Password reset completed - userId: {}", user.getId());
+        log.info("비밀번호 재설정 완료 - userId: {}", user.getId());
         return PasswordResetExecuteResponse.success();
     }
 }

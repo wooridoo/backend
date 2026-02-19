@@ -90,15 +90,15 @@ public class MyAccountResponse {
 
     private static String getBankName(String code) {
         if ("088".equals(code)) {
-            return "SHINHAN";
+            return "신한은행";
         }
         if ("004".equals(code)) {
-            return "KOOKMIN";
+            return "국민은행";
         }
         if ("020".equals(code)) {
-            return "WOORI";
+            return "우리은행";
         }
-        return "UNKNOWN";
+        return "기타은행";
     }
 
     private static String maskAccountNumber(String number) {
