@@ -3,6 +3,7 @@ package com.woorido.user.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -12,8 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.woorido.common.dto.ApiResponse;
 import com.woorido.user.dto.request.UserUpdateRequest;
+import com.woorido.user.dto.request.UserPasswordChangeRequest;
 import com.woorido.user.dto.response.NicknameCheckResponse;
+import com.woorido.user.dto.response.UserPasswordChangeResponse;
 import com.woorido.user.dto.response.UserProfileResponse;
+import com.woorido.user.dto.response.UserPublicProfileResponse;
 import com.woorido.user.dto.response.UserUpdateResponse;
 import com.woorido.user.dto.response.UserWithdrawResponse;
 import com.woorido.user.service.UserService;
@@ -100,6 +104,36 @@ public class UserController {
     }
 
     /**
+     * 비밀번호 변경 API
+     * PUT /users/me/password
+     */
+    @PutMapping("/me/password")
+    public ResponseEntity<ApiResponse<UserPasswordChangeResponse>> changePassword(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Valid @RequestBody UserPasswordChangeRequest request) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                throw new RuntimeException("AUTH_001:인증이 필요합니다");
+            }
+
+            String accessToken = authHeader.substring(7);
+            UserPasswordChangeResponse response = userService.changePassword(accessToken, request);
+            return ResponseEntity.ok(ApiResponse.success(response, "비밀번호가 변경되었습니다"));
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            if (message != null) {
+                if (message.startsWith("AUTH_001"))
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+                if (message.startsWith("USER_003") || message.startsWith("VALIDATION_001"))
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
+        }
+    }
+
+    /**
      * 회원 탈퇴 API
      * DELETE /users/me
      */
@@ -126,6 +160,35 @@ public class UserController {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
+        }
+    }
+
+    /**
+     * 사용자 공개 정보 조회 API
+     * GET /users/{userId}
+     */
+    @GetMapping("/{userId}")
+    public ResponseEntity<ApiResponse<UserPublicProfileResponse>> getUserProfile(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @PathVariable("userId") String userId) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                throw new RuntimeException("AUTH_001:인증이 필요합니다");
+            }
+            String accessToken = authHeader.substring(7);
+            UserPublicProfileResponse response = userService.getUserProfile(accessToken, userId);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            if (message != null) {
+                if (message.startsWith("AUTH_001"))
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+                if (message.startsWith("USER_001"))
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(message));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
         }
     }
 

@@ -65,4 +65,14 @@
         WHERE id = #{voteId}
   </update>
 
+  <delete id="deleteRecordsByMeetingVoteId">
+        DELETE FROM woorido.meeting_vote_records
+        WHERE meeting_vote_id = #{voteId}
+  </delete>
+
+  <delete id="deleteVoteById">
+        DELETE FROM woorido.meeting_votes
+        WHERE id = #{voteId}
+  </delete>
+
 </mapper>

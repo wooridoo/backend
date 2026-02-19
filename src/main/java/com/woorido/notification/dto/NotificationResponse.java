@@ -17,6 +17,7 @@ public class NotificationResponse {
     private boolean isRead;
     private Map<String, Object> data;
     private String createdAt;
+    private String readAt;
 
     public static NotificationResponse from(Notification notification) {
         Map<String, Object> dataMap = new HashMap<>();
@@ -38,6 +39,7 @@ public class NotificationResponse {
                 .isRead(notification.getIsRead())
                 .data(dataMap)
                 .createdAt(notification.getCreatedAt().format(DateTimeFormatter.ISO_DATE_TIME))
+                .readAt(notification.getReadAt() != null ? notification.getReadAt().format(DateTimeFormatter.ISO_DATE_TIME) : null)
                 .build();
     }
 }

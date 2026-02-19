@@ -28,6 +28,7 @@ import com.woorido.vote.dto.request.CreateVoteRequest;
 import com.woorido.vote.dto.response.CastVoteResponse;
 import com.woorido.vote.dto.response.VoteDetailResponse;
 import com.woorido.vote.dto.response.VoteListResponse;
+import com.woorido.vote.dto.response.VoteResultResponse;
 import com.woorido.vote.repository.ExpenseVoteMapper;
 import com.woorido.vote.repository.GeneralVoteMapper;
 import com.woorido.vote.repository.VoteMapper;
@@ -354,6 +355,37 @@ public class VoteService {
         .requiredApproval(requiredApproval)
         .deadline(deadline)
         .createdAt(createdAt)
+        .build();
+  }
+
+  @Transactional(readOnly = true)
+  public VoteResultResponse getVoteResult(String voteId, String userId) {
+    VoteDetailResponse detail = getVoteDetail(voteId, userId);
+    if (detail.getStatus() == VoteStatus.PENDING) {
+      throw new RuntimeException("VOTE_007:아직 진행 중인 투표입니다");
+    }
+
+    int agree = detail.getVoteCount() != null ? detail.getVoteCount().getAgree() : 0;
+    int disagree = detail.getVoteCount() != null ? detail.getVoteCount().getDisagree() : 0;
+    int total = detail.getVoteCount() != null ? detail.getVoteCount().getTotal() : 0;
+    int requiredApproval = detail.getRequiredApproval();
+
+    double approvalRate = total > 0 ? (double) agree / total * 100.0 : 0.0;
+    boolean passed = detail.getStatus() == VoteStatus.APPROVED;
+
+    return VoteResultResponse.builder()
+        .voteId(detail.getVoteId())
+        .type(detail.getType())
+        .status(detail.getStatus())
+        .voteCount(VoteResultResponse.VoteCount.builder()
+            .agree(agree)
+            .disagree(disagree)
+            .total(total)
+            .build())
+        .eligibleVoters(detail.getEligibleVoters())
+        .requiredApproval(requiredApproval)
+        .passed(passed)
+        .approvalRate(approvalRate)
         .build();
   }
 

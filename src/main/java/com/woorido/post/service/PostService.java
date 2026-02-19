@@ -389,6 +389,31 @@ public class PostService {
   }
 
   /**
+   * 게시글 좋아요 취소.
+   * 좋아요가 없으면 no-op으로 현재 상태를 반환한다.
+   */
+  public com.woorido.post.dto.response.PostLikeResponse unlikePost(String challengeId, String postId, String userId) {
+    Post post = postMapper.findById(postId);
+    if (post == null || !challengeId.equals(post.getChallengeId())) {
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
+    }
+
+    requireMemberAny(challengeId, userId);
+
+    if (postLikeMapper.exists(postId, userId)) {
+      postLikeMapper.delete(postId, userId);
+      postMapper.decreaseLikeCount(postId);
+    }
+
+    post = postMapper.findById(postId);
+    return com.woorido.post.dto.response.PostLikeResponse.builder()
+        .postId(postId)
+        .liked(false)
+        .likeCount(post != null ? post.getLikeCount() : 0)
+        .build();
+  }
+
+  /**
    * 게시글 삭제(소프트 삭제).
    * 삭제 가능 여부는 전략 객체에서 검증한다.
    */

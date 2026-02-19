@@ -106,6 +106,11 @@
     WHERE id = #{id}
   </update>
 
+  <delete id="deleteById">
+    DELETE FROM woorido.meetings
+    WHERE id = #{meetingId}
+  </delete>
+
   <select id="countAttendees" resultType="int">
     SELECT COUNT(*)
     FROM woorido.meeting_votes mv

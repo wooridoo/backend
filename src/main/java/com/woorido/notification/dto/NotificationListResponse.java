@@ -12,4 +12,6 @@ public class NotificationListResponse {
   private int unreadCount;
   private long totalElements;
   private int totalPages;
+  private int number;
+  private int size;
 }

@@ -2,10 +2,14 @@ package com.woorido.auth.controller;
 
 import com.woorido.auth.dto.request.LoginRequest;
 import com.woorido.auth.dto.request.LogoutRequest;
+import com.woorido.auth.dto.request.EmailConfirmRequest;
+import com.woorido.auth.dto.request.EmailVerifyRequest;
 import com.woorido.auth.dto.request.PasswordResetExecuteRequest;
 import com.woorido.auth.dto.request.PasswordResetRequest;
 import com.woorido.auth.dto.request.RefreshRequest;
 import com.woorido.auth.dto.request.SignupRequest;
+import com.woorido.auth.dto.response.EmailConfirmResponse;
+import com.woorido.auth.dto.response.EmailVerifyResponse;
 import com.woorido.auth.dto.response.LoginResponse;
 import com.woorido.auth.dto.response.LogoutResponse;
 import com.woorido.auth.dto.response.PasswordResetExecuteResponse;
@@ -14,6 +18,7 @@ import com.woorido.auth.dto.response.RefreshResponse;
 import com.woorido.auth.dto.response.SignupResponse;
 import com.woorido.auth.service.LoginService;
 import com.woorido.auth.service.LogoutService;
+import com.woorido.auth.service.EmailVerificationService;
 import com.woorido.auth.service.PasswordResetService;
 import com.woorido.auth.service.RefreshService;
 import com.woorido.auth.service.SignupService;
@@ -43,6 +48,7 @@ public class AuthController {
   private final PasswordResetService passwordResetService;
   private final RefreshService refreshService;
   private final SignupService signupService;
+  private final EmailVerificationService emailVerificationService;
 
   @PostMapping("/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
@@ -74,6 +80,32 @@ public class AuthController {
       String message = e.getMessage();
       if (message != null && message.startsWith("USER_002")) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  @PostMapping("/email/verify")
+  public ResponseEntity<ApiResponse<EmailVerifyResponse>> verifyEmail(
+      @Valid @RequestBody EmailVerifyRequest request) {
+    try {
+      EmailVerifyResponse response = emailVerificationService.issueVerifyCode(request.getEmail());
+      return ResponseEntity.ok(ApiResponse.success(response, "인증 코드를 발송했습니다"));
+    } catch (RuntimeException e) {
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(e.getMessage()));
+    }
+  }
+
+  @PostMapping("/email/confirm")
+  public ResponseEntity<ApiResponse<EmailConfirmResponse>> confirmEmail(
+      @Valid @RequestBody EmailConfirmRequest request) {
+    try {
+      EmailConfirmResponse response = emailVerificationService.confirm(request.getEmail(), request.getCode());
+      return ResponseEntity.ok(ApiResponse.success(response, "인증이 완료되었습니다"));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith("AUTH_007")) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
