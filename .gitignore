@@ -27,3 +27,7 @@ local-devlog-2026-02-17-2026-02-18.md
 # python cache artifacts (django)
 __pycache__/
 *.pyc
+
+# django local runtime artifacts
+django/.venv/
+django/db.sqlite3
