@@ -108,6 +108,23 @@
         WHERE id = #{id}
       </update>
 
+      <update id="updatePinned">
+        UPDATE woorido.posts
+        SET is_pinned = #{isPinned},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{postId}
+      </update>
+
+      <update id="clearPinnedNotices">
+        UPDATE woorido.posts
+        SET is_pinned = 'N',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE challenge_id = #{challengeId}
+          AND is_notice = 'Y'
+          AND is_pinned = 'Y'
+          AND deleted_at IS NULL
+      </update>
+
       <select id="isLiked" resultType="boolean">
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM woorido.post_likes

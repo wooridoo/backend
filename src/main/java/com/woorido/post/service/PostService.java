@@ -12,6 +12,7 @@ import com.woorido.post.dto.request.UpdatePostRequest;
 import com.woorido.post.dto.response.CreatePostResponse;
 import com.woorido.common.dto.AuthorInfo;
 import com.woorido.post.dto.response.PostDetailResponse;
+import com.woorido.post.dto.response.PinPostResponse;
 import com.woorido.post.repository.PostMapper;
 import java.util.List;
 import java.util.Map;
@@ -64,8 +65,16 @@ public class PostService {
       }
     }
 
+    String isNoticeFlag = isNotice ? "Y" : "N";
+    String isPinnedFlag = isNotice ? "Y" : "N";
+
+    // 공지 작성 시 기존 공지 고정을 해제해 챌린지당 1개 고정 정책을 보장한다.
+    if (isNotice) {
+      postMapper.clearPinnedNotices(challengeId);
+    }
+
     // 도메인 팩토리로 게시글 엔티티 생성
-    Post post = postFactory.create(challengeId, userId, request, isNotice ? "Y" : "N");
+    Post post = postFactory.create(challengeId, userId, request, isNoticeFlag, isPinnedFlag);
 
     // 게시글 본문 저장
     postMapper.insert(post);
@@ -114,9 +123,9 @@ public class PostService {
       throw new IllegalArgumentException("POST_004:게시글 수정 권한이 없습니다");
     }
 
-    // 공지글 전환 시 리더 권한 검증
-    String category = request.getCategory();
-    boolean isNotice = "NOTICE".equals(category);
+    // category 미입력 시 기존 값을 유지한다.
+    String nextCategory = request.getCategory() != null ? request.getCategory() : post.getCategory();
+    boolean isNotice = "NOTICE".equals(nextCategory);
     if (isNotice) {
       if (!"LEADER".equals(role)) {
         throw new IllegalArgumentException("POST_002:공지 게시글은 리더만 작성할 수 있습니다");
@@ -129,6 +138,15 @@ public class PostService {
 
     // 게시글 본문 업데이트
     postMapper.update(post);
+
+    if (isNotice) {
+      // 공지 상태라면 항상 단일 고정 정책을 맞춘다.
+      postMapper.clearPinnedNotices(challengeId);
+      postMapper.updatePinned(postId, "Y");
+    } else {
+      // 일반 게시글은 고정 상태를 유지하지 않는다.
+      postMapper.updatePinned(postId, "N");
+    }
 
     // 이미지 목록은 전체 교체 방식으로 동기화
     postImageMapper.deleteAllByPostId(postId);
@@ -324,6 +342,40 @@ public class PostService {
         .totalPages((int) Math.ceil((double) totalElements / size))
         .number(page)
         .size(size)
+        .build();
+  }
+
+  /**
+   * 공지 게시글 상단 고정/해제.
+   * 정책: NOTICE만 고정 가능, 챌린지당 고정은 1건만 허용, 리더만 변경 가능.
+   */
+  public PinPostResponse setPostPinned(String challengeId, String postId, String userId, boolean pinned) {
+    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
+    String role = (String) memberInfo.get("ROLE");
+    if (!"LEADER".equals(role)) {
+      throw new IllegalArgumentException("POST_002:공지 게시글 고정 권한이 없습니다");
+    }
+
+    Post post = postMapper.findById(postId);
+    if (post == null || !challengeId.equals(post.getChallengeId())) {
+      throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
+    }
+
+    if (!"Y".equals(post.getIsNotice())) {
+      throw new IllegalArgumentException("POST_005:공지 게시글만 고정할 수 있습니다");
+    }
+
+    if (pinned) {
+      postMapper.clearPinnedNotices(challengeId);
+      postMapper.updatePinned(postId, "Y");
+    } else {
+      postMapper.updatePinned(postId, "N");
+    }
+
+    return PinPostResponse.builder()
+        .postId(postId)
+        .isPinned(pinned)
+        .pinnedAt(LocalDateTime.now())
         .build();
   }
 

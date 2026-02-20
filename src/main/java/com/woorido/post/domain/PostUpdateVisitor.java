@@ -11,10 +11,14 @@ public class PostUpdateVisitor implements PostVisitor {
     @Override
     public void visit(Post post) {
         String noticeVal = (isNotice != null) ? isNotice : post.getIsNotice();
+        String titleVal = request.getTitle() != null ? request.getTitle() : post.getTitle();
+        String contentVal = request.getContent() != null ? request.getContent() : post.getContent();
+        String categoryVal = request.getCategory() != null ? request.getCategory() : post.getCategory();
+
         post.modify(
-                request.getTitle(),
-                request.getContent(),
-                request.getCategory(),
+                titleVal,
+                contentVal,
+                categoryVal,
                 noticeVal,
                 post.getIsPinned());
     }

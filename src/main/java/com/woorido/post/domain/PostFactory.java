@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class PostFactory {
 
-    public Post create(String challengeId, String userId, CreatePostRequest request, String isNotice) {
+    public Post create(String challengeId, String userId, CreatePostRequest request, String isNotice, String isPinned) {
         return Post.builder()
                 .id(UUID.randomUUID().toString())
                 .challengeId(challengeId)
@@ -16,7 +16,7 @@ public class PostFactory {
                 .content(request.getContent())
                 .category(request.getCategory())
                 .isNotice(isNotice)
-                .isPinned("N")
+                .isPinned(isPinned)
                 .build();
     }
 }

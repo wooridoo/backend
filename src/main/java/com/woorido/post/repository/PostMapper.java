@@ -33,6 +33,10 @@ public interface PostMapper {
 
   void update(Post post);
 
+  void updatePinned(@Param("postId") String postId, @Param("isPinned") String isPinned);
+
+  void clearPinnedNotices(@Param("challengeId") String challengeId);
+
   void delete(@Param("postId") String postId);
 
   int count(Map<String, Object> params);

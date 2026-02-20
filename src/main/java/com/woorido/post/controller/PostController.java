@@ -4,8 +4,10 @@ import com.woorido.common.dto.ApiResponse;
 import com.woorido.common.util.JwtUtil;
 import java.util.Map;
 import com.woorido.post.dto.request.CreatePostRequest;
+import com.woorido.post.dto.request.PinPostRequest;
 import com.woorido.post.dto.request.UpdatePostRequest;
 import com.woorido.post.dto.response.CreatePostResponse;
+import com.woorido.post.dto.response.PinPostResponse;
 import com.woorido.post.dto.response.PostDetailResponse;
 import com.woorido.post.dto.response.PostListResponse;
 import com.woorido.post.service.PostService;
@@ -226,6 +228,57 @@ public class PostController {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
       }
       log.error("Update Post Error", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+    }
+  }
+
+  /**
+   * 게시글 상단 고정/해제 API
+   * PUT /challenges/{challengeId}/posts/{postId}/pin
+   */
+  @PutMapping("/{postId}/pin")
+  public ResponseEntity<ApiResponse<PinPostResponse>> setPostPinned(
+      @PathVariable("challengeId") String challengeId,
+      @PathVariable("postId") String postId,
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      @RequestBody PinPostRequest request) {
+
+    try {
+      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("AUTH_001:Authorization header is required");
+      }
+      String accessToken = authHeader.substring(7);
+
+      if (!jwtUtil.validateToken(accessToken)) {
+        throw new RuntimeException("AUTH_002:Invalid access token");
+      }
+      String userId = jwtUtil.getUserIdFromToken(accessToken);
+
+      if (request.getPinned() == null) {
+        throw new IllegalArgumentException("VALIDATION_001:pinned 값이 필요합니다");
+      }
+
+      PinPostResponse response = postService.setPostPinned(challengeId, postId, userId, request.getPinned());
+      String message = request.getPinned() ? "게시글이 상단에 고정되었습니다" : "게시글 고정이 해제되었습니다";
+
+      return ResponseEntity.ok(ApiResponse.success(response, message));
+
+    } catch (IllegalArgumentException e) {
+      String message = e.getMessage();
+      if (message != null &&
+          (message.startsWith("MEMBER_001") || message.startsWith("POST_002") || message.startsWith("POST_005"))) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
+      } else if (message != null && message.startsWith("POST_001")) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith("AUTH_")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+      }
+      log.error("Set Post Pin Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
