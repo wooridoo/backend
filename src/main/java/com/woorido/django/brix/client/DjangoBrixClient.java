@@ -8,6 +8,7 @@ import org.springframework.web.client.RestClientException;
 
 import com.woorido.django.brix.dto.DjangoBrixCalculateRequest;
 import com.woorido.django.brix.dto.DjangoBrixCalculateResponse;
+import java.util.Objects;
 
 @Component
 public class DjangoBrixClient {
@@ -18,17 +19,21 @@ public class DjangoBrixClient {
   public DjangoBrixClient(RestClient.Builder restClientBuilder,
       @Value("${django.brix.base-url:http://localhost:8000}") String baseUrl,
       @Value("${django.brix.api-key:woorido-django-internal-key}") String apiKey) {
-    this.restClient = restClientBuilder.baseUrl(baseUrl).build();
-    this.apiKey = apiKey;
+    String resolvedBaseUrl = Objects.requireNonNull(baseUrl, "django.brix.base-url must not be null");
+    this.restClient = restClientBuilder.baseUrl(resolvedBaseUrl).build();
+    this.apiKey = Objects.requireNonNull(apiKey, "django.brix.api-key must not be null");
   }
 
   public DjangoBrixCalculateResponse calculate(DjangoBrixCalculateRequest request) {
+    DjangoBrixCalculateRequest safeRequest = Objects.requireNonNull(request, "request must not be null");
+    MediaType contentType = Objects.requireNonNull(MediaType.APPLICATION_JSON, "application/json must not be null");
+
     try {
       DjangoBrixCalculateResponse response = restClient.post()
           .uri("/internal/brix/calculate")
-          .contentType(MediaType.APPLICATION_JSON)
+          .contentType(contentType)
           .header("X-Api-Key", apiKey)
-          .body(request)
+          .body(safeRequest)
           .retrieve()
           .body(DjangoBrixCalculateResponse.class);
       if (response == null) {

@@ -261,7 +261,7 @@ public class UserService {
                         .totalMeetings(0)
                         .build())
                 .commonChallenges(Collections.emptyList())
-                .isVerified(Boolean.TRUE.equals(user.getIsVerified()))
+                .isVerified("Y".equalsIgnoreCase(user.getIsVerified()))
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().format(DATETIME_FORMATTER) : null)
                 .build();
     }

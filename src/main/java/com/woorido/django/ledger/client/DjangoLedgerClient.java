@@ -8,6 +8,7 @@ import org.springframework.web.client.RestClientException;
 
 import com.woorido.django.ledger.dto.DjangoLedgerGraphRequest;
 import com.woorido.django.ledger.dto.DjangoLedgerGraphResponse;
+import java.util.Objects;
 
 @Component
 public class DjangoLedgerClient {
@@ -18,17 +19,21 @@ public class DjangoLedgerClient {
   public DjangoLedgerClient(RestClient.Builder restClientBuilder,
       @Value("${django.ledger.base-url:${django.brix.base-url:http://localhost:8000}}") String baseUrl,
       @Value("${django.ledger.api-key:${django.brix.api-key:woorido-django-internal-key}}") String apiKey) {
-    this.restClient = restClientBuilder.baseUrl(baseUrl).build();
-    this.apiKey = apiKey;
+    String resolvedBaseUrl = Objects.requireNonNull(baseUrl, "django.ledger.base-url must not be null");
+    this.restClient = restClientBuilder.baseUrl(resolvedBaseUrl).build();
+    this.apiKey = Objects.requireNonNull(apiKey, "django.ledger.api-key must not be null");
   }
 
   public DjangoLedgerGraphResponse calculateGraph(DjangoLedgerGraphRequest request) {
+    DjangoLedgerGraphRequest safeRequest = Objects.requireNonNull(request, "request must not be null");
+    MediaType contentType = Objects.requireNonNull(MediaType.APPLICATION_JSON, "application/json must not be null");
+
     try {
       DjangoLedgerGraphResponse response = restClient.post()
           .uri("/internal/brix/ledger/chart")
-          .contentType(MediaType.APPLICATION_JSON)
+          .contentType(contentType)
           .header("X-Api-Key", apiKey)
-          .body(request)
+          .body(safeRequest)
           .retrieve()
           .body(DjangoLedgerGraphResponse.class);
       if (response == null) {
