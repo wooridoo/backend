@@ -16,6 +16,9 @@ public interface UserMapper {
         // 로그인용 조회
         User findByEmail(@Param("email") String email);
 
+        // 소셜 로그인용 조회
+        User findBySocial(@Param("socialProvider") String socialProvider, @Param("socialId") String socialId);
+
         // 이메일 중복 체크 (회원가입용)
         int countByEmail(@Param("email") String email);
 
@@ -55,6 +58,10 @@ public interface UserMapper {
 
         // 사용자 상태 업데이트
         void updateAccountStatus(@Param("id") String id, @Param("status") String status);
+
+        // 기존 이메일 계정에 소셜 계정 연결
+        void linkSocialAccount(@Param("id") String id, @Param("socialProvider") String socialProvider,
+                        @Param("socialId") String socialId);
 
         // 비밀번호 재설정 토큰으로 사용자 조회
         User findByPasswordResetToken(@Param("token") String token);

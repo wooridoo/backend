@@ -12,5 +12,6 @@ public class UserInfo {
     private String nickname;
     private String profileImage;
     private String status;
+    private Boolean hasPassword;
     private Boolean isNewUser;
 }

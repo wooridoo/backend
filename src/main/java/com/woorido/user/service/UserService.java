@@ -93,6 +93,7 @@ public class UserService {
                 .birthDate(user.getBirthDate() != null ? user.getBirthDate().format(DATE_FORMATTER) : null)
                 .profileImage(user.getProfileImageUrl())
                 .status(user.getAccountStatus().name())
+                .hasPassword(user.getPasswordHash() != null && !user.getPasswordHash().isBlank())
                 .brix(brixScore != null ? brixScore : 12.0)
                 .account(accountInfo)
                 .stats(UserProfileResponse.StatsInfo.builder()
@@ -163,9 +164,12 @@ public class UserService {
         User user = userMapper.findById(userId);
 
         // 2. 비밀번호 확인
-        if (request.getPassword() != null) {
-            if (user.getPasswordHash() != null
-                    && !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        boolean hasPassword = user.getPasswordHash() != null && !user.getPasswordHash().isBlank();
+        if (hasPassword) {
+            if (request.getPassword() == null || request.getPassword().isBlank()) {
+                throw new RuntimeException("USER_009:비밀번호를 입력해주세요");
+            }
+            if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
                 throw new RuntimeException("USER_003:비밀번호가 일치하지 않습니다");
             }
         }

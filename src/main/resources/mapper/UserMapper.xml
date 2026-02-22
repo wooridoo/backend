@@ -47,6 +47,13 @@
         SELECT * FROM woorido.users WHERE email = #{email}
     </select>
 
+    <!-- 소셜 제공자 + 소셜 ID로 사용자 조회 -->
+    <select id="findBySocial" resultMap="UserResultMap">
+        SELECT * FROM woorido.users
+        WHERE social_provider = #{socialProvider}
+          AND social_id = #{socialId}
+    </select>
+
     <!-- 이메일 중복 체크 (회원가입용) -->
     <select id="countByEmail" resultType="int">
         SELECT COUNT(*) FROM woorido.users WHERE email = #{email}
@@ -56,10 +63,12 @@
     <insert id="insertUser" parameterType="com.woorido.common.entity.User">
         INSERT INTO woorido.users (
             id, email, password_hash, name, nickname, phone, birth_date,
+            social_provider, social_id,
             account_status, agreed_terms, agreed_privacy, agreed_marketing,
             created_at, failed_login_attempts
         ) VALUES (
             #{id}, #{email}, #{passwordHash}, #{name}, #{nickname}, #{phone}, #{birthDate, jdbcType=DATE},
+            #{socialProvider, jdbcType=VARCHAR}, #{socialId, jdbcType=VARCHAR},
             #{accountStatus}, #{agreedTerms}, #{agreedPrivacy}, #{agreedMarketing},
             #{createdAt}, 0
         )
@@ -118,6 +127,15 @@
     <update id="updateAccountStatus">
         UPDATE woorido.users
         SET account_status = #{status, jdbcType=VARCHAR},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id, jdbcType=VARCHAR}
+    </update>
+
+    <!-- 기존 계정에 소셜 로그인 정보 연결 -->
+    <update id="linkSocialAccount">
+        UPDATE woorido.users
+        SET social_provider = #{socialProvider, jdbcType=VARCHAR},
+            social_id = #{socialId, jdbcType=VARCHAR},
             updated_at = CURRENT_TIMESTAMP
         WHERE id = #{id, jdbcType=VARCHAR}
     </update>

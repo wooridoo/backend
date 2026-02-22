@@ -11,5 +11,6 @@ public class LoginResponse {
     private String refreshToken;
     private String tokenType;
     private Integer expiresIn;
+    private String returnTo;
     private UserInfo user;
 }

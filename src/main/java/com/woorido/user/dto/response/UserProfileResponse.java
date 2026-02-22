@@ -16,6 +16,7 @@ public class UserProfileResponse {
     private String birthDate;
     private String profileImage;
     private String status;
+    private Boolean hasPassword;
     private Double brix;
     private AccountInfo account;
     private StatsInfo stats;

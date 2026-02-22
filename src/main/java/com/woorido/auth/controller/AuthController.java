@@ -16,6 +16,8 @@ import com.woorido.auth.dto.request.PasswordResetExecuteRequest;
 import com.woorido.auth.dto.request.PasswordResetRequest;
 import com.woorido.auth.dto.request.RefreshRequest;
 import com.woorido.auth.dto.request.SignupRequest;
+import com.woorido.auth.dto.request.SocialAuthCompleteRequest;
+import com.woorido.auth.dto.request.SocialAuthStartRequest;
 import com.woorido.auth.dto.response.EmailConfirmResponse;
 import com.woorido.auth.dto.response.EmailVerifyResponse;
 import com.woorido.auth.dto.response.LoginResponse;
@@ -24,12 +26,14 @@ import com.woorido.auth.dto.response.PasswordResetExecuteResponse;
 import com.woorido.auth.dto.response.PasswordResetResponse;
 import com.woorido.auth.dto.response.RefreshResponse;
 import com.woorido.auth.dto.response.SignupResponse;
+import com.woorido.auth.dto.response.SocialAuthStartResponse;
 import com.woorido.auth.service.EmailVerificationService;
 import com.woorido.auth.service.LoginService;
 import com.woorido.auth.service.LogoutService;
 import com.woorido.auth.service.PasswordResetService;
 import com.woorido.auth.service.RefreshService;
 import com.woorido.auth.service.SignupService;
+import com.woorido.auth.social.SocialAuthService;
 import com.woorido.common.dto.ApiResponse;
 
 import jakarta.validation.Valid;
@@ -48,6 +52,7 @@ public class AuthController {
   private final RefreshService refreshService;
   private final SignupService signupService;
   private final EmailVerificationService emailVerificationService;
+  private final SocialAuthService socialAuthService;
 
   @PostMapping("/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
@@ -79,6 +84,53 @@ public class AuthController {
       String message = e.getMessage();
       if (message != null && message.startsWith("USER_002")) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  @PostMapping("/social/start")
+  public ResponseEntity<ApiResponse<SocialAuthStartResponse>> startSocialAuth(
+      @Valid @RequestBody SocialAuthStartRequest request) {
+    try {
+      SocialAuthStartResponse response = socialAuthService.start(request);
+      return ResponseEntity.ok(ApiResponse.success(response));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("AUTH_011")) {
+          return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error(message));
+        }
+        if (message.startsWith("AUTH_012") || message.startsWith("AUTH_013")) {
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+        }
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
+    }
+  }
+
+  @PostMapping("/social/complete")
+  public ResponseEntity<ApiResponse<LoginResponse>> completeSocialAuth(
+      @Valid @RequestBody SocialAuthCompleteRequest request) {
+    try {
+      LoginResponse response = socialAuthService.complete(request);
+      return ResponseEntity.ok(ApiResponse.success(response));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null) {
+        if (message.startsWith("AUTH_011")) {
+          return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error(message));
+        }
+        if (message.startsWith("AUTH_012")
+            || message.startsWith("AUTH_013")
+            || message.startsWith("AUTH_014")
+            || message.startsWith("AUTH_015")
+            || message.startsWith("AUTH_016")) {
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+        }
+        if (message.startsWith("USER_005")) {
+          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
+        }
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
