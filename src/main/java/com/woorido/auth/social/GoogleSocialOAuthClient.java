@@ -43,6 +43,11 @@ public class GoogleSocialOAuthClient extends AbstractSocialOAuthClient {
     }
 
     @Override
+    public String defaultRedirectUri() {
+        return redirectUri;
+    }
+
+    @Override
     public String buildAuthorizeUrl(String state) {
         return UriComponentsBuilder.fromHttpUrl(AUTHORIZE_ENDPOINT)
                 .queryParam("client_id", clientId)
@@ -50,7 +55,7 @@ public class GoogleSocialOAuthClient extends AbstractSocialOAuthClient {
                 .queryParam("response_type", "code")
                 .queryParam("scope", "openid email profile")
                 .queryParam("state", state)
-                .build(true)
+                .build()
                 .toUriString();
     }
 
@@ -85,4 +90,3 @@ public class GoogleSocialOAuthClient extends AbstractSocialOAuthClient {
                 .build();
     }
 }
-

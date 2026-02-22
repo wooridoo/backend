@@ -41,13 +41,19 @@ public class KakaoSocialOAuthClient extends AbstractSocialOAuthClient {
     }
 
     @Override
+    public String defaultRedirectUri() {
+        return redirectUri;
+    }
+
+    @Override
     public String buildAuthorizeUrl(String state) {
         return UriComponentsBuilder.fromHttpUrl(AUTHORIZE_ENDPOINT)
                 .queryParam("client_id", clientId)
                 .queryParam("redirect_uri", redirectUri)
                 .queryParam("response_type", "code")
+                .queryParam("scope", "account_email profile_nickname")
                 .queryParam("state", state)
-                .build(true)
+                .build()
                 .toUriString();
     }
 
@@ -85,4 +91,3 @@ public class KakaoSocialOAuthClient extends AbstractSocialOAuthClient {
                 .build();
     }
 }
-

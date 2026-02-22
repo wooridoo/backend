@@ -7,8 +7,9 @@ public interface SocialOAuthClient {
 
     boolean isConfigured();
 
+    String defaultRedirectUri();
+
     String buildAuthorizeUrl(String state);
 
     SocialUserProfile fetchUserProfile(String authorizationCode);
 }
-

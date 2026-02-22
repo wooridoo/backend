@@ -118,6 +118,19 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 소셜 온보딩 완료 -->
+    <update id="completeSocialOnboarding">
+        UPDATE woorido.users
+        SET nickname = #{nickname, jdbcType=VARCHAR},
+            phone = #{phone, jdbcType=VARCHAR},
+            agreed_terms = 'Y',
+            agreed_privacy = 'Y',
+            agreed_marketing = #{agreedMarketing, jdbcType=VARCHAR},
+            terms_agreed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id, jdbcType=VARCHAR}
+    </update>
+
     <!-- 닉네임 중복 체크 (전체) -->
     <select id="countByNickname" resultType="int">
         SELECT COUNT(*) FROM woorido.users WHERE nickname = #{nickname}

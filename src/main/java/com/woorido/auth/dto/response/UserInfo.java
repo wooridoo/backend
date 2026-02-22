@@ -14,4 +14,5 @@ public class UserInfo {
     private String status;
     private Boolean hasPassword;
     private Boolean isNewUser;
+    private Boolean requiresOnboarding;
 }

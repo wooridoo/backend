@@ -53,6 +53,13 @@ public interface UserMapper {
                         @Param("phone") String phone,
                         @Param("profileImage") String profileImage);
 
+        // 소셜 온보딩 완료 처리
+        void completeSocialOnboarding(
+                        @Param("id") String id,
+                        @Param("nickname") String nickname,
+                        @Param("phone") String phone,
+                        @Param("agreedMarketing") String agreedMarketing);
+
         // 닉네임 중복 체크 (전체)
         int countByNickname(@Param("nickname") String nickname);
 

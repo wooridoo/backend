@@ -31,3 +31,9 @@ __pycache__/
 # django local runtime artifacts
 django/.venv/
 django/db.sqlite3
+
+# local environment secrets
+.env
+.env.local
+.env.properties
+.env.local.properties

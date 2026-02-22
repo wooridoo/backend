@@ -63,6 +63,14 @@ public class ChallengeController {
       ChallengeListResponse response = challengeService.getChallengeList(request);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (RuntimeException e) {
+      log.error(
+          "챌린지 목록 조회 실패: status={}, category={}, sort={}, page={}, size={}",
+          request.getStatus(),
+          request.getCategory(),
+          request.getSort(),
+          request.getPage(),
+          request.getSize(),
+          e);
 
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));

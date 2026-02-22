@@ -1,12 +1,21 @@
 package com.woorido.auth.controller;
 
+import java.net.URI;
+
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.woorido.auth.dto.request.EmailConfirmRequest;
 import com.woorido.auth.dto.request.EmailVerifyRequest;
@@ -27,6 +36,7 @@ import com.woorido.auth.dto.response.PasswordResetResponse;
 import com.woorido.auth.dto.response.RefreshResponse;
 import com.woorido.auth.dto.response.SignupResponse;
 import com.woorido.auth.dto.response.SocialAuthStartResponse;
+import com.woorido.auth.dto.response.SocialProviderStatusResponse;
 import com.woorido.auth.service.EmailVerificationService;
 import com.woorido.auth.service.LoginService;
 import com.woorido.auth.service.LogoutService;
@@ -35,6 +45,7 @@ import com.woorido.auth.service.RefreshService;
 import com.woorido.auth.service.SignupService;
 import com.woorido.auth.social.SocialAuthService;
 import com.woorido.common.dto.ApiResponse;
+import com.woorido.common.entity.SocialProvider;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +64,9 @@ public class AuthController {
   private final SignupService signupService;
   private final EmailVerificationService emailVerificationService;
   private final SocialAuthService socialAuthService;
+
+  @Value("${app.frontend.base-url:http://localhost:5173}")
+  private String frontendBaseUrl;
 
   @PostMapping("/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
@@ -109,6 +123,12 @@ public class AuthController {
     }
   }
 
+  @GetMapping("/social/providers")
+  public ResponseEntity<ApiResponse<SocialProviderStatusResponse>> getSocialProviderStatuses() {
+    SocialProviderStatusResponse response = socialAuthService.getProviderStatuses();
+    return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
   @PostMapping("/social/complete")
   public ResponseEntity<ApiResponse<LoginResponse>> completeSocialAuth(
       @Valid @RequestBody SocialAuthCompleteRequest request) {
@@ -124,6 +144,8 @@ public class AuthController {
         if (message.startsWith("AUTH_012")
             || message.startsWith("AUTH_013")
             || message.startsWith("AUTH_014")
+            || message.startsWith("AUTH_017")
+            || message.startsWith("AUTH_018")
             || message.startsWith("AUTH_015")
             || message.startsWith("AUTH_016")) {
           return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
@@ -134,6 +156,44 @@ public class AuthController {
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
+  }
+
+  @GetMapping("/social/callback/{provider}")
+  public ResponseEntity<Void> socialProviderCallback(
+      @PathVariable("provider") String providerPathValue,
+      @RequestParam(value = "code", required = false) String code,
+      @RequestParam(value = "state", required = false) String state,
+      @RequestParam(value = "error", required = false) String error,
+      @RequestParam(value = "error_description", required = false) String errorDescription) {
+    SocialProvider provider;
+    try {
+      provider = parseSocialProvider(providerPathValue);
+    } catch (IllegalArgumentException e) {
+      return ResponseEntity.badRequest().build();
+    }
+
+    UriComponentsBuilder redirectBuilder = UriComponentsBuilder
+        .fromHttpUrl(frontendBaseUrl)
+        .path("/auth/social/callback")
+        .queryParam("provider", provider.name());
+
+    if (StringUtils.hasText(code)) {
+      redirectBuilder.queryParam("code", code);
+    }
+    if (StringUtils.hasText(state)) {
+      redirectBuilder.queryParam("state", state);
+    }
+    if (StringUtils.hasText(error)) {
+      redirectBuilder.queryParam("error", error);
+    }
+    if (StringUtils.hasText(errorDescription)) {
+      redirectBuilder.queryParam("error_description", errorDescription);
+    }
+
+    URI redirectUri = redirectBuilder.build(true).toUri();
+    HttpHeaders headers = new HttpHeaders();
+    headers.setLocation(redirectUri);
+    return new ResponseEntity<>(headers, HttpStatus.FOUND);
   }
 
   @PostMapping("/email/verify")
@@ -224,5 +284,23 @@ public class AuthController {
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
+  }
+
+  private SocialProvider parseSocialProvider(String rawValue) {
+    if (!StringUtils.hasText(rawValue)) {
+      throw new IllegalArgumentException("지원하지 않는 소셜 제공자입니다");
+    }
+
+    SocialProvider parsedProvider;
+    try {
+      parsedProvider = SocialProvider.valueOf(rawValue.trim().toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("지원하지 않는 소셜 제공자입니다");
+    }
+
+    if (parsedProvider != SocialProvider.GOOGLE && parsedProvider != SocialProvider.KAKAO) {
+      throw new IllegalArgumentException("지원하지 않는 소셜 제공자입니다");
+    }
+    return parsedProvider;
   }
 }

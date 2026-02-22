@@ -11,8 +11,10 @@ import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
 import com.woorido.common.util.JwtUtil;
 import com.woorido.user.dto.request.UserUpdateRequest;
+import com.woorido.user.dto.request.SocialOnboardingRequest;
 import com.woorido.user.dto.request.UserPasswordChangeRequest;
 import com.woorido.user.dto.response.NicknameCheckResponse;
+import com.woorido.user.dto.response.SocialOnboardingCompleteResponse;
 import com.woorido.user.dto.response.UserPasswordChangeResponse;
 import com.woorido.user.dto.response.UserProfileResponse;
 import com.woorido.user.dto.response.UserPublicProfileResponse;
@@ -94,6 +96,7 @@ public class UserService {
                 .profileImage(user.getProfileImageUrl())
                 .status(user.getAccountStatus().name())
                 .hasPassword(user.getPasswordHash() != null && !user.getPasswordHash().isBlank())
+                .requiresOnboarding(isSocialOnboardingRequired(user))
                 .brix(brixScore != null ? brixScore : 12.0)
                 .account(accountInfo)
                 .stats(UserProfileResponse.StatsInfo.builder()
@@ -148,6 +151,60 @@ public class UserService {
                 .phone(updatedUser.getPhone())
                 .profileImage(updatedUser.getProfileImageUrl())
                 .updatedAt(java.time.LocalDateTime.now().format(DATETIME_FORMATTER))
+                .build();
+    }
+
+    /**
+     * 소셜 신규가입 사용자의 필수 온보딩 정보를 저장합니다.
+     */
+    public SocialOnboardingCompleteResponse completeSocialOnboarding(String accessToken, SocialOnboardingRequest request) {
+        if (!jwtUtil.validateToken(accessToken)) {
+            throw new RuntimeException("AUTH_001:인증이 필요합니다");
+        }
+
+        String userId = jwtUtil.getUserIdFromToken(accessToken);
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new RuntimeException("AUTH_001:인증이 필요합니다");
+        }
+        if (user.getSocialProvider() == null) {
+            throw new RuntimeException("AUTH_013:지원하지 않는 소셜 인증 요청입니다");
+        }
+        if (request.getNickname() == null || request.getNickname().isBlank()) {
+            throw new RuntimeException("USER_006:닉네임을 입력해 주세요");
+        }
+        String normalizedNickname = request.getNickname().trim();
+        if (normalizedNickname.length() < 2 || normalizedNickname.length() > 20) {
+            throw new RuntimeException("USER_006:닉네임은 2-20자여야 합니다");
+        }
+        if (request.getPhone() == null || request.getPhone().isBlank()) {
+            throw new RuntimeException("VALIDATION_001:전화번호를 입력해 주세요");
+        }
+        String normalizedPhone = request.getPhone().trim();
+        if (!normalizedPhone.matches("^010-\\d{4}-\\d{4}$")) {
+            throw new RuntimeException("VALIDATION_001:전화번호 형식이 올바르지 않습니다");
+        }
+        if (!request.isTermsAgreed() || !request.isPrivacyAgreed()) {
+            throw new RuntimeException("VALIDATION_001:필수 약관 동의가 필요합니다");
+        }
+
+        if (!normalizedNickname.equals(user.getNickname())) {
+            int count = userMapper.countByNicknameExcludingUser(normalizedNickname, userId);
+            if (count > 0) {
+                throw new RuntimeException("USER_007:이미 사용 중인 닉네임입니다");
+            }
+        }
+
+        userMapper.completeSocialOnboarding(
+                userId,
+                normalizedNickname,
+                normalizedPhone,
+                request.isMarketingAgreed() ? "Y" : "N");
+
+        UserProfileResponse profile = getMyProfile(accessToken);
+        return SocialOnboardingCompleteResponse.builder()
+                .completed(true)
+                .user(profile)
                 .build();
     }
 
@@ -279,5 +336,15 @@ public class UserService {
         boolean hasDigit = password.chars().anyMatch(Character::isDigit);
         boolean hasSpecial = password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
         return hasLetter && hasDigit && hasSpecial;
+    }
+
+    private boolean isSocialOnboardingRequired(User user) {
+        if (user.getSocialProvider() == null) {
+            return false;
+        }
+
+        boolean agreedTerms = "Y".equalsIgnoreCase(user.getAgreedTerms());
+        boolean agreedPrivacy = "Y".equalsIgnoreCase(user.getAgreedPrivacy());
+        return !agreedTerms || !agreedPrivacy;
     }
 }

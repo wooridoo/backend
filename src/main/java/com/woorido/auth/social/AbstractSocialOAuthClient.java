@@ -17,6 +17,9 @@ import org.springframework.util.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 abstract class AbstractSocialOAuthClient implements SocialOAuthClient {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(7);
 
@@ -38,13 +41,17 @@ abstract class AbstractSocialOAuthClient implements SocialOAuthClient {
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("AUTH_014:소셜 인증 처리에 실패했습니다");
+                String body = response.body();
+                log.warn("OAuth token exchange failed: url={}, status={}, body={}",
+                        url, response.statusCode(), summarize(body));
+                throw mapTokenExchangeFailure(body);
             }
             return objectMapper.readTree(response.body());
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("AUTH_014:소셜 인증 처리에 실패했습니다");
+            log.warn("OAuth token exchange exception: url={}, message={}", url, e.getMessage());
+            throw new RuntimeException("AUTH_018:소셜 제공자 응답 처리에 실패했습니다");
         }
     }
 
@@ -57,14 +64,42 @@ abstract class AbstractSocialOAuthClient implements SocialOAuthClient {
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("AUTH_014:소셜 인증 처리에 실패했습니다");
+                log.warn("OAuth user profile request failed: url={}, status={}, body={}",
+                        url, response.statusCode(), summarize(response.body()));
+                throw new RuntimeException("AUTH_018:소셜 제공자 응답 처리에 실패했습니다");
             }
             return objectMapper.readTree(response.body());
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("AUTH_014:소셜 인증 처리에 실패했습니다");
+            log.warn("OAuth user profile exception: url={}, message={}", url, e.getMessage());
+            throw new RuntimeException("AUTH_018:소셜 제공자 응답 처리에 실패했습니다");
         }
     }
-}
 
+    private RuntimeException mapTokenExchangeFailure(String body) {
+        try {
+            JsonNode payload = objectMapper.readTree(body);
+            String errorCode = payload.path("error").asText("");
+            if ("invalid_grant".equalsIgnoreCase(errorCode)) {
+                return new RuntimeException("AUTH_017:인가 코드가 만료되었거나 이미 사용되었습니다");
+            }
+        } catch (Exception ignored) {
+            // JSON 파싱이 실패해도 일반 제공자 오류로 처리합니다.
+        }
+
+        return new RuntimeException("AUTH_018:소셜 제공자 응답 처리에 실패했습니다");
+    }
+
+    private String summarize(String rawBody) {
+        if (!StringUtils.hasText(rawBody)) {
+            return "<empty>";
+        }
+
+        String normalized = rawBody.replaceAll("[\\r\\n\\t]+", " ").trim();
+        if (normalized.length() <= 280) {
+            return normalized;
+        }
+        return normalized.substring(0, 280) + "...";
+    }
+}

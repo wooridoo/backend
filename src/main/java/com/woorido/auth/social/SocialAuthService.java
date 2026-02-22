@@ -15,6 +15,7 @@ import com.woorido.account.repository.AccountMapper;
 import com.woorido.auth.dto.request.SocialAuthCompleteRequest;
 import com.woorido.auth.dto.request.SocialAuthStartRequest;
 import com.woorido.auth.dto.response.LoginResponse;
+import com.woorido.auth.dto.response.SocialProviderStatusResponse;
 import com.woorido.auth.dto.response.SocialAuthStartResponse;
 import com.woorido.auth.dto.response.UserInfo;
 import com.woorido.common.entity.AccountStatus;
@@ -23,17 +24,33 @@ import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
 import com.woorido.common.util.JwtUtil;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class SocialAuthService {
     private final UserMapper userMapper;
     private final AccountMapper accountMapper;
     private final JwtUtil jwtUtil;
     private final SocialStateService socialStateService;
     private final List<SocialOAuthClient> oauthClients;
+
+    @PostConstruct
+    void logOAuthConfiguration() {
+        for (SocialOAuthClient client : oauthClients) {
+            String redirectUri = client.defaultRedirectUri();
+            if (client.isConfigured()) {
+                log.info("OAuth client configured: provider={}, redirectUri={}", client.provider(), redirectUri);
+                continue;
+            }
+
+            log.warn("OAuth client is not fully configured: provider={}, redirectUri={}", client.provider(), redirectUri);
+        }
+    }
 
     public SocialAuthStartResponse start(SocialAuthStartRequest request) {
         SocialProvider provider = parseProvider(request.getProvider());
@@ -50,6 +67,14 @@ public class SocialAuthService {
 
         return SocialAuthStartResponse.builder()
                 .authorizeUrl(authorizeUrl)
+                .build();
+    }
+
+    public SocialProviderStatusResponse getProviderStatuses() {
+        return SocialProviderStatusResponse.builder()
+                .providers(List.of(
+                        buildProviderStatus(SocialProvider.GOOGLE),
+                        buildProviderStatus(SocialProvider.KAKAO)))
                 .build();
     }
 
@@ -105,6 +130,7 @@ public class SocialAuthService {
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
         boolean isNewUser = user.getCreatedAt() != null
                 && user.getCreatedAt().isAfter(LocalDateTime.now().minusDays(7));
+        boolean requiresOnboarding = isOnboardingRequired(user);
 
         return LoginResponse.builder()
                 .accessToken(accessToken)
@@ -120,6 +146,7 @@ public class SocialAuthService {
                         .status(user.getAccountStatus().name())
                         .hasPassword(user.getPasswordHash() != null && !user.getPasswordHash().isBlank())
                         .isNewUser(isNewUser)
+                        .requiresOnboarding(requiresOnboarding)
                         .build())
                 .build();
     }
@@ -140,8 +167,8 @@ public class SocialAuthService {
                 .socialProvider(provider)
                 .socialId(profile.getSocialId())
                 .accountStatus(AccountStatus.ACTIVE)
-                .agreedTerms("Y")
-                .agreedPrivacy("Y")
+                .agreedTerms("N")
+                .agreedPrivacy("N")
                 .agreedMarketing("N")
                 .createdAt(now)
                 .build();
@@ -225,6 +252,43 @@ public class SocialAuthService {
         return client;
     }
 
+    private SocialProviderStatusResponse.ProviderStatus buildProviderStatus(SocialProvider provider) {
+        SocialOAuthClient client = findClient(provider);
+        if (client == null) {
+            return SocialProviderStatusResponse.ProviderStatus.builder()
+                    .provider(provider.name())
+                    .enabled(false)
+                    .reasonCode("AUTH_013")
+                    .build();
+        }
+
+        boolean enabled = client.isConfigured();
+        return SocialProviderStatusResponse.ProviderStatus.builder()
+                .provider(provider.name())
+                .enabled(enabled)
+                .reasonCode(enabled ? null : "AUTH_011")
+                .build();
+    }
+
+    private SocialOAuthClient findClient(SocialProvider provider) {
+        for (SocialOAuthClient client : oauthClients) {
+            if (client.provider() == provider) {
+                return client;
+            }
+        }
+        return null;
+    }
+
+    private boolean isOnboardingRequired(User user) {
+        if (user.getSocialProvider() == null) {
+            return false;
+        }
+
+        boolean agreedTerms = "Y".equalsIgnoreCase(user.getAgreedTerms());
+        boolean agreedPrivacy = "Y".equalsIgnoreCase(user.getAgreedPrivacy());
+        return !agreedTerms || !agreedPrivacy;
+    }
+
     private String sanitizeReturnTo(String returnTo) {
         if (!StringUtils.hasText(returnTo)) {
             return "/";
@@ -236,4 +300,3 @@ public class SocialAuthService {
         return normalized;
     }
 }
-

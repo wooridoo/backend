@@ -12,4 +12,3 @@ public class SocialStatePayload {
     private SocialAuthIntent intent;
     private String returnTo;
 }
-

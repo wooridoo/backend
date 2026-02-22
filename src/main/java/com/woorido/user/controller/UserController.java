@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.woorido.common.dto.ApiResponse;
 import com.woorido.user.dto.request.UserUpdateRequest;
 import com.woorido.user.dto.request.UserPasswordChangeRequest;
+import com.woorido.user.dto.request.SocialOnboardingRequest;
 import com.woorido.user.dto.response.NicknameCheckResponse;
+import com.woorido.user.dto.response.SocialOnboardingCompleteResponse;
 import com.woorido.user.dto.response.UserPasswordChangeResponse;
 import com.woorido.user.dto.response.UserProfileResponse;
 import com.woorido.user.dto.response.UserPublicProfileResponse;
@@ -97,6 +99,43 @@ public class UserController {
             } else if (message != null && message.startsWith("USER_007")) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body(ApiResponse.error(message));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
+        }
+    }
+
+    /**
+     * 소셜 신규가입 사용자 온보딩 완료 API
+     * PUT /users/me/social-onboarding
+     */
+    @PutMapping("/me/social-onboarding")
+    public ResponseEntity<ApiResponse<SocialOnboardingCompleteResponse>> completeSocialOnboarding(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody SocialOnboardingRequest request) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                throw new RuntimeException("AUTH_001:인증이 필요합니다");
+            }
+
+            String accessToken = authHeader.substring(7);
+            SocialOnboardingCompleteResponse response = userService.completeSocialOnboarding(accessToken, request);
+            return ResponseEntity.ok(ApiResponse.success(response, "소셜 가입 정보 입력이 완료되었습니다"));
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            if (message != null) {
+                if (message.startsWith("AUTH_001")) {
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+                }
+                if (message.startsWith("USER_007")) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message));
+                }
+                if (message.startsWith("AUTH_013")
+                        || message.startsWith("VALIDATION_001")
+                        || message.startsWith("USER_006")) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+                }
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("서버 오류가 발생했습니다"));
