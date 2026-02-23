@@ -53,8 +53,13 @@ public class BrixInternalController {
       }
     }
 
-    BrixBatchResult result = brixBatchService.recalculate(cutoffAt);
-    return ResponseEntity.ok(ApiResponse.success(result, "브릭스 수동 집계가 완료되었습니다"));
+    try {
+      BrixBatchResult result = brixBatchService.recalculate(cutoffAt);
+      return ResponseEntity.ok(ApiResponse.success(result, "브릭스 수동 집계가 완료되었습니다"));
+    } catch (RuntimeException e) {
+      String message = e.getMessage() != null ? e.getMessage() : "BRIX_001:브릭스 수동 집계에 실패했습니다";
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error(message));
+    }
   }
 
   private LocalDateTime parseCutoffAt(String value) {
