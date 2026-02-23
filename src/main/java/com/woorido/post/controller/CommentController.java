@@ -59,10 +59,18 @@ public class CommentController {
       @PathVariable("challengeId") String challengeId,
       @PathVariable("postId") String postId,
       @RequestParam(value = "page", defaultValue = "0") int page,
-      @RequestParam(value = "size", defaultValue = "50") int size) {
+      @RequestParam(value = "size", defaultValue = "50") int size,
+      @RequestHeader("Authorization") String authHeader) {
 
-    List<CommentResponse> comments = commentService.getComments(postId, page, size);
-    return ResponseEntity.ok(ApiResponse.success(comments));
+    try {
+      String userId = extractUserId(authHeader);
+      List<CommentResponse> comments = commentService.getComments(challengeId, postId, userId, page, size);
+      return ResponseEntity.ok(ApiResponse.success(comments));
+    } catch (IllegalArgumentException e) {
+      return handleIllegalArgument(e);
+    } catch (RuntimeException e) {
+      return handleRuntime(e);
+    }
   }
 
   @PostMapping("/{commentId}/like")
