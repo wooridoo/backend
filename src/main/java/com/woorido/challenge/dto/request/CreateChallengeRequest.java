@@ -44,6 +44,9 @@ public class CreateChallengeRequest {
   @Size(max = 500, message = "썸네일 URL은 최대 500자입니다")
   private String thumbnailImage;
 
+  @Size(max = 500, message = "배너 URL은 최대 500자입니다")
+  private String bannerImage;
+
   @Size(max = 1000, message = "규칙은 최대 1000자입니다")
   private String rules;
 }

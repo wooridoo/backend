@@ -23,6 +23,7 @@ public class ChallengeDetailResponse {
   private Long depositAmount;
   private Integer supportDay;
   private String thumbnailImage;
+  private String bannerImage;
   private String rules;
   private Boolean isVerified;
   private Leader leader;

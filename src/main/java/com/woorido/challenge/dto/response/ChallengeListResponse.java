@@ -32,6 +32,7 @@ public class ChallengeListResponse {
     private MemberCount memberCount;
     private Long supportAmount;
     private String thumbnailImage;
+    private String bannerImage;
     private Boolean isVerified;
     private Leader leader;
     private String createdAt;

@@ -46,6 +46,7 @@ public class PostService {
   private final com.woorido.post.domain.PostLikeFactory postLikeFactory;
   private final com.woorido.post.domain.PostImageFactory postImageFactory;
   private final com.woorido.post.domain.PostDeleteStrategy postDeleteStrategy;
+  private static final int MAX_POST_IMAGE_COUNT = 10;
 
   /**
    * 게시글 생성.
@@ -75,6 +76,8 @@ public class PostService {
 
     // 도메인 팩토리로 게시글 엔티티 생성
     Post post = postFactory.create(challengeId, userId, request, isNoticeFlag, isPinnedFlag);
+
+    validateImageUrls(request.getImageUrls());
 
     // 게시글 본문 저장
     postMapper.insert(post);
@@ -136,6 +139,8 @@ public class PostService {
     PostUpdateVisitor visitor = new PostUpdateVisitor(request, isNotice ? "Y" : "N");
     post.accept(visitor);
 
+    validateImageUrls(request.getImageUrls());
+
     // 게시글 본문 업데이트
     postMapper.update(post);
 
@@ -150,7 +155,7 @@ public class PostService {
 
     // 이미지 목록은 전체 교체 방식으로 동기화
     postImageMapper.deleteAllByPostId(postId);
-    saveImages(postId, request.getAttachmentIds());
+    saveImages(postId, request.getImageUrls());
 
     User user = userMapper.findById(userId);
     return CreatePostResponse.builder()
@@ -332,6 +337,7 @@ public class PostService {
           .viewCount(((Number) p.get("VIEW_COUNT")).longValue())
           .isPinned("Y".equals(p.get("IS_PINNED")))
           .isLiked(isLikedVal)
+          .images(getImageUrlsForPost((String) p.get("ID")))
           .createdAt(toLocalDateTime(p.get("CREATED_AT")))
           .build();
     }).toList();
@@ -508,6 +514,29 @@ public class PostService {
       throw new IllegalArgumentException("MEMBER_001:챌린지 멤버가 아닙니다");
     }
     return memberInfo;
+  }
+
+  private void validateImageUrls(List<String> imageUrls) {
+    if (imageUrls == null) {
+      return;
+    }
+
+    if (imageUrls.size() > MAX_POST_IMAGE_COUNT) {
+      throw new IllegalArgumentException("IMAGE_004:게시글 이미지는 최대 10장까지 업로드할 수 있습니다");
+    }
+  }
+
+  private List<String> getImageUrlsForPost(String postId) {
+    List<Map<String, Object>> attachments = postMapper.findAttachments(postId);
+    if (attachments == null || attachments.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    return attachments.stream()
+        .map(row -> row.get("FILE_URL"))
+        .filter(value -> value != null)
+        .map(Object::toString)
+        .toList();
   }
 }
 

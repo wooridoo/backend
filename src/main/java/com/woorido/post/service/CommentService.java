@@ -54,9 +54,19 @@ public class CommentService {
     // 댓글 대상 게시글이 현재 챌린지에 속하는지 확인
     requirePostInChallenge(challengeId, postId);
 
-    if (request.getParentId() != null) {
+    String content = request.getContent() == null ? "" : request.getContent().trim();
+    if (content.isEmpty()) {
+      throw new IllegalArgumentException("VALIDATION_001:댓글 내용을 입력해주세요");
+    }
+
+    String parentCommentId = request.getParentId();
+    if (parentCommentId != null && parentCommentId.isBlank()) {
+      parentCommentId = null;
+    }
+
+    if (parentCommentId != null) {
       // 대댓글이면 부모 댓글 존재 여부/게시글 일치 여부를 확인
-      Comment parent = commentMapper.findById(request.getParentId())
+      Comment parent = commentMapper.findById(parentCommentId)
           .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
       if (!postId.equals(parent.getPostId())) {
         throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
@@ -69,9 +79,9 @@ public class CommentService {
     Comment comment = Comment.builder()
         .id(id)
         .postId(postId)
-        .parentId(request.getParentId())
+        .parentId(parentCommentId)
         .createdBy(userId)
-        .content(request.getContent())
+        .content(content)
         .createdAt(now)
         .updatedAt(now)
         .build();
@@ -112,7 +122,10 @@ public class CommentService {
    * 루트 댓글을 기준으로 답글 트리를 재귀적으로 구성한다.
    */
   @Transactional(readOnly = true)
-  public List<CommentResponse> getComments(String postId, int page, int size) {
+  public List<CommentResponse> getComments(String challengeId, String postId, String userId, int page, int size) {
+    requireMemberAny(challengeId, userId);
+    requirePostInChallenge(challengeId, postId);
+
     List<Comment> comments = commentMapper.findAllByPostId(postId);
     if (comments.isEmpty()) {
       return new ArrayList<>();
@@ -124,12 +137,12 @@ public class CommentService {
         .collect(Collectors.toList());
 
     Map<String, AuthorInfo> authorMap = new HashMap<>();
-    for (String userId : userIds) {
+    for (String authorUserId : userIds) {
       // 현재는 사용자 정보를 개별 조회(N+1)한다.
       // 트래픽이 커지면 IN 조회 방식으로 최적화할 수 있다.
-      User user = userMapper.findById(userId);
+      User user = userMapper.findById(authorUserId);
       if (user != null) {
-        authorMap.put(userId, AuthorInfo.builder()
+        authorMap.put(authorUserId, AuthorInfo.builder()
             .userId(user.getId())
             .nickname(user.getNickname())
             .profileImage(user.getProfileImageUrl())

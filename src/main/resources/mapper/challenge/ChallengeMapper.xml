@@ -24,6 +24,7 @@
         <result property="isPublic" column="is_public" />
         <result property="thumbnailUrl" column="thumbnail_url" />
         <result property="bannerUrl" column="banner_url" />
+        <result property="rules" column="rules" />
         <result property="version" column="version" />
         <result property="createdAt" column="created_at" />
         <result property="updatedAt" column="updated_at" />
@@ -59,14 +60,14 @@
             current_members, min_members, max_members,
             balance, monthly_fee, deposit_amount,
             status, is_verified, is_public,
-            thumbnail_url, version, created_at, updated_at
+            thumbnail_url, banner_url, rules, version, created_at, updated_at
         ) VALUES (
             #{id}, #{name}, #{description}, #{category}, #{creatorId},
             SYSTIMESTAMP, #{leaderBenefitRate, jdbcType=NUMERIC},
             #{currentMembers}, #{minMembers}, #{maxMembers},
             #{balance}, #{monthlyFee}, #{depositAmount},
             #{status}, 'N', 'Y',
-            #{thumbnailUrl, jdbcType=VARCHAR}, 0, SYSTIMESTAMP, SYSTIMESTAMP
+            #{thumbnailUrl, jdbcType=VARCHAR}, #{bannerUrl, jdbcType=VARCHAR}, #{rules, jdbcType=VARCHAR}, 0, SYSTIMESTAMP, SYSTIMESTAMP
         )
     </insert>
 
@@ -108,6 +109,7 @@
             c.max_members,
             c.monthly_fee AS support_amount,
             c.thumbnail_url AS thumbnail_image,
+            c.banner_url AS banner_image,
             c.is_verified,
             c.created_at,
             u.id AS leader_user_id,
@@ -181,6 +183,8 @@
             c.deposit_amount,
             c.balance,
             c.thumbnail_url AS thumbnail_image,
+            c.banner_url AS banner_image,
+            c.rules,
             c.is_verified,
             c.activated_at AS started_at,
             c.created_at,
@@ -206,6 +210,8 @@
         SET name = #{name, jdbcType=VARCHAR},
             description = #{description, jdbcType=VARCHAR},
             thumbnail_url = #{thumbnailUrl, jdbcType=VARCHAR},
+            banner_url = #{bannerUrl, jdbcType=VARCHAR},
+            rules = #{rules, jdbcType=VARCHAR},
             max_members = #{maxMembers, jdbcType=INTEGER},
             updated_at = SYSTIMESTAMP
         WHERE id = #{id}
@@ -230,6 +236,7 @@
             c.max_members,
             c.monthly_fee AS support_amount,
             c.thumbnail_url AS thumbnail_image,
+            c.banner_url AS banner_image,
             cm.role AS my_role,
             cm.privilege_status AS my_status,
             cm.joined_at,

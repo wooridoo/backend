@@ -1,17 +1,24 @@
 package com.woorido.post.controller;
 
 import com.woorido.common.dto.ApiResponse;
+import com.woorido.common.exception.ImageValidationException;
+import com.woorido.common.image.ImagePolicyType;
+import com.woorido.common.image.ImageUploadService;
 import com.woorido.common.util.JwtUtil;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.List;
 import com.woorido.post.dto.request.CreatePostRequest;
 import com.woorido.post.dto.request.PinPostRequest;
 import com.woorido.post.dto.request.UpdatePostRequest;
 import com.woorido.post.dto.response.CreatePostResponse;
+import com.woorido.post.dto.response.PostImagesUploadResponse;
 import com.woorido.post.dto.response.PinPostResponse;
 import com.woorido.post.dto.response.PostDetailResponse;
 import com.woorido.post.dto.response.PostListResponse;
 import com.woorido.post.service.PostService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,8 +47,12 @@ public class PostController {
   private final PostService postService;
   private final JwtUtil jwtUtil;
   private final com.woorido.common.strategy.ImageUploadStrategy imageUploadStrategy;
+  private final ImageUploadService imageUploadService;
   private final com.woorido.challenge.repository.ChallengeMemberMapper challengeMemberMapper; // Need to verify
                                                                                               // membership
+
+  @Value("${app.backend.base-url:http://localhost:8080}")
+  private String backendBaseUrl;
 
   /**
    * 게시글 작성 API
@@ -407,6 +419,69 @@ public class PostController {
   }
 
   /**
+   * 게시글 이미지 다중 업로드 API
+   * POST /challenges/{challengeId}/posts/images
+   */
+  @PostMapping("/images")
+  public ResponseEntity<ApiResponse<PostImagesUploadResponse>> uploadPostImages(
+      @PathVariable("challengeId") String challengeId,
+      @RequestParam(value = "files", required = false) List<MultipartFile> files,
+      @RequestParam(value = "files[]", required = false) List<MultipartFile> filesBracket,
+      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+    try {
+      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("AUTH_001:Authorization header is required");
+      }
+      String accessToken = authHeader.substring(7);
+
+      if (!jwtUtil.validateToken(accessToken)) {
+        throw new RuntimeException("AUTH_002:Invalid access token");
+      }
+      String userId = jwtUtil.getUserIdFromToken(accessToken);
+
+      Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
+      if (memberInfo == null || "LEFT".equals(memberInfo.get("STATUS"))) {
+        throw new IllegalArgumentException("MEMBER_001:User is not a challenge member");
+      }
+
+      List<MultipartFile> uploadFiles = mergeUploadFiles(files, filesBracket);
+      if (uploadFiles.isEmpty()) {
+        throw new ImageValidationException("IMAGE_004", "업로드할 이미지가 없습니다");
+      }
+
+      List<String> imageUrls = imageUploadService.uploadBatch(
+          uploadFiles,
+          ImagePolicyType.POST_ATTACHMENT,
+          "posts/" + challengeId);
+
+      PostImagesUploadResponse response = PostImagesUploadResponse.builder()
+          .imageUrls(imageUrls)
+          .uploadedCount(imageUrls.size())
+          .build();
+
+      return ResponseEntity.ok(ApiResponse.success(response, "이미지가 업로드되었습니다"));
+
+    } catch (IllegalArgumentException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith("MEMBER_001")) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+    } catch (RuntimeException e) {
+      if (e instanceof ImageValidationException) {
+        throw e;
+      }
+      if (e.getMessage() != null && e.getMessage().startsWith("AUTH_")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
+      }
+      log.error("Post Image Upload Error", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+    }
+  }
+
+  /**
    * 파일 업로드 API
    * POST /challenges/{challengeId}/posts/upload
    */
@@ -429,7 +504,7 @@ public class PostController {
 
       // Check Membership
       Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
-      if (memberInfo == null) {
+      if (memberInfo == null || "LEFT".equals(memberInfo.get("STATUS"))) {
         throw new IllegalArgumentException("MEMBER_001:User is not a challenge member");
       }
 
@@ -440,7 +515,7 @@ public class PostController {
       // Note: We don't save to DB here as per requirement. ID is generated for
       // display.
       Long fileId = Math.abs(java.util.UUID.randomUUID().getMostSignificantBits());
-      String fileUrl = "/uploads/" + uploadedPath; // Assuming handled by static resource handler
+      String fileUrl = buildAbsoluteUploadUrl(uploadedPath);
 
       com.woorido.post.dto.response.FileUploadResponse response = com.woorido.post.dto.response.FileUploadResponse
           .builder()
@@ -467,6 +542,25 @@ public class PostController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
     }
+  }
+
+  private List<MultipartFile> mergeUploadFiles(List<MultipartFile> files, List<MultipartFile> filesBracket) {
+    List<MultipartFile> merged = new ArrayList<>();
+    if (files != null) {
+      merged.addAll(files);
+    }
+    if (filesBracket != null) {
+      merged.addAll(filesBracket);
+    }
+    return merged.stream().filter(file -> file != null && !file.isEmpty()).toList();
+  }
+
+  private String buildAbsoluteUploadUrl(String uploadedPath) {
+    String baseUrl = backendBaseUrl.endsWith("/")
+        ? backendBaseUrl.substring(0, backendBaseUrl.length() - 1)
+        : backendBaseUrl;
+    String normalizedPath = uploadedPath.startsWith("/") ? uploadedPath.substring(1) : uploadedPath;
+    return baseUrl + "/uploads/" + normalizedPath;
   }
 }
 

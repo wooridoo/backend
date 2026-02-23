@@ -122,6 +122,8 @@ public class ChallengeService {
         .depositAmount(request.getDepositAmount())
         .status(ChallengeStatus.RECRUITING)
         .thumbnailUrl(request.getThumbnailImage())
+        .bannerUrl(request.getBannerImage())
+        .rules(request.getRules())
         .build();
 
     challengeMapper.insert(challenge);
@@ -283,6 +285,7 @@ public class ChallengeService {
               .build())
           .supportAmount(getLong(row, "SUPPORT_AMOUNT"))
           .thumbnailImage(getString(row, "THUMBNAIL_IMAGE"))
+          .bannerImage(getString(row, "BANNER_IMAGE"))
           .isVerified("Y".equals(getString(row, "IS_VERIFIED")))
           .leader(ChallengeListResponse.Leader.builder()
               .userId(getString(row, "LEADER_USER_ID"))
@@ -392,6 +395,8 @@ public class ChallengeService {
         .supportAmount(getLong(challenge, "SUPPORT_AMOUNT"))
         .depositAmount(getLong(challenge, "DEPOSIT_AMOUNT"))
         .thumbnailImage(getString(challenge, "THUMBNAIL_IMAGE"))
+        .bannerImage(getString(challenge, "BANNER_IMAGE"))
+        .rules(getString(challenge, "RULES"))
         .isVerified("Y".equals(getString(challenge, "IS_VERIFIED")))
         .leader(ChallengeDetailResponse.Leader.builder()
             .id(getString(challenge, "LEADER_ID"))
@@ -460,6 +465,9 @@ public class ChallengeService {
     if (request.getThumbnailImage() != null) {
       challenge.setThumbnailUrl(request.getThumbnailImage());
     }
+    if (request.getBannerImage() != null) {
+      challenge.setBannerUrl(request.getBannerImage());
+    }
     if (request.getRules() != null) {
       challenge.setRules(request.getRules());
     }
@@ -520,6 +528,7 @@ public class ChallengeService {
               .build())
           .supportAmount(supportAmount)
           .thumbnailImage(row.get("THUMBNAIL_IMAGE") != null ? row.get("THUMBNAIL_IMAGE").toString() : null)
+          .bannerImage(row.get("BANNER_IMAGE") != null ? row.get("BANNER_IMAGE").toString() : null)
           .build();
 
       challengeItems.add(item);
