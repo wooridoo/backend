@@ -26,9 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -355,9 +357,9 @@ public class MeetingService {
       throw new RuntimeException("MEETING_002:이미 지난 모임입니다");
     }
 
-    // 하위 호환: 과거 클라이언트는 status 필드를, 최신 클라이언트는 choice 필드를 사용한다.
-    String choice = request.getChoice() != null ? request.getChoice() : request.getStatus();
+    String choice = normalizeAttendanceChoice(request);
     record.setChoice(choice);
+    record.setActualAttendance("PENDING");
     record.setAttendanceConfirmedAt(now);
     meetingVoteMapper.updateRecord(record);
 
@@ -401,35 +403,55 @@ public class MeetingService {
     }
 
     MeetingVote vote = meetingVoteMapper.findByMeetingId(meetingId)
-        .orElseThrow(() -> new RuntimeException("VOTE_001:투표 정보를 찾을 수 없습니다"));
+        .orElseThrow(() -> new RuntimeException("MEETING_001:모임 투표를 찾을 수 없습니다"));
 
-    List<String> actualAttendees = request.getActualAttendees();
-    int actualAttendCount = 0;
-
-    if (actualAttendees != null) {
-      // 전달받은 실제 참석자 목록을 기준으로 레코드를 upsert한다.
-      for (String attendeeId : actualAttendees) {
-        MeetingVoteRecord record = meetingVoteMapper.findRecord(vote.getId(), attendeeId).orElse(null);
-        if (record == null) {
-          record = new MeetingVoteRecord();
-          record.setId(UUID.randomUUID().toString());
-          record.setMeetingVoteId(vote.getId());
-          record.setUserId(attendeeId);
-          record.setChoice("AGREE");
-          record.setActualAttendance("ATTENDED");
-          record.setAttendanceConfirmedAt(LocalDateTime.now());
-          record.setCreatedAt(LocalDateTime.now());
-          meetingVoteMapper.insertRecord(record);
-        } else {
-          record.setActualAttendance("ATTENDED");
-          record.setAttendanceConfirmedAt(LocalDateTime.now());
-          meetingVoteMapper.updateRecord(record);
-        }
-        actualAttendCount++;
-      }
+    List<String> actualAttendees = request != null ? request.getActualAttendees() : null;
+    if (actualAttendees == null || actualAttendees.isEmpty()) {
+      throw new RuntimeException("MEETING_003:실제 참석자를 1명 이상 선택해야 합니다");
     }
 
+    int actualAttendCount = 0;
+    Set<String> uniqueAttendees = new HashSet<>();
     LocalDateTime now = LocalDateTime.now();
+
+    for (String attendeeIdRaw : actualAttendees) {
+      if (!hasText(attendeeIdRaw)) {
+        throw new RuntimeException("MEETING_003:참석자 ID가 비어 있습니다");
+      }
+
+      String attendeeId = attendeeIdRaw.trim();
+      if (!uniqueAttendees.add(attendeeId)) {
+        throw new RuntimeException("MEETING_003:실제 참석자 목록에 중복 ID가 포함되어 있습니다");
+      }
+
+      Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(attendeeId, challengeId);
+      if (memberInfo == null || !"ACTIVE".equals(asString(memberInfo.get("STATUS")))) {
+        throw new RuntimeException("MEETING_003:활성 멤버만 실제 참석자로 처리할 수 있습니다");
+      }
+
+      if (meetingMapper.isAttendee(meetingId, attendeeId) == 0) {
+        throw new RuntimeException("MEETING_003:출석 응답이 AGREE인 멤버만 실제 참석자로 처리할 수 있습니다");
+      }
+
+      MeetingVoteRecord record = meetingVoteMapper.findRecord(vote.getId(), attendeeId).orElse(null);
+      if (record == null) {
+        record = new MeetingVoteRecord();
+        record.setId(UUID.randomUUID().toString());
+        record.setMeetingVoteId(vote.getId());
+        record.setUserId(attendeeId);
+        record.setChoice("AGREE");
+        record.setActualAttendance("ATTENDED");
+        record.setAttendanceConfirmedAt(now);
+        record.setCreatedAt(now);
+        meetingVoteMapper.insertRecord(record);
+      } else {
+        record.setActualAttendance("ATTENDED");
+        record.setAttendanceConfirmedAt(now);
+        meetingVoteMapper.updateRecord(record);
+      }
+      actualAttendCount++;
+    }
+
     Meeting meetingUpdate = new Meeting();
     meetingUpdate.setId(meetingId);
     meetingUpdate.setCompletedAt(now);
@@ -444,7 +466,6 @@ public class MeetingService {
         .status("COMPLETED")
         .attendance(CompleteMeetingResponse.AttendanceStats.builder()
             .actual(actualAttendCount)
-            // totalMembers가 0인 비정상 데이터에서도 0으로 나누지 않도록 방어한다.
             .total(Math.max(totalMembers, 0))
             .rate(totalMembers > 0 ? (double) actualAttendCount / totalMembers * 100 : 0.0)
             .build())
@@ -624,7 +645,7 @@ public class MeetingService {
   }
 
   /**
-   * null-safe 문자열 변환.
+   * 참석 투표 가능 상태인지 확인한다.
    */
   private boolean isAttendanceVoteCastable(String status) {
     if (status == null) {
@@ -634,6 +655,26 @@ public class MeetingService {
     return "PENDING".equals(normalized)
         || "OPEN".equals(normalized)
         || "IN_PROGRESS".equals(normalized);
+  }
+
+  private String normalizeAttendanceChoice(AttendanceResponseRequest request) {
+    String rawChoice = request != null ? request.getChoice() : null;
+    if (!hasText(rawChoice) && request != null) {
+      rawChoice = request.getStatus();
+    }
+    if (!hasText(rawChoice)) {
+      throw new RuntimeException("MEETING_003:출석 응답값이 필요합니다");
+    }
+
+    String normalized = rawChoice.trim().toUpperCase();
+    if (!"AGREE".equals(normalized) && !"DISAGREE".equals(normalized) && !"PENDING".equals(normalized)) {
+      throw new RuntimeException("MEETING_003:지원하지 않는 출석 응답값입니다");
+    }
+    return normalized;
+  }
+
+  private boolean hasText(String value) {
+    return value != null && !value.trim().isEmpty();
   }
 
   private String asString(Object value) {

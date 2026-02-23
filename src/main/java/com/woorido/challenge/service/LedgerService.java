@@ -1,7 +1,6 @@
 package com.woorido.challenge.service;
 
 import com.woorido.challenge.domain.LedgerEntry;
-import com.woorido.challenge.domain.LedgerEntryType;
 import com.woorido.challenge.dto.request.CreateLedgerEntryRequest;
 import com.woorido.challenge.dto.request.UpdateLedgerEntryRequest;
 import com.woorido.challenge.dto.response.LedgerEntryResponse;
@@ -15,7 +14,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,21 +72,7 @@ public class LedgerService {
     String userId = resolveUserId(authorization);
     requireChallengeMember(challengeId, userId);
 
-    LedgerEntry entry = LedgerEntry.builder()
-        .id(UUID.randomUUID().toString())
-        .challengeId(challengeId)
-        .type(LedgerEntryType.valueOf(request.getType().toUpperCase()))
-        .amount(request.getAmount() != null ? request.getAmount() : 0L)
-        .balanceBefore(0L)
-        .balanceAfter(0L)
-        .description(request.getDescription())
-        .relatedUserId(userId)
-        .memo(request.getMemo())
-        .createdAt(LocalDateTime.now())
-        .build();
-
-    ledgerMapper.insert(entry);
-    return toResponse(entry);
+    throw new RuntimeException("LEDGER_003:수기 장부 생성은 비활성화되어 있습니다");
   }
 
   @Transactional
@@ -101,17 +85,7 @@ public class LedgerService {
     }
     requireChallengeMember(current.getChallengeId(), userId);
 
-    LedgerEntry updated = LedgerEntry.builder()
-        .id(entryId)
-        .description(request.getDescription())
-        .memo(request.getMemo())
-        .memoUpdatedAt(LocalDateTime.now())
-        .memoUpdatedBy(userId)
-        .build();
-    ledgerMapper.updateLedgerEntry(updated);
-
-    LedgerEntry saved = ledgerMapper.findById(entryId);
-    return toResponse(saved);
+    throw new RuntimeException("LEDGER_003:수기 장부 수정은 비활성화되어 있습니다");
   }
 
   private String resolveUserId(String authorization) {

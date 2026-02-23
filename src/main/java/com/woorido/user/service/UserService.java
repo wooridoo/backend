@@ -312,11 +312,12 @@ public class UserService {
         }
 
         int completedChallenges = userMapper.countCompletedChallengesByUserId(targetUserId);
+        Double brixScore = userMapper.findTotalScoreByUserId(targetUserId);
         return UserPublicProfileResponse.builder()
                 .userId(user.getId())
                 .nickname(user.getNickname())
                 .profileImage(user.getProfileImageUrl())
-                .brix(0.0)
+                .brix(brixScore != null ? brixScore : 12.0)
                 .stats(UserPublicProfileResponse.Stats.builder()
                         .completedChallenges(completedChallenges)
                         .totalMeetings(0)

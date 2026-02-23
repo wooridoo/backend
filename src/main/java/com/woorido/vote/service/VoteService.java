@@ -461,7 +461,7 @@ public class VoteService {
       validateRevokedPolicy(type, expenseRequest.getMeetingId(), asString(memberInfo.get("STATUS")));
 
       if (hasText(expenseRequest.getMeetingId())) {
-        int attendee = meetingMapper.isAttendee(expenseRequest.getMeetingId(), userId);
+        int attendee = meetingMapper.isActualAttendee(expenseRequest.getMeetingId(), userId);
         if (attendee == 0) {
           throw new RuntimeException("VOTE_007:해당 모임 참석자만 투표할 수 있습니다");
         }
@@ -561,7 +561,7 @@ public class VoteService {
       throw new RuntimeException("MEETING_001:모임을 찾을 수 없습니다");
     }
 
-    int attendeeCount = meetingMapper.countAttendees(meetingId);
+    int attendeeCount = meetingMapper.countActualAttendees(meetingId);
     if (attendeeCount <= 0) {
       throw new RuntimeException("VOTE_009:모임 참석자가 없어 지출 투표를 생성할 수 없습니다");
     }

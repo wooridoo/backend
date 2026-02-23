@@ -51,6 +51,7 @@ import com.woorido.common.util.JwtUtil;
 import com.woorido.django.ledger.client.DjangoLedgerClient;
 import com.woorido.django.ledger.dto.DjangoLedgerGraphRequest;
 import com.woorido.django.ledger.dto.DjangoLedgerGraphResponse;
+import com.woorido.meeting.repository.MeetingMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -73,6 +74,7 @@ public class ChallengeService {
   private final JwtUtil jwtUtil;
   private final LedgerMapper ledgerMapper;
   private final DjangoLedgerClient djangoLedgerClient;
+  private final MeetingMapper meetingMapper;
 
   /**
    * 챌린지를 생성하고 생성자를 리더 멤버로 등록한다.
@@ -1066,6 +1068,7 @@ public class ChallengeService {
     int activeCount = 0;
     int overdueCount = 0;
     int graceCount = 0;
+    int completedMeetings = meetingMapper.countCompletedMeetingsByChallengeId(challengeId);
 
     for (Map<String, Object> data : membersData) {
       String status = (String) data.get("STATUS");
@@ -1116,13 +1119,20 @@ public class ChallengeService {
           .overdueCount(0)
           .build();
 
+      int attendedMeetings = meetingMapper.countAttendedCompletedMeetingsByChallengeIdAndUserId(
+          challengeId,
+          getString(data, "USER_ID"));
+      double attendanceRate = completedMeetings > 0
+          ? (double) attendedMeetings / completedMeetings * 100.0
+          : 0.0;
+
       memberList.add(ChallengeMemberListResponse.MemberInfo.builder()
           .memberId((String) data.get("MEMBER_ID"))
           .user(userInfo)
           .role((String) data.get("ROLE"))
           .status(status)
           .supportStatus(supportStatus)
-          .attendanceRate(100.0) // Temporary logic
+          .attendanceRate(attendanceRate)
           .joinedAt(data.get("JOINED_AT") != null ? data.get("JOINED_AT").toString() : null)
           .build());
     }
@@ -1238,9 +1248,9 @@ public class ChallengeService {
         ? Long.parseLong(memberData.get("TOTAL_SUPPORT_PAID").toString())
         : 0L;
 
-    int meetingsTotal = 0; // meetingMapper.countTotalMeetings(challengeId);
-    int meetingsAttended = 0; // meetingMapper.countAttendedMeetings(challengeId, targetUserId);
-    Double attendanceRate = 0.0;
+    int meetingsTotal = meetingMapper.countCompletedMeetingsByChallengeId(challengeId);
+    int meetingsAttended = meetingMapper.countAttendedCompletedMeetingsByChallengeIdAndUserId(challengeId, targetUserId);
+    Double attendanceRate = meetingsTotal > 0 ? (double) meetingsAttended / meetingsTotal * 100.0 : 0.0;
 
     Double supportRate = totalSupportPaid > 0 ? 100.0 : 0.0;
 

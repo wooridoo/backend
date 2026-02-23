@@ -45,8 +45,18 @@ public interface MeetingMapper {
         // 모임 참석 여부 확인
         int isAttendee(@Param("meetingId") String meetingId, @Param("userId") String userId);
 
+        int countActualAttendees(@Param("meetingId") String meetingId);
+
+        int isActualAttendee(@Param("meetingId") String meetingId, @Param("userId") String userId);
+
         // 모임 참석자 목록 조회 (AGREE 상태)
         List<Map<String, Object>> findAttendeesByMeetingId(@Param("meetingId") String meetingId);
+
+        int countCompletedMeetingsByChallengeId(@Param("challengeId") String challengeId);
+
+        int countAttendedCompletedMeetingsByChallengeIdAndUserId(
+                        @Param("challengeId") String challengeId,
+                        @Param("userId") String userId);
 
         // 특정 유저가 최근 완료한 모임 수(리더 강퇴 활성 조건 확인용)
         int countCompletedMeetingsSince(@Param("challengeId") String challengeId,

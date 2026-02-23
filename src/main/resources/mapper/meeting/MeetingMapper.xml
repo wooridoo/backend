@@ -128,6 +128,27 @@
       AND mvr.choice = 'AGREE'
   </select>
 
+  <select id="countActualAttendees" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id
+    JOIN woorido.meetings m ON m.id = mv.meeting_id
+    WHERE mv.meeting_id = #{meetingId}
+      AND m.status = 'COMPLETED'
+      AND mvr.actual_attendance = 'ATTENDED'
+  </select>
+
+  <select id="isActualAttendee" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meeting_votes mv
+    JOIN woorido.meeting_vote_records mvr ON mv.id = mvr.meeting_vote_id
+    JOIN woorido.meetings m ON m.id = mv.meeting_id
+    WHERE mv.meeting_id = #{meetingId}
+      AND mvr.user_id = #{userId}
+      AND m.status = 'COMPLETED'
+      AND mvr.actual_attendance = 'ATTENDED'
+  </select>
+
   <select id="findAttendeesByMeetingId" resultType="java.util.Map">
     SELECT
         u.id as USER_ID,
@@ -150,6 +171,26 @@
       AND status = 'COMPLETED'
       AND completed_at IS NOT NULL
       AND completed_at &gt;= #{since}
+  </select>
+
+  <select id="countCompletedMeetingsByChallengeId" resultType="int">
+    SELECT COUNT(*)
+    FROM woorido.meetings
+    WHERE challenge_id = #{challengeId}
+      AND status = 'COMPLETED'
+      AND completed_at IS NOT NULL
+  </select>
+
+  <select id="countAttendedCompletedMeetingsByChallengeIdAndUserId" resultType="int">
+    SELECT COUNT(DISTINCT m.id)
+    FROM woorido.meetings m
+    JOIN woorido.meeting_votes mv ON mv.meeting_id = m.id
+    JOIN woorido.meeting_vote_records mvr ON mvr.meeting_vote_id = mv.id
+    WHERE m.challenge_id = #{challengeId}
+      AND m.status = 'COMPLETED'
+      AND m.completed_at IS NOT NULL
+      AND mvr.user_id = #{userId}
+      AND mvr.actual_attendance = 'ATTENDED'
   </select>
 
 </mapper>

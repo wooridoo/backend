@@ -86,7 +86,7 @@ public class LedgerController {
     if (message.startsWith("AUTH_")) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
     }
-    if (message.startsWith("CHALLENGE_003")) {
+    if (message.startsWith("CHALLENGE_003") || message.startsWith("LEDGER_003")) {
       return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
     }
     if (message.startsWith("CHALLENGE_001") || message.startsWith("LEDGER_001")) {
