@@ -32,4 +32,16 @@
         WHERE comment_id = #{commentId}
     </select>
 
+    <select id="findLikedCommentIds" resultType="string">
+        SELECT comment_id
+        FROM woorido.comment_likes
+        WHERE user_id = #{userId}
+        <if test="commentIds != null and commentIds.size() > 0">
+            AND comment_id IN
+            <foreach collection="commentIds" item="commentId" open="(" separator="," close=")">
+                #{commentId}
+            </foreach>
+        </if>
+    </select>
+
 </mapper>

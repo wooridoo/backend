@@ -3,10 +3,13 @@ package com.woorido.notification.controller;
 import com.woorido.common.dto.ApiResponse;
 import com.woorido.common.util.AuthHeaderResolver;
 import com.woorido.notification.domain.Notification;
+import com.woorido.notification.domain.NotificationSettings;
+import com.woorido.notification.dto.request.UpdateNotificationSettingsRequest;
 import com.woorido.notification.dto.NotificationListResponse;
 import com.woorido.notification.dto.NotificationMarkReadResponse;
 import com.woorido.notification.dto.NotificationReadAllResponse;
 import com.woorido.notification.dto.NotificationResponse;
+import com.woorido.notification.dto.response.NotificationSettingsResponse;
 import com.woorido.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -116,6 +120,31 @@ public class NotificationController {
           .readCount(readCount)
           .build();
       return ResponseEntity.ok(ApiResponse.success(response, readCount + "개의 알림을 읽음 처리했습니다"));
+    } catch (RuntimeException e) {
+      return handleError(e);
+    }
+  }
+
+  @GetMapping("/settings")
+  public ResponseEntity<ApiResponse<NotificationSettingsResponse>> getSettings(
+      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+    try {
+      String userId = validateAndGetUserId(authHeader);
+      NotificationSettings settings = notificationService.getNotificationSettings(userId);
+      return ResponseEntity.ok(ApiResponse.success(NotificationSettingsResponse.from(settings)));
+    } catch (RuntimeException e) {
+      return handleError(e);
+    }
+  }
+
+  @PutMapping("/settings")
+  public ResponseEntity<ApiResponse<NotificationSettingsResponse>> updateSettings(
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      @RequestBody UpdateNotificationSettingsRequest request) {
+    try {
+      String userId = validateAndGetUserId(authHeader);
+      NotificationSettings settings = notificationService.updateNotificationSettings(userId, request);
+      return ResponseEntity.ok(ApiResponse.success(NotificationSettingsResponse.from(settings), "알림 설정이 저장되었습니다"));
     } catch (RuntimeException e) {
       return handleError(e);
     }

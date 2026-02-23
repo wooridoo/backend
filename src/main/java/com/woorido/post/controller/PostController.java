@@ -1,6 +1,7 @@
 package com.woorido.post.controller;
 
 import com.woorido.common.dto.ApiResponse;
+import com.woorido.common.exception.RateLimitExceededException;
 import com.woorido.common.exception.ImageValidationException;
 import com.woorido.common.image.ImagePolicyType;
 import com.woorido.common.image.ImageUploadService;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -262,16 +264,26 @@ public class PostController {
   public ResponseEntity<ApiResponse<com.woorido.post.dto.response.PostLikeResponse>> toggleLike(
       @PathVariable("challengeId") String challengeId,
       @PathVariable("postId") String postId,
-      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      HttpServletRequest httpServletRequest) {
 
     try {
       String userId = resolveUserId(authHeader);
+      String clientIp = extractClientIp(httpServletRequest);
 
-      com.woorido.post.dto.response.PostLikeResponse response = postService.toggleLike(challengeId, postId, userId);
+      com.woorido.post.dto.response.PostLikeResponse response = postService.toggleLike(
+          challengeId,
+          postId,
+          userId,
+          clientIp);
 
       String message = response.isLiked() ? "Post liked" : "Post like removed";
       return ResponseEntity.ok(ApiResponse.success(response, message));
 
+    } catch (RateLimitExceededException e) {
+      return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+          .header("Retry-After", String.valueOf(e.getRetryAfterSeconds()))
+          .body(ApiResponse.error(e.getMessage()));
     } catch (IllegalArgumentException e) {
       String message = e.getMessage();
       if (message != null && message.startsWith("MEMBER_001")) {
@@ -296,13 +308,23 @@ public class PostController {
   public ResponseEntity<ApiResponse<com.woorido.post.dto.response.PostLikeResponse>> unlikePost(
       @PathVariable("challengeId") String challengeId,
       @PathVariable("postId") String postId,
-      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      HttpServletRequest httpServletRequest) {
 
     try {
       String userId = resolveUserId(authHeader);
+      String clientIp = extractClientIp(httpServletRequest);
 
-      com.woorido.post.dto.response.PostLikeResponse response = postService.unlikePost(challengeId, postId, userId);
+      com.woorido.post.dto.response.PostLikeResponse response = postService.unlikePost(
+          challengeId,
+          postId,
+          userId,
+          clientIp);
       return ResponseEntity.ok(ApiResponse.success(response, "Post like removed"));
+    } catch (RateLimitExceededException e) {
+      return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+          .header("Retry-After", String.valueOf(e.getRetryAfterSeconds()))
+          .body(ApiResponse.error(e.getMessage()));
     } catch (IllegalArgumentException e) {
       String message = e.getMessage();
       if (message != null && message.startsWith("MEMBER_001")) {
@@ -478,6 +500,18 @@ public class PostController {
 
   private String resolveUserId(String authHeader) {
     return authHeaderResolver.resolveUserId(authHeader);
+  }
+
+  private String extractClientIp(HttpServletRequest request) {
+    String forwarded = request.getHeader("X-Forwarded-For");
+    if (forwarded != null && !forwarded.isBlank()) {
+      String[] parts = forwarded.split(",");
+      if (parts.length > 0 && !parts[0].isBlank()) {
+        return parts[0].trim();
+      }
+    }
+    String remoteAddr = request.getRemoteAddr();
+    return remoteAddr == null ? "unknown" : remoteAddr;
   }
 }
 

@@ -112,6 +112,18 @@
         WHERE id = #{postId} AND like_count > 0
     </update>
 
+    <update id="increaseCommentCount">
+        UPDATE woorido.posts
+        SET comment_count = comment_count + 1
+        WHERE id = #{postId}
+    </update>
+
+    <update id="decreaseCommentCount">
+        UPDATE woorido.posts
+        SET comment_count = comment_count - 1
+        WHERE id = #{postId} AND comment_count > 0
+    </update>
+
       <update id="update" parameterType="com.woorido.post.domain.Post">
         UPDATE woorido.posts
         SET 

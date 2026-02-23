@@ -4,6 +4,8 @@ import com.woorido.challenge.repository.ChallengeMemberMapper;
 import com.woorido.common.dto.AuthorInfo;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
+import com.woorido.notification.domain.NotificationType;
+import com.woorido.notification.service.NotificationService;
 import com.woorido.post.domain.Comment;
 import com.woorido.post.domain.CommentDeleteStrategy;
 import com.woorido.post.domain.CommentLike;
@@ -23,11 +25,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,34 +48,55 @@ public class CommentService {
   private final CommentDeleteStrategy commentDeleteStrategy;
   private final ChallengeMemberMapper challengeMemberMapper;
   private final PostMapper postMapper;
+  private final SocialRateLimitService socialRateLimitService;
+  private final NotificationService notificationService;
+  private final Map<String, Long> duplicateCommentWriteCache = new ConcurrentHashMap<>();
+
+  private static final int MAX_COMMENT_DEPTH = 50;
+  private static final long DUPLICATE_COMMENT_WINDOW_MILLIS = 15_000L;
 
   /**
    * 댓글 생성.
    * 흐름: 멤버/게시글 검증 -> (대댓글인 경우) 부모 댓글 검증 -> 댓글 저장
    */
   @Transactional
-  public String createComment(String challengeId, String postId, String userId, CreateCommentRequest request) {
+  public String createComment(
+      String challengeId,
+      String postId,
+      String userId,
+      String clientIp,
+      CreateCommentRequest request) {
     // 요청자가 해당 챌린지의 유효 멤버인지 확인
     requireActiveMember(challengeId, userId);
     // 댓글 대상 게시글이 현재 챌린지에 속하는지 확인
-    requirePostInChallenge(challengeId, postId);
+    Post post = requirePostInChallenge(challengeId, postId);
+    socialRateLimitService.checkCommentWriteLimit(userId, clientIp);
 
     String content = request.getContent() == null ? "" : request.getContent().trim();
     if (content.isEmpty()) {
       throw new IllegalArgumentException("VALIDATION_001:댓글 내용을 입력해주세요");
     }
 
+    String normalizedContent = normalizeContent(content);
+    guardAgainstDuplicateCommentWrite(postId, userId, normalizedContent);
+
     String parentCommentId = request.getParentId();
     if (parentCommentId != null && parentCommentId.isBlank()) {
       parentCommentId = null;
     }
 
+    Comment parentComment = null;
     if (parentCommentId != null) {
       // 대댓글이면 부모 댓글 존재 여부/게시글 일치 여부를 확인
-      Comment parent = commentMapper.findById(parentCommentId)
+      parentComment = commentMapper.findById(parentCommentId)
           .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
-      if (!postId.equals(parent.getPostId())) {
+      if (!postId.equals(parentComment.getPostId())) {
         throw new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다");
+      }
+
+      int parentDepth = computeDepthFromRoot(parentComment);
+      if (parentDepth >= MAX_COMMENT_DEPTH) {
+        throw new IllegalArgumentException("COMMENT_004:허용 depth를 초과했습니다");
       }
     }
 
@@ -87,6 +114,37 @@ public class CommentService {
         .build();
 
     commentMapper.save(comment);
+    postMapper.increaseCommentCount(postId);
+
+    String actorName = resolveActorName(userId);
+    String linkUrl = buildFeedLink(challengeId, postId);
+
+    if (parentComment != null) {
+      notificationService.publishSocialNotification(
+          NotificationType.COMMENT_REPLIED,
+          parentComment.getCreatedBy(),
+          userId,
+          parentComment.getId(),
+          "새 답글",
+          actorName + "님이 회원님의 댓글에 답글을 남겼습니다.",
+          "회원님의 댓글에 새 답글이 도착했습니다.",
+          linkUrl,
+          "COMMENT",
+          parentComment.getId());
+    } else {
+      notificationService.publishSocialNotification(
+          NotificationType.POST_COMMENTED,
+          post.getCreatedBy(),
+          userId,
+          postId,
+          "새 댓글",
+          actorName + "님이 회원님의 게시글에 댓글을 남겼습니다.",
+          "회원님의 게시글에 새 댓글이 도착했습니다.",
+          linkUrl,
+          "POST",
+          postId);
+    }
+
     return comment.getId();
   }
 
@@ -95,11 +153,12 @@ public class CommentService {
    * 이미 좋아요가 있으면 취소, 없으면 생성한다.
    */
   @Transactional
-  public boolean toggleLike(String challengeId, String postId, String commentId, String userId) {
+  public boolean toggleLike(String challengeId, String postId, String commentId, String userId, String clientIp) {
+    socialRateLimitService.checkLikeWriteLimit(userId, clientIp);
     // 경계/권한 검증
     requireActiveMember(challengeId, userId);
     requirePostInChallenge(challengeId, postId);
-    requireCommentInPost(commentId, postId);
+    Comment targetComment = requireCommentInPost(commentId, postId);
 
     if (commentLikeMapper.exists(commentId, userId)) {
       commentLikeMapper.delete(commentId, userId);
@@ -114,6 +173,21 @@ public class CommentService {
         .createdAt(LocalDateTime.now())
         .build());
     commentMapper.increaseLikeCount(commentId);
+
+    String actorName = resolveActorName(userId);
+    String linkUrl = buildFeedLink(challengeId, postId);
+    notificationService.publishSocialNotification(
+        NotificationType.COMMENT_LIKED,
+        targetComment.getCreatedBy(),
+        userId,
+        commentId,
+        "댓글 좋아요",
+        actorName + "님이 회원님의 댓글을 좋아합니다.",
+        "회원님의 댓글에 좋아요가 도착했습니다.",
+        linkUrl,
+        "COMMENT",
+        commentId);
+
     return true;
   }
 
@@ -130,6 +204,9 @@ public class CommentService {
     if (comments.isEmpty()) {
       return new ArrayList<>();
     }
+
+    Set<String> commentIds = comments.stream().map(Comment::getId).collect(Collectors.toSet());
+    Set<String> likedCommentIds = resolveLikedCommentIds(commentIds, userId);
 
     List<String> userIds = comments.stream()
         .map(Comment::getCreatedBy)
@@ -151,17 +228,8 @@ public class CommentService {
     }
 
     List<CommentResponse> rootComments = comments.stream()
-        .filter(c -> c.getParentId() == null)
-        .map(c -> CommentResponse.builder()
-            .id(c.getId())
-            .content(c.getContent())
-            .author(authorMap.get(c.getCreatedBy()))
-            .likeCount(c.getLikeCount())
-            .createdAt(c.getCreatedAt())
-            .updatedAt(c.getUpdatedAt())
-            .parentId(null)
-            .replies(getReplies(c.getId(), comments, authorMap))
-            .build())
+        .filter(c -> c.getParentId() == null || !commentIds.contains(c.getParentId()))
+        .map(c -> toCommentResponse(c, comments, authorMap, likedCommentIds))
         .collect(Collectors.toList());
 
     int safePage = Math.max(page, 0);
@@ -217,6 +285,7 @@ public class CommentService {
     } else {
       commentLikeMapper.deleteByCommentId(commentId);
       commentMapper.deletePhysical(commentId);
+      postMapper.decreaseCommentCount(postId);
     }
 
     return DeleteCommentResponse.builder()
@@ -225,24 +294,103 @@ public class CommentService {
         .build();
   }
 
-  /**
-   * 답글 트리 구성용 재귀 함수.
-   */
-  private List<CommentResponse> getReplies(String parentId, List<Comment> allComments, Map<String, AuthorInfo> authorMap) {
-    // 재귀 종료 조건은 "더 이상 자식이 없을 때(empty list)"다.
+  private List<CommentResponse> getReplies(
+      String parentId,
+      List<Comment> allComments,
+      Map<String, AuthorInfo> authorMap,
+      Set<String> likedCommentIds) {
     return allComments.stream()
         .filter(c -> parentId.equals(c.getParentId()))
-        .map(c -> CommentResponse.builder()
-            .id(c.getId())
-            .content(c.getContent())
-            .author(authorMap.get(c.getCreatedBy()))
-            .likeCount(c.getLikeCount())
-            .createdAt(c.getCreatedAt())
-            .updatedAt(c.getUpdatedAt())
-            .parentId(parentId)
-            .replies(getReplies(c.getId(), allComments, authorMap))
-            .build())
+        .map(c -> toCommentResponse(c, allComments, authorMap, likedCommentIds))
         .collect(Collectors.toList());
+  }
+
+  private CommentResponse toCommentResponse(
+      Comment comment,
+      List<Comment> allComments,
+      Map<String, AuthorInfo> authorMap,
+      Set<String> likedCommentIds) {
+    return CommentResponse.builder()
+        .id(comment.getId())
+        .commentId(comment.getId())
+        .content(comment.getContent())
+        .author(authorMap.get(comment.getCreatedBy()))
+        .likeCount(comment.getLikeCount())
+        .isDeleted(comment.getDeletedAt() != null)
+        .isLiked(likedCommentIds.contains(comment.getId()))
+        .createdAt(comment.getCreatedAt())
+        .updatedAt(comment.getUpdatedAt())
+        .parentId(comment.getParentId())
+        .replies(getReplies(comment.getId(), allComments, authorMap, likedCommentIds))
+        .build();
+  }
+
+  private Set<String> resolveLikedCommentIds(Set<String> commentIds, String userId) {
+    if (commentIds.isEmpty()) {
+      return Set.of();
+    }
+    List<String> likedIds = commentLikeMapper.findLikedCommentIds(new ArrayList<>(commentIds), userId);
+    if (likedIds == null || likedIds.isEmpty()) {
+      return Set.of();
+    }
+    return new HashSet<>(likedIds);
+  }
+
+  private int computeDepthFromRoot(Comment parentComment) {
+    int depth = 0;
+    Set<String> visited = new HashSet<>();
+    Comment current = parentComment;
+
+    while (current.getParentId() != null) {
+      if (!visited.add(current.getId())) {
+        throw new IllegalArgumentException("COMMENT_004:허용 depth를 초과했습니다");
+      }
+      depth += 1;
+      current = commentMapper.findByIdIncludingDeleted(current.getParentId())
+          .orElseThrow(() -> new IllegalArgumentException("COMMENT_002: 댓글을 찾을 수 없습니다"));
+    }
+    return depth;
+  }
+
+  private String normalizeContent(String content) {
+    return content
+        .replaceAll("\\s+", " ")
+        .trim()
+        .toLowerCase(Locale.ROOT);
+  }
+
+  private void guardAgainstDuplicateCommentWrite(String postId, String userId, String normalizedContent) {
+    long now = System.currentTimeMillis();
+    String key = postId + "|" + userId + "|" + normalizedContent;
+
+    synchronized (duplicateCommentWriteCache) {
+      Long previous = duplicateCommentWriteCache.get(key);
+      if (previous != null && now - previous <= DUPLICATE_COMMENT_WINDOW_MILLIS) {
+        throw new IllegalArgumentException("COMMENT_005:동일 내용 단기 중복 댓글은 잠시 후 다시 시도해주세요");
+      }
+      duplicateCommentWriteCache.put(key, now);
+      cleanupDuplicateCommentWriteCache(now);
+    }
+  }
+
+  private void cleanupDuplicateCommentWriteCache(long now) {
+    if (duplicateCommentWriteCache.size() < 10_000) {
+      return;
+    }
+    duplicateCommentWriteCache.entrySet().removeIf(
+        entry -> now - entry.getValue() > DUPLICATE_COMMENT_WINDOW_MILLIS);
+  }
+
+  private String resolveActorName(String userId) {
+    User actor = userMapper.findById(userId);
+    if (actor == null || actor.getNickname() == null || actor.getNickname().isBlank()) {
+      return "누군가";
+    }
+    return actor.getNickname();
+  }
+
+  private String buildFeedLink(String challengeId, String postId) {
+    return "/challenges/" + challengeId + "/feed?postId=" + postId;
   }
 
   /**

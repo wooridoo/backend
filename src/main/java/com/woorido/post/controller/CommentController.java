@@ -1,6 +1,7 @@
 package com.woorido.post.controller;
 
 import com.woorido.common.dto.ApiResponse;
+import com.woorido.common.exception.RateLimitExceededException;
 import com.woorido.common.util.AuthHeaderResolver;
 import com.woorido.post.dto.request.CreateCommentRequest;
 import com.woorido.post.dto.request.UpdateCommentRequest;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 
@@ -40,13 +42,19 @@ public class CommentController {
       @PathVariable("challengeId") String challengeId,
       @PathVariable("postId") String postId,
       @RequestHeader("Authorization") String authHeader,
+      HttpServletRequest httpServletRequest,
       @RequestBody CreateCommentRequest request) {
 
     try {
       String userId = extractUserId(authHeader);
-      String commentId = commentService.createComment(challengeId, postId, userId, request);
+      String clientIp = extractClientIp(httpServletRequest);
+      String commentId = commentService.createComment(challengeId, postId, userId, clientIp, request);
       return ResponseEntity.status(HttpStatus.CREATED)
           .body(ApiResponse.success(Map.of("commentId", commentId)));
+    } catch (RateLimitExceededException e) {
+      return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+          .header("Retry-After", String.valueOf(e.getRetryAfterSeconds()))
+          .body(ApiResponse.error(e.getMessage()));
     } catch (IllegalArgumentException e) {
       return handleIllegalArgument(e);
     } catch (RuntimeException e) {
@@ -78,14 +86,20 @@ public class CommentController {
       @PathVariable("challengeId") String challengeId,
       @PathVariable("postId") String postId,
       @PathVariable("commentId") String commentId,
-      @RequestHeader("Authorization") String authHeader) {
+      @RequestHeader("Authorization") String authHeader,
+      HttpServletRequest httpServletRequest) {
 
     try {
       String userId = extractUserId(authHeader);
-      boolean isLiked = commentService.toggleLike(challengeId, postId, commentId, userId);
+      String clientIp = extractClientIp(httpServletRequest);
+      boolean isLiked = commentService.toggleLike(challengeId, postId, commentId, userId, clientIp);
       return ResponseEntity.ok(ApiResponse.success(
           Map.of("isLiked", isLiked),
           isLiked ? "좋아요를 눌렀습니다" : "좋아요를 취소했습니다"));
+    } catch (RateLimitExceededException e) {
+      return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+          .header("Retry-After", String.valueOf(e.getRetryAfterSeconds()))
+          .body(ApiResponse.error(e.getMessage()));
     } catch (IllegalArgumentException e) {
       return handleIllegalArgument(e);
     } catch (RuntimeException e) {
@@ -132,6 +146,18 @@ public class CommentController {
 
   private String extractUserId(String authHeader) {
     return authHeaderResolver.resolveUserId(authHeader);
+  }
+
+  private String extractClientIp(HttpServletRequest request) {
+    String forwarded = request.getHeader("X-Forwarded-For");
+    if (forwarded != null && !forwarded.isBlank()) {
+      String[] parts = forwarded.split(",");
+      if (parts.length > 0 && !parts[0].isBlank()) {
+        return parts[0].trim();
+      }
+    }
+    String remoteAddr = request.getRemoteAddr();
+    return remoteAddr == null ? "unknown" : remoteAddr;
   }
 
   private <T> ResponseEntity<ApiResponse<T>> handleRuntime(RuntimeException e) {

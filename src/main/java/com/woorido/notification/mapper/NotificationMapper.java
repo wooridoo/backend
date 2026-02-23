@@ -1,6 +1,7 @@
 package com.woorido.notification.mapper;
 
 import com.woorido.notification.domain.Notification;
+import com.woorido.notification.domain.NotificationSettings;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -30,4 +31,18 @@ public interface NotificationMapper {
   int updateAllAsReadByUserId(@Param("userId") String userId);
 
   int countUnreadByUserId(@Param("userId") String userId);
+
+  void updateNotificationContent(
+      @Param("id") String id,
+      @Param("title") String title,
+      @Param("content") String content,
+      @Param("linkUrl") String linkUrl,
+      @Param("relatedEntityType") String relatedEntityType,
+      @Param("relatedEntityId") String relatedEntityId);
+
+  Optional<NotificationSettings> findSettingsByUserId(@Param("userId") String userId);
+
+  int updateSettings(NotificationSettings settings);
+
+  int insertSettings(NotificationSettings settings);
 }

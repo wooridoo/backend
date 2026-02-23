@@ -1,6 +1,7 @@
 package com.woorido.post.repository;
 
 import com.woorido.post.domain.CommentLike;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,4 +16,6 @@ public interface CommentLikeMapper {
     void deleteByCommentId(@Param("commentId") String commentId);
 
     long countByCommentId(@Param("commentId") String commentId);
+
+    List<String> findLikedCommentIds(@Param("commentIds") List<String> commentIds, @Param("userId") String userId);
 }

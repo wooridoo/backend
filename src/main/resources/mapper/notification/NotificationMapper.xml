@@ -17,6 +17,24 @@
         <result property="createdAt" column="CREATED_AT"/>
     </resultMap>
 
+    <resultMap id="NotificationSettingsResultMap" type="com.woorido.notification.domain.NotificationSettings">
+        <id property="id" column="ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="pushEnabled" column="PUSH_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="emailEnabled" column="EMAIL_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="smsEnabled" column="SMS_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="voteNotification" column="VOTE_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="meetingNotification" column="MEETING_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="expenseNotification" column="EXPENSE_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="snsNotification" column="SNS_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="systemNotification" column="SYSTEM_NOTIFICATION" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="quietHoursEnabled" column="QUIET_HOURS_ENABLED" javaType="java.lang.Boolean" jdbcType="CHAR" typeHandler="com.woorido.common.handler.BooleanYnTypeHandler"/>
+        <result property="quietHoursStart" column="QUIET_HOURS_START"/>
+        <result property="quietHoursEnd" column="QUIET_HOURS_END"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+    </resultMap>
+
     <insert id="save" parameterType="com.woorido.notification.domain.Notification">
         INSERT INTO WOORIDO.NOTIFICATIONS (
             ID, USER_ID, TYPE, TITLE, CONTENT, LINK_URL,
@@ -92,5 +110,91 @@
         WHERE USER_ID = #{userId}
         AND IS_READ = 'N'
     </select>
+
+    <update id="updateNotificationContent">
+        UPDATE WOORIDO.NOTIFICATIONS
+        SET TITLE = #{title},
+            CONTENT = #{content},
+            LINK_URL = #{linkUrl},
+            RELATED_ENTITY_TYPE = #{relatedEntityType},
+            RELATED_ENTITY_ID = #{relatedEntityId},
+            IS_READ = 'N',
+            READ_AT = NULL
+        WHERE ID = #{id}
+    </update>
+
+    <select id="findSettingsByUserId" resultMap="NotificationSettingsResultMap">
+        SELECT
+            ID,
+            USER_ID,
+            PUSH_ENABLED,
+            EMAIL_ENABLED,
+            SMS_ENABLED,
+            VOTE_NOTIFICATION,
+            MEETING_NOTIFICATION,
+            EXPENSE_NOTIFICATION,
+            SNS_NOTIFICATION,
+            SYSTEM_NOTIFICATION,
+            QUIET_HOURS_ENABLED,
+            QUIET_HOURS_START,
+            QUIET_HOURS_END,
+            CREATED_AT,
+            UPDATED_AT
+        FROM WOORIDO.NOTIFICATION_SETTINGS
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <update id="updateSettings" parameterType="com.woorido.notification.domain.NotificationSettings">
+        UPDATE WOORIDO.NOTIFICATION_SETTINGS
+        SET PUSH_ENABLED = #{pushEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            EMAIL_ENABLED = #{emailEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            SMS_ENABLED = #{smsEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            VOTE_NOTIFICATION = #{voteNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            MEETING_NOTIFICATION = #{meetingNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            EXPENSE_NOTIFICATION = #{expenseNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            SNS_NOTIFICATION = #{snsNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            SYSTEM_NOTIFICATION = #{systemNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            QUIET_HOURS_ENABLED = #{quietHoursEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            QUIET_HOURS_START = #{quietHoursStart},
+            QUIET_HOURS_END = #{quietHoursEnd},
+            UPDATED_AT = CURRENT_TIMESTAMP
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <insert id="insertSettings" parameterType="com.woorido.notification.domain.NotificationSettings">
+        INSERT INTO WOORIDO.NOTIFICATION_SETTINGS (
+            ID,
+            USER_ID,
+            PUSH_ENABLED,
+            EMAIL_ENABLED,
+            SMS_ENABLED,
+            VOTE_NOTIFICATION,
+            MEETING_NOTIFICATION,
+            EXPENSE_NOTIFICATION,
+            SNS_NOTIFICATION,
+            SYSTEM_NOTIFICATION,
+            QUIET_HOURS_ENABLED,
+            QUIET_HOURS_START,
+            QUIET_HOURS_END,
+            CREATED_AT,
+            UPDATED_AT
+        ) VALUES (
+            #{id},
+            #{userId},
+            #{pushEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{emailEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{smsEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{voteNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{meetingNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{expenseNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{snsNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{systemNotification, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{quietHoursEnabled, typeHandler=com.woorido.common.handler.BooleanYnTypeHandler},
+            #{quietHoursStart},
+            #{quietHoursEnd},
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        )
+    </insert>
 
 </mapper>

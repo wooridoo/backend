@@ -3,6 +3,8 @@ package com.woorido.post.service;
 import com.woorido.challenge.repository.ChallengeMemberMapper;
 import com.woorido.common.entity.User;
 import com.woorido.common.mapper.UserMapper;
+import com.woorido.notification.domain.NotificationType;
+import com.woorido.notification.service.NotificationService;
 import com.woorido.post.domain.Post;
 import com.woorido.post.domain.PostFactory;
 import com.woorido.post.domain.PostUpdateVisitor;
@@ -46,6 +48,8 @@ public class PostService {
   private final com.woorido.post.domain.PostLikeFactory postLikeFactory;
   private final com.woorido.post.domain.PostImageFactory postImageFactory;
   private final com.woorido.post.domain.PostDeleteStrategy postDeleteStrategy;
+  private final SocialRateLimitService socialRateLimitService;
+  private final NotificationService notificationService;
   private static final int MAX_POST_IMAGE_COUNT = 10;
 
   /**
@@ -416,7 +420,13 @@ public class PostService {
    * 게시글 좋아요 토글.
    * 이미 좋아요가 있으면 취소, 없으면 생성한다.
    */
-  public com.woorido.post.dto.response.PostLikeResponse toggleLike(String challengeId, String postId, String userId) {
+  public com.woorido.post.dto.response.PostLikeResponse toggleLike(
+      String challengeId,
+      String postId,
+      String userId,
+      String clientIp) {
+    socialRateLimitService.checkLikeWriteLimit(userId, clientIp);
+
     Post post = postMapper.findById(postId);
     if (post == null || !challengeId.equals(post.getChallengeId())) {
       throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
@@ -438,6 +448,19 @@ public class PostService {
     }
 
     post = postMapper.findById(postId);
+    if (liked && post != null) {
+      notificationService.publishSocialNotification(
+          NotificationType.POST_LIKED,
+          post.getCreatedBy(),
+          userId,
+          postId,
+          "게시글 좋아요",
+          resolveActorName(userId) + "님이 회원님의 게시글을 좋아합니다.",
+          "회원님의 게시글에 좋아요가 도착했습니다.",
+          buildFeedLink(challengeId, postId),
+          "POST",
+          postId);
+    }
 
     return com.woorido.post.dto.response.PostLikeResponse.builder()
         .postId(postId)
@@ -450,7 +473,13 @@ public class PostService {
    * 게시글 좋아요 취소.
    * 좋아요가 없으면 no-op으로 현재 상태를 반환한다.
    */
-  public com.woorido.post.dto.response.PostLikeResponse unlikePost(String challengeId, String postId, String userId) {
+  public com.woorido.post.dto.response.PostLikeResponse unlikePost(
+      String challengeId,
+      String postId,
+      String userId,
+      String clientIp) {
+    socialRateLimitService.checkLikeWriteLimit(userId, clientIp);
+
     Post post = postMapper.findById(postId);
     if (post == null || !challengeId.equals(post.getChallengeId())) {
       throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
@@ -545,6 +574,18 @@ public class PostService {
         .filter(value -> value != null)
         .map(Object::toString)
         .toList();
+  }
+
+  private String resolveActorName(String userId) {
+    User actor = userMapper.findById(userId);
+    if (actor == null || actor.getNickname() == null || actor.getNickname().isBlank()) {
+      return "누군가";
+    }
+    return actor.getNickname();
+  }
+
+  private String buildFeedLink(String challengeId, String postId) {
+    return "/challenges/" + challengeId + "/feed?postId=" + postId;
   }
 }
 

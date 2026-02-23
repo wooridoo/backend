@@ -21,6 +21,10 @@ public interface PostMapper {
 
   void decreaseLikeCount(@Param("postId") String postId);
 
+  void increaseCommentCount(@Param("postId") String postId);
+
+  void decreaseCommentCount(@Param("postId") String postId);
+
   boolean isLiked(@Param("postId") String postId, @Param("userId") String userId);
 
   List<Map<String, Object>> findAttachments(@Param("postId") String postId);
