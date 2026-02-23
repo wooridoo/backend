@@ -1215,7 +1215,7 @@ public class ChallengeService {
     String autoPayValue = request.getAutoPayEnabled() ? "Y" : "N";
     int result = challengeMemberMapper.updateAutoPayEnabled(userId, challengeId, autoPayValue);
     if (result == 0) {
-      throw new RuntimeException("ERROR:자동 납입 설정 업데이트에 실패했습니다");
+      throw new RuntimeException("CHALLENGE_014:자동 납입 설정 업데이트에 실패했습니다");
     }
 
     LocalDate nextDate = LocalDate.now().plusMonths(1).withDayOfMonth(1);
@@ -1324,19 +1324,19 @@ public class ChallengeService {
 
     if (myMemberInfo == null ||
         (!"LEADER".equals(myMemberInfo.get("ROLE")) && !"LEADER".equals(myMemberInfo.get("role")))) {
-      throw new RuntimeException("리더만 리더 위임을 수행할 수 있습니다.");
+      throw new RuntimeException("CHALLENGE_004:리더만 리더 위임을 수행할 수 있습니다");
     }
     String myMemberId = (String) myMemberInfo.get("MEMBER_ID");
     if (myMemberId == null)
       myMemberId = (String) myMemberInfo.get("member_id"); // Fallback
 
     if (userId.equals(targetUserId)) {
-      throw new RuntimeException("본인에게는 리더를 위임할 수 없습니다.");
+      throw new RuntimeException("VALIDATION_001:본인에게는 리더를 위임할 수 없습니다");
     }
 
     Map<String, Object> targetMemberInfo = challengeMemberMapper.findByUserIdAndChallengeId(targetUserId, challengeId);
     if (targetMemberInfo == null) {
-      throw new RuntimeException("대상 멤버 정보를 찾을 수 없습니다. (ID: " + targetUserId + ")");
+      throw new RuntimeException("MEMBER_001:대상 멤버 정보를 찾을 수 없습니다");
     }
     String targetMemberId = (String) targetMemberInfo.get("MEMBER_ID");
     if (targetMemberId == null)
@@ -1344,20 +1344,20 @@ public class ChallengeService {
 
     com.woorido.challenge.domain.ChallengeMember targetMember = challengeMemberMapper.findById(targetMemberId);
     if (targetMember == null) {
-      throw new RuntimeException("대상 멤버 상세 정보를 찾을 수 없습니다.");
+      throw new RuntimeException("MEMBER_001:대상 멤버 상세 정보를 찾을 수 없습니다");
     }
     if (PrivilegeStatus.ACTIVE != targetMember.getPrivilegeStatus()) {
-      throw new RuntimeException("ACTIVE 상태의 멤버에게만 리더를 위임할 수 있습니다. (현재 상태: " + targetMember.getPrivilegeStatus() + ")");
+      throw new RuntimeException("MEMBER_001:ACTIVE 상태의 멤버에게만 리더를 위임할 수 있습니다");
     }
 
     int count1 = challengeMemberMapper.updateRole("FOLLOWER", myMemberId, challengeId);
     if (count1 == 0) {
-      throw new RuntimeException("ERROR: Failed to update current leader role. ID mismatch? " + myMemberId);
+      throw new RuntimeException("CHALLENGE_014:리더 권한 이관 처리에 실패했습니다");
     }
 
     int count2 = challengeMemberMapper.updateRole("LEADER", targetMemberId, challengeId);
     if (count2 == 0) {
-      throw new RuntimeException("ERROR: Failed to update new leader role. ID mismatch? " + targetMemberId);
+      throw new RuntimeException("CHALLENGE_014:리더 권한 이관 처리에 실패했습니다");
     }
 
     Map<String, Object> myDetail = challengeMemberMapper.findMemberDetail(challengeId, myMemberId);

@@ -1,6 +1,5 @@
 package com.woorido.user.controller;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +27,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.woorido.common.util.AuthHeaderResolver;
 
 @RestController
 @RequestMapping("/users")
@@ -35,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
+    private final AuthHeaderResolver authHeaderResolver;
 
     /**
      * 내 정보 조회 API
@@ -43,28 +44,9 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
-
-        try {
-            // Authorization 헤더에서 Bearer 토큰 추출
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                throw new RuntimeException("AUTH_001:인증이 필요합니다");
-            }
-
-            String accessToken = authHeader.substring(7); // "Bearer " 제거
-
-            UserProfileResponse response = userService.getMyProfile(accessToken);
-            return ResponseEntity.ok(ApiResponse.success(response));
-
-        } catch (RuntimeException e) {
-
-            String message = e.getMessage();
-            if (message != null && message.startsWith("AUTH_001")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error(message));
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
-        }
+        String accessToken = authHeaderResolver.resolveToken(authHeader);
+        UserProfileResponse response = userService.getMyProfile(accessToken);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -75,34 +57,9 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserUpdateResponse>> updateMyProfile(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @Valid @RequestBody UserUpdateRequest request) {
-
-        try {
-            // Authorization 헤더에서 Bearer 토큰 추출
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                throw new RuntimeException("AUTH_001:인증이 필요합니다");
-            }
-
-            String accessToken = authHeader.substring(7); // "Bearer " 제거
-
-            UserUpdateResponse response = userService.updateMyProfile(accessToken, request);
-            return ResponseEntity.ok(ApiResponse.success(response, "정보가 수정되었습니다"));
-
-        } catch (RuntimeException e) {
-
-            String message = e.getMessage();
-            if (message != null && message.startsWith("AUTH_001")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error(message));
-            } else if (message != null && message.startsWith("USER_006")) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(ApiResponse.error(message));
-            } else if (message != null && message.startsWith("USER_007")) {
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body(ApiResponse.error(message));
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
-        }
+        String accessToken = authHeaderResolver.resolveToken(authHeader);
+        UserUpdateResponse response = userService.updateMyProfile(accessToken, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "정보가 수정되었습니다"));
     }
 
     /**
@@ -113,33 +70,9 @@ public class UserController {
     public ResponseEntity<ApiResponse<SocialOnboardingCompleteResponse>> completeSocialOnboarding(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestBody SocialOnboardingRequest request) {
-
-        try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                throw new RuntimeException("AUTH_001:인증이 필요합니다");
-            }
-
-            String accessToken = authHeader.substring(7);
-            SocialOnboardingCompleteResponse response = userService.completeSocialOnboarding(accessToken, request);
-            return ResponseEntity.ok(ApiResponse.success(response, "소셜 가입 정보 입력이 완료되었습니다"));
-        } catch (RuntimeException e) {
-            String message = e.getMessage();
-            if (message != null) {
-                if (message.startsWith("AUTH_001")) {
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-                }
-                if (message.startsWith("USER_007")) {
-                    return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message));
-                }
-                if (message.startsWith("AUTH_013")
-                        || message.startsWith("VALIDATION_001")
-                        || message.startsWith("USER_006")) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
-                }
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
-        }
+        String accessToken = authHeaderResolver.resolveToken(authHeader);
+        SocialOnboardingCompleteResponse response = userService.completeSocialOnboarding(accessToken, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "소셜 가입 정보 입력이 완료되었습니다"));
     }
 
     /**
@@ -150,26 +83,9 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserPasswordChangeResponse>> changePassword(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @Valid @RequestBody UserPasswordChangeRequest request) {
-
-        try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                throw new RuntimeException("AUTH_001:인증이 필요합니다");
-            }
-
-            String accessToken = authHeader.substring(7);
-            UserPasswordChangeResponse response = userService.changePassword(accessToken, request);
-            return ResponseEntity.ok(ApiResponse.success(response, "비밀번호가 변경되었습니다"));
-        } catch (RuntimeException e) {
-            String message = e.getMessage();
-            if (message != null) {
-                if (message.startsWith("AUTH_001"))
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-                if (message.startsWith("USER_003") || message.startsWith("VALIDATION_001"))
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
-        }
+        String accessToken = authHeaderResolver.resolveToken(authHeader);
+        UserPasswordChangeResponse response = userService.changePassword(accessToken, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "비밀번호가 변경되었습니다"));
     }
 
     /**
@@ -180,26 +96,9 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserWithdrawResponse>> withdraw(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestBody com.woorido.user.dto.request.UserWithdrawRequest request) {
-
-        try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                throw new RuntimeException("AUTH_001:인증이 필요합니다");
-            }
-            String accessToken = authHeader.substring(7);
-
-            UserWithdrawResponse response = userService.withdrawUser(accessToken, request);
-            return ResponseEntity.ok(ApiResponse.success(response, "탈퇴 처리되었습니다. 30일 내 재가입 시 데이터가 복구됩니다."));
-
-        } catch (RuntimeException e) {
-            String message = e.getMessage();
-            if (message != null) {
-                if (message.startsWith("AUTH_001"))
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-                if (message.startsWith("USER_003") || message.startsWith("USER_008") || message.startsWith("USER_009"))
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
-        }
+        String accessToken = authHeaderResolver.resolveToken(authHeader);
+        UserWithdrawResponse response = userService.withdrawUser(accessToken, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "탈퇴 처리되었습니다. 30일 내 재가입 시 데이터가 복구됩니다."));
     }
 
     /**
@@ -210,25 +109,9 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserPublicProfileResponse>> getUserProfile(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable("userId") String userId) {
-
-        try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                throw new RuntimeException("AUTH_001:인증이 필요합니다");
-            }
-            String accessToken = authHeader.substring(7);
-            UserPublicProfileResponse response = userService.getUserProfile(accessToken, userId);
-            return ResponseEntity.ok(ApiResponse.success(response));
-        } catch (RuntimeException e) {
-            String message = e.getMessage();
-            if (message != null) {
-                if (message.startsWith("AUTH_001"))
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-                if (message.startsWith("USER_001"))
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(message));
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
-        }
+        String accessToken = authHeaderResolver.resolveToken(authHeader);
+        UserPublicProfileResponse response = userService.getUserProfile(accessToken, userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -238,25 +121,10 @@ public class UserController {
     @GetMapping("/check-nickname")
     public ResponseEntity<ApiResponse<NicknameCheckResponse>> checkNickname(
             @RequestParam("nickname") String nickname) {
-
-        try {
-            NicknameCheckResponse response = userService.checkNicknameAvailability(nickname);
-
-            if (response.getIsAvailable()) {
-                return ResponseEntity.ok(ApiResponse.success(response, "사용 가능한 닉네임입니다"));
-            } else {
-                return ResponseEntity.ok(ApiResponse.success(response, "이미 사용 중인 닉네임입니다"));
-            }
-
-        } catch (RuntimeException e) {
-
-            String message = e.getMessage();
-            if (message != null && message.startsWith("USER_006")) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(ApiResponse.error(message));
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("서버 오류가 발생했습니다"));
+        NicknameCheckResponse response = userService.checkNicknameAvailability(nickname);
+        if (response.getIsAvailable()) {
+            return ResponseEntity.ok(ApiResponse.success(response, "사용 가능한 닉네임입니다"));
         }
+        return ResponseEntity.ok(ApiResponse.success(response, "이미 사용 중인 닉네임입니다"));
     }
 }

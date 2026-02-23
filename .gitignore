@@ -10,7 +10,7 @@ bin/
 build/
 *.class
 
-test/
+/test/
 server.log
 
 # local API smoke test artifacts
@@ -20,6 +20,9 @@ api-smoke-server.err.log
 
 # local upload artifacts from API smoke
 uploads/attachments/*
+uploads/posts/*
+uploads/challenges/*
+uploads/users/*
 
 # local portfolio/dev log (do not commit)
 local-devlog-2026-02-17-2026-02-18.md

@@ -37,19 +37,57 @@
         <result property="termsAgreedAt" column="terms_agreed_at"/>
     </resultMap>
 
+    <sql id="UserColumns">
+        id,
+        email,
+        password_hash,
+        name,
+        nickname,
+        phone,
+        profile_image_url,
+        birth_date,
+        gender,
+        bio,
+        is_verified,
+        verification_token,
+        verification_token_expires,
+        social_provider,
+        social_id,
+        password_reset_token,
+        password_reset_expires,
+        failed_login_attempts,
+        locked_until,
+        account_status,
+        suspended_at,
+        suspended_until,
+        suspension_reason,
+        created_at,
+        updated_at,
+        last_login_at,
+        agreed_terms,
+        agreed_privacy,
+        agreed_marketing,
+        terms_agreed_at
+    </sql>
+
     <!-- ID로 사용자 조회 -->
     <select id="findById" resultMap="UserResultMap">
-        SELECT * FROM woorido.users WHERE id = #{id}
+        SELECT <include refid="UserColumns"/>
+        FROM woorido.users
+        WHERE id = #{id}
     </select>
 
     <!-- 이메일로 사용자 조회 (로그인용) -->
     <select id="findByEmail" resultMap="UserResultMap">
-        SELECT * FROM woorido.users WHERE email = #{email}
+        SELECT <include refid="UserColumns"/>
+        FROM woorido.users
+        WHERE email = #{email}
     </select>
 
     <!-- 소셜 제공자 + 소셜 ID로 사용자 조회 -->
     <select id="findBySocial" resultMap="UserResultMap">
-        SELECT * FROM woorido.users
+        SELECT <include refid="UserColumns"/>
+        FROM woorido.users
         WHERE social_provider = #{socialProvider}
           AND social_id = #{socialId}
     </select>
@@ -155,7 +193,9 @@
 
     <!-- 비밀번호 재설정 토큰으로 사용자 조회 -->
     <select id="findByPasswordResetToken" resultMap="UserResultMap">
-        SELECT * FROM woorido.users WHERE password_reset_token = #{token}
+        SELECT <include refid="UserColumns"/>
+        FROM woorido.users
+        WHERE password_reset_token = #{token}
     </select>
 
     <!-- 비밀번호 변경 -->

@@ -53,7 +53,23 @@
       </resultMap>
 
       <select id="findById" resultMap="PostResultMap">
-        SELECT * FROM woorido.posts WHERE id = #{id} AND deleted_at IS NULL
+        SELECT
+            id,
+            challenge_id,
+            created_by,
+            title,
+            content,
+            category,
+            is_notice,
+            is_pinned,
+            like_count,
+            comment_count,
+            view_count,
+            created_at,
+            updated_at
+        FROM woorido.posts
+        WHERE id = #{id}
+          AND deleted_at IS NULL
       </select>
 
       <select id="findByIdWithAuthor" resultType="java.util.Map">
@@ -162,8 +178,41 @@
 
       <!-- Oracle 11g Style Pagination -->
       <select id="findAll" resultType="java.util.Map">
-        SELECT * FROM (
-            SELECT A.*, ROWNUM RNUM FROM (
+        SELECT
+            ID,
+            CHALLENGE_ID,
+            CREATED_BY,
+            TITLE,
+            CONTENT,
+            CATEGORY,
+            IS_NOTICE,
+            IS_PINNED,
+            LIKE_COUNT,
+            COMMENT_COUNT,
+            VIEW_COUNT,
+            CREATED_AT,
+            AUTHOR_NICKNAME,
+            AUTHOR_PROFILE_IMAGE,
+            IS_LIKED
+        FROM (
+            SELECT
+                A.ID,
+                A.CHALLENGE_ID,
+                A.CREATED_BY,
+                A.TITLE,
+                A.CONTENT,
+                A.CATEGORY,
+                A.IS_NOTICE,
+                A.IS_PINNED,
+                A.LIKE_COUNT,
+                A.COMMENT_COUNT,
+                A.VIEW_COUNT,
+                A.CREATED_AT,
+                A.AUTHOR_NICKNAME,
+                A.AUTHOR_PROFILE_IMAGE,
+                A.IS_LIKED,
+                ROWNUM RNUM
+            FROM (
                 SELECT 
                     p.id as ID,
                     p.challenge_id as CHALLENGE_ID,
@@ -186,7 +235,8 @@
                 JOIN woorido.users u ON p.created_by = u.id
             <include refid="searchCriteria"/>
                 ORDER BY p.is_pinned DESC, ${sortColumn} ${sortOrder}
-            ) A WHERE ROWNUM &lt;= #{endRow}
+            ) A
+            WHERE ROWNUM &lt;= #{endRow}
         ) WHERE RNUM &gt; #{startRow}
       </select>
 

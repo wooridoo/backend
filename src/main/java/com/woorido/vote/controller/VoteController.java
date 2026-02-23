@@ -1,7 +1,7 @@
 package com.woorido.vote.controller;
 
 import com.woorido.common.dto.ApiResponse;
-import com.woorido.common.util.JwtUtil;
+import com.woorido.common.util.AuthHeaderResolver;
 import com.woorido.vote.dto.VoteDto;
 import com.woorido.vote.dto.request.CastVoteRequest;
 import com.woorido.vote.dto.request.CreateVoteRequest;
@@ -29,7 +29,7 @@ public class VoteController {
   // - Keep API response mapping here, keep domain rules in Service.
 
   private final VoteService voteService;
-  private final JwtUtil jwtUtil;
+  private final AuthHeaderResolver authHeaderResolver;
 
   @GetMapping("/challenges/{challengeId}/votes")
   public ResponseEntity<ApiResponse<VoteListResponse>> getVoteList(
@@ -108,14 +108,7 @@ public class VoteController {
   }
 
   private String extractUserId(String authorization) {
-    if (authorization == null || !authorization.startsWith("Bearer ")) {
-      throw new RuntimeException("AUTH_001:인증이 필요합니다");
-    }
-    String token = authorization.substring(7);
-    if (!jwtUtil.validateToken(token)) {
-      throw new RuntimeException("AUTH_001:인증이 필요합니다");
-    }
-    return jwtUtil.getUserIdFromToken(token);
+    return authHeaderResolver.resolveAccessUserId(authorization);
   }
 
   private <T> ResponseEntity<ApiResponse<T>> handleError(RuntimeException e) {
@@ -138,6 +131,6 @@ public class VoteController {
     }
 
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(ApiResponse.error("서버 오류가 발생했습니다: " + message));
+        .body(ApiResponse.error("서버 오류가 발생했습니다"));
   }
 }

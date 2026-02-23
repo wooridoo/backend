@@ -1,7 +1,7 @@
 package com.woorido.notification.controller;
 
 import com.woorido.common.dto.ApiResponse;
-import com.woorido.common.util.JwtUtil;
+import com.woorido.common.util.AuthHeaderResolver;
 import com.woorido.notification.domain.Notification;
 import com.woorido.notification.dto.NotificationListResponse;
 import com.woorido.notification.dto.NotificationMarkReadResponse;
@@ -32,7 +32,7 @@ public class NotificationController {
   // - Keep API response mapping here, keep domain rules in Service.
 
   private final NotificationService notificationService;
-  private final JwtUtil jwtUtil;
+  private final AuthHeaderResolver authHeaderResolver;
 
   @GetMapping
   public ResponseEntity<ApiResponse<NotificationListResponse>> getNotifications(
@@ -122,16 +122,7 @@ public class NotificationController {
   }
 
   private String validateAndGetUserId(String authHeader) {
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      throw new RuntimeException("AUTH_001:인증이 필요합니다");
-    }
-
-    String token = authHeader.substring(7);
-    if (!jwtUtil.validateToken(token) || !jwtUtil.isAccessToken(token)) {
-      throw new RuntimeException("AUTH_001:인증이 필요합니다");
-    }
-
-    return jwtUtil.getUserIdFromToken(token);
+    return authHeaderResolver.resolveAccessUserId(authHeader);
   }
 
   private <T> ResponseEntity<ApiResponse<T>> handleError(RuntimeException e) {
@@ -151,6 +142,6 @@ public class NotificationController {
     }
 
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(ApiResponse.error("서버 오류가 발생했습니다: " + message));
+        .body(ApiResponse.error("서버 오류가 발생했습니다"));
   }
 }

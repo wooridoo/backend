@@ -68,8 +68,41 @@
     </resultMap>
 
     <select id="findTransactions" parameterType="com.woorido.account.dto.request.TransactionSearchRequest" resultMap="AccountTransactionResultMap">
-        SELECT * FROM (
-            SELECT t.*, ROWNUM AS rn FROM (
+        SELECT
+            id,
+            account_id,
+            type,
+            amount,
+            balance_before,
+            balance_after,
+            locked_before,
+            locked_after,
+            idempotency_key,
+            related_challenge_id,
+            related_user_id,
+            description,
+            pg_provider,
+            pg_tx_id,
+            created_at
+        FROM (
+            SELECT
+                t.id,
+                t.account_id,
+                t.type,
+                t.amount,
+                t.balance_before,
+                t.balance_after,
+                t.locked_before,
+                t.locked_after,
+                t.idempotency_key,
+                t.related_challenge_id,
+                t.related_user_id,
+                t.description,
+                t.pg_provider,
+                t.pg_tx_id,
+                t.created_at,
+                ROWNUM AS rn
+            FROM (
                 SELECT
                     at.id,
                     at.account_id,

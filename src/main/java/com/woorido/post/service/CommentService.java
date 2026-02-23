@@ -50,7 +50,7 @@ public class CommentService {
   @Transactional
   public String createComment(String challengeId, String postId, String userId, CreateCommentRequest request) {
     // 요청자가 해당 챌린지의 유효 멤버인지 확인
-    requireMemberAny(challengeId, userId);
+    requireActiveMember(challengeId, userId);
     // 댓글 대상 게시글이 현재 챌린지에 속하는지 확인
     requirePostInChallenge(challengeId, postId);
 
@@ -97,7 +97,7 @@ public class CommentService {
   @Transactional
   public boolean toggleLike(String challengeId, String postId, String commentId, String userId) {
     // 경계/권한 검증
-    requireMemberAny(challengeId, userId);
+    requireActiveMember(challengeId, userId);
     requirePostInChallenge(challengeId, postId);
     requireCommentInPost(commentId, postId);
 
@@ -123,7 +123,7 @@ public class CommentService {
    */
   @Transactional(readOnly = true)
   public List<CommentResponse> getComments(String challengeId, String postId, String userId, int page, int size) {
-    requireMemberAny(challengeId, userId);
+    requireReadableMember(challengeId, userId);
     requirePostInChallenge(challengeId, postId);
 
     List<Comment> comments = commentMapper.findAllByPostId(postId);
@@ -178,7 +178,7 @@ public class CommentService {
   public UpdateCommentResponse updateComment(String challengeId, String postId,
       String commentId, String userId, UpdateCommentRequest request) {
 
-    requireMemberAny(challengeId, userId);
+    requireActiveMember(challengeId, userId);
     requirePostInChallenge(challengeId, postId);
 
     Comment comment = requireCommentInPost(commentId, postId);
@@ -202,7 +202,7 @@ public class CommentService {
    * 자식 댓글이 있으면 소프트 삭제, 없으면 물리 삭제를 적용한다.
    */
   public DeleteCommentResponse deleteComment(String challengeId, String postId, String commentId, String userId) {
-    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
+    Map<String, Object> memberInfo = requireActiveMember(challengeId, userId);
     requirePostInChallenge(challengeId, postId);
 
     Comment comment = requireCommentInPost(commentId, postId);
@@ -248,10 +248,18 @@ public class CommentService {
   /**
    * 챌린지 멤버 검증(LEFT 제외).
    */
-  private Map<String, Object> requireMemberAny(String challengeId, String userId) {
+  private Map<String, Object> requireReadableMember(String challengeId, String userId) {
     Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
     if (memberInfo == null || "LEFT".equals(asString(memberInfo.get("STATUS")))) {
       throw new IllegalArgumentException("MEMBER_001: 챌린지 멤버가 아닙니다");
+    }
+    return memberInfo;
+  }
+
+  private Map<String, Object> requireActiveMember(String challengeId, String userId) {
+    Map<String, Object> memberInfo = requireReadableMember(challengeId, userId);
+    if (!"ACTIVE".equals(asString(memberInfo.get("STATUS")))) {
+      throw new IllegalArgumentException("MEMBER_001: 챌린지 멤버 권한이 없습니다");
     }
     return memberInfo;
   }

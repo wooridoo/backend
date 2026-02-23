@@ -42,6 +42,7 @@ import com.woorido.challenge.domain.Challenge;
 import com.woorido.challenge.domain.LedgerEntry;
 import com.woorido.challenge.domain.LedgerEntryType;
 import com.woorido.challenge.repository.ChallengeMapper;
+import com.woorido.challenge.repository.ChallengeMemberMapper;
 import com.woorido.challenge.repository.LedgerEntryMapper;
 
 @Service
@@ -60,6 +61,7 @@ public class AccountService {
     private final JwtUtil jwtUtil;
 
     private final ChallengeMapper challengeMapper;
+    private final ChallengeMemberMapper challengeMemberMapper;
     private final LedgerEntryMapper ledgerEntryMapper;
 
     /**
@@ -414,8 +416,8 @@ public class AccountService {
             throw new RuntimeException("CHALLENGE_001:챌린지를 찾을 수 없습니다");
         }
 
-        int isMember = challengeMapper.countMemberByChallengeIdAndUserId(request.getChallengeId(), userId);
-        if (isMember == 0) {
+        String privilegeStatus = challengeMemberMapper.getPrivilegeStatus(request.getChallengeId(), userId);
+        if (!"ACTIVE".equals(privilegeStatus)) {
             throw new RuntimeException("CHALLENGE_003:챌린지 멤버가 아닙니다");
         }
 

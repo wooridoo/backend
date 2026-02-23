@@ -1,7 +1,7 @@
 package com.woorido.post.controller;
 
 import com.woorido.common.dto.ApiResponse;
-import com.woorido.common.util.JwtUtil;
+import com.woorido.common.util.AuthHeaderResolver;
 import com.woorido.post.dto.request.CreateCommentRequest;
 import com.woorido.post.dto.request.UpdateCommentRequest;
 import com.woorido.post.dto.response.CommentResponse;
@@ -33,7 +33,7 @@ public class CommentController {
   // - Keep API response mapping here, keep domain rules in Service.
 
   private final CommentService commentService;
-  private final JwtUtil jwtUtil;
+  private final AuthHeaderResolver authHeaderResolver;
 
   @PostMapping
   public ResponseEntity<ApiResponse<Map<String, String>>> createComment(
@@ -131,15 +131,7 @@ public class CommentController {
   }
 
   private String extractUserId(String authHeader) {
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      throw new RuntimeException("AUTH_001:인증이 필요합니다");
-    }
-
-    String token = authHeader.substring(7);
-    if (!jwtUtil.validateToken(token)) {
-      throw new RuntimeException("AUTH_002:유효하지 않은 토큰입니다");
-    }
-    return jwtUtil.getUserIdFromToken(token);
+    return authHeaderResolver.resolveUserId(authHeader);
   }
 
   private <T> ResponseEntity<ApiResponse<T>> handleRuntime(RuntimeException e) {
@@ -148,7 +140,7 @@ public class CommentController {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
     }
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(ApiResponse.error("서버 오류가 발생했습니다: " + message));
+        .body(ApiResponse.error("서버 오류가 발생했습니다"));
   }
 
   private <T> ResponseEntity<ApiResponse<T>> handleIllegalArgument(IllegalArgumentException e) {

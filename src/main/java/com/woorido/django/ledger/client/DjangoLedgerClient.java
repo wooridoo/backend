@@ -1,6 +1,7 @@
 package com.woorido.django.ledger.client;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -21,9 +22,18 @@ public class DjangoLedgerClient {
 
   public DjangoLedgerClient(RestClient.Builder restClientBuilder, ObjectMapper objectMapper,
       @Value("${django.ledger.base-url:${django.brix.base-url:http://localhost:8000}}") String baseUrl,
-      @Value("${django.ledger.api-key:${django.brix.api-key:woorido-django-internal-key}}") String apiKey) {
+      @Value("${django.ledger.api-key:${django.brix.api-key:}}") String apiKey,
+      @Value("${django.ledger.connect-timeout-ms:3000}") int connectTimeoutMs,
+      @Value("${django.ledger.read-timeout-ms:5000}") int readTimeoutMs) {
     String resolvedBaseUrl = Objects.requireNonNull(baseUrl, "django.ledger.base-url must not be null");
-    this.restClient = restClientBuilder.baseUrl(resolvedBaseUrl).build();
+    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(connectTimeoutMs);
+    requestFactory.setReadTimeout(readTimeoutMs);
+
+    this.restClient = restClientBuilder
+        .baseUrl(resolvedBaseUrl)
+        .requestFactory(requestFactory)
+        .build();
     this.apiKey = Objects.requireNonNull(apiKey, "django.ledger.api-key must not be null");
     this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
   }
@@ -51,7 +61,7 @@ public class DjangoLedgerClient {
       }
       return response;
     } catch (RestClientException e) {
-      throw new RuntimeException("LEDGER_001:Failed to call Django ledger graph API", e);
+      throw new RuntimeException("LEDGER_004:Django ledger service unavailable", e);
     }
   }
 }

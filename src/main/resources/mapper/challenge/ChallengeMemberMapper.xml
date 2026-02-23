@@ -166,7 +166,12 @@
   </update>
 
   <select id="findTopBrixActiveMemberExcludingUser" resultType="java.util.Map">
-    SELECT * FROM (
+    SELECT
+      MEMBER_ID,
+      USER_ID,
+      JOINED_AT,
+      BRIX
+    FROM (
       SELECT
         cm.id AS MEMBER_ID,
         cm.user_id AS USER_ID,

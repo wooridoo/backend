@@ -30,7 +30,7 @@ public class BrixInternalController {
   @Value("${brix.batch.zone:Asia/Seoul}")
   private String batchZone;
 
-  @Value("${brix.batch.internal-api-key:${django.brix.api-key:woorido-django-internal-key}}")
+  @Value("${brix.batch.internal-api-key:${django.brix.api-key:}}")
   private String internalApiKey;
 
   private final BrixBatchService brixBatchService;
@@ -39,7 +39,9 @@ public class BrixInternalController {
   public ResponseEntity<ApiResponse<BrixBatchResult>> recalculate(
       @RequestHeader(value = "X-Internal-Api-Key", required = false) String requestApiKey,
       @RequestBody(required = false) BrixRecalculateRequest request) {
-    if (requestApiKey == null || !requestApiKey.equals(internalApiKey)) {
+    if (internalApiKey == null || internalApiKey.isBlank()
+        || requestApiKey == null
+        || !requestApiKey.equals(internalApiKey)) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("AUTH_001:인증이 필요합니다"));
     }
 
@@ -57,8 +59,12 @@ public class BrixInternalController {
       BrixBatchResult result = brixBatchService.recalculate(cutoffAt);
       return ResponseEntity.ok(ApiResponse.success(result, "브릭스 수동 집계가 완료되었습니다"));
     } catch (RuntimeException e) {
-      String message = e.getMessage() != null ? e.getMessage() : "BRIX_001:브릭스 수동 집계에 실패했습니다";
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error(message));
+      String message = e.getMessage();
+      if (message != null && message.startsWith("BRIX_")) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 

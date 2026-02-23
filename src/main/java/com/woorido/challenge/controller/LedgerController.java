@@ -95,6 +95,6 @@ public class LedgerController {
     if (message.startsWith("No enum constant")) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("LEDGER_002:지원하지 않는 장부 유형입니다"));
     }
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다: " + message));
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("서버 오류가 발생했습니다"));
   }
 }

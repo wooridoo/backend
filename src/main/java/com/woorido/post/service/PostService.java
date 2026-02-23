@@ -54,7 +54,7 @@ public class PostService {
    */
   public CreatePostResponse createPost(String challengeId, String userId, CreatePostRequest request) {
     // 챌린지 멤버 여부(LEFT 제외) 검증
-    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
+    Map<String, Object> memberInfo = requireActiveMember(challengeId, userId);
 
     String role = (String) memberInfo.get("ROLE");
 
@@ -109,7 +109,7 @@ public class PostService {
    */
   public CreatePostResponse updatePost(String challengeId, String postId, String userId, UpdatePostRequest request) {
     // 챌린지 멤버 여부(LEFT 제외) 검증
-    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
+    Map<String, Object> memberInfo = requireActiveMember(challengeId, userId);
     String role = (String) memberInfo.get("ROLE");
 
     // 수정 대상 게시글 조회 및 경계(challengeId) 검증
@@ -180,7 +180,7 @@ public class PostService {
    */
   public PostDetailResponse getPostDetail(String challengeId, String postId, String userId) {
     // 조회 권한(멤버십) 검증
-    requireMemberAny(challengeId, userId);
+    requireReadableMember(challengeId, userId);
 
     // 조회수 증가
     postMapper.increaseViewCount(postId);
@@ -260,7 +260,7 @@ public class PostService {
   public PostListResponse getPostList(String challengeId, String userId, int page, int size, String category,
       String sortBy, String order) {
     // 챌린지 멤버 여부(LEFT 제외) 검증
-    requireMemberAny(challengeId, userId);
+    requireReadableMember(challengeId, userId);
 
     // 동적 SQL 파라미터 구성
     Map<String, Object> params = new HashMap<>();
@@ -356,7 +356,7 @@ public class PostService {
    * 정책: NOTICE만 고정 가능, 챌린지당 고정은 1건만 허용, 리더만 변경 가능.
    */
   public PinPostResponse setPostPinned(String challengeId, String postId, String userId, boolean pinned) {
-    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
+    Map<String, Object> memberInfo = requireActiveMember(challengeId, userId);
     String role = (String) memberInfo.get("ROLE");
     if (!"LEADER".equals(role)) {
       throw new IllegalArgumentException("POST_002:공지 게시글 고정 권한이 없습니다");
@@ -423,7 +423,7 @@ public class PostService {
     }
 
     // 좋아요는 챌린지 멤버만 가능하도록 조회 API와 동일한 권한 경계를 맞춘다.
-    requireMemberAny(challengeId, userId);
+    requireActiveMember(challengeId, userId);
 
     boolean liked;
     if (postLikeMapper.exists(postId, userId)) {
@@ -456,7 +456,7 @@ public class PostService {
       throw new IllegalArgumentException("POST_001:게시글을 찾을 수 없습니다");
     }
 
-    requireMemberAny(challengeId, userId);
+    requireActiveMember(challengeId, userId);
 
     if (postLikeMapper.exists(postId, userId)) {
       postLikeMapper.delete(postId, userId);
@@ -485,7 +485,7 @@ public class PostService {
     }
 
     // 요청자 역할 조회(삭제 권한 판단에 사용)
-    Map<String, Object> memberInfo = requireMemberAny(challengeId, userId);
+    Map<String, Object> memberInfo = requireActiveMember(challengeId, userId);
     String role = (String) memberInfo.get("ROLE");
 
     // 작성자/리더 조건 등 삭제 정책 검증
@@ -507,11 +507,19 @@ public class PostService {
   /**
    * 챌린지 멤버(LEFT 제외) 검증 공통 메서드.
    */
-  private Map<String, Object> requireMemberAny(String challengeId, String userId) {
+  private Map<String, Object> requireReadableMember(String challengeId, String userId) {
     Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
     // 탈퇴(LEFT) 상태는 조회/작성 모두 차단한다.
     if (memberInfo == null || "LEFT".equals(memberInfo.get("STATUS"))) {
       throw new IllegalArgumentException("MEMBER_001:챌린지 멤버가 아닙니다");
+    }
+    return memberInfo;
+  }
+
+  private Map<String, Object> requireActiveMember(String challengeId, String userId) {
+    Map<String, Object> memberInfo = requireReadableMember(challengeId, userId);
+    if (!"ACTIVE".equals(memberInfo.get("STATUS"))) {
+      throw new IllegalArgumentException("MEMBER_001:챌린지 멤버 권한이 없습니다");
     }
     return memberInfo;
   }

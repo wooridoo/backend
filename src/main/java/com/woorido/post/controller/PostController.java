@@ -4,7 +4,7 @@ import com.woorido.common.dto.ApiResponse;
 import com.woorido.common.exception.ImageValidationException;
 import com.woorido.common.image.ImagePolicyType;
 import com.woorido.common.image.ImageUploadService;
-import com.woorido.common.util.JwtUtil;
+import com.woorido.common.util.AuthHeaderResolver;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.List;
@@ -45,7 +45,7 @@ public class PostController {
   // - Keep API response mapping here, keep domain rules in Service.
 
   private final PostService postService;
-  private final JwtUtil jwtUtil;
+  private final AuthHeaderResolver authHeaderResolver;
   private final com.woorido.common.strategy.ImageUploadStrategy imageUploadStrategy;
   private final ImageUploadService imageUploadService;
   private final com.woorido.challenge.repository.ChallengeMemberMapper challengeMemberMapper; // Need to verify
@@ -65,17 +65,7 @@ public class PostController {
       @RequestBody CreatePostRequest request) {
 
     try {
-      // Check Authorization
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      // Validate Token and Get User ID
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       CreatePostResponse response = postService.createPost(challengeId, userId, request);
 
@@ -103,7 +93,7 @@ public class PostController {
       }
       log.error("Create Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -118,15 +108,7 @@ public class PostController {
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       PostDetailResponse response = postService.getPostDetail(challengeId, postId, userId);
 
@@ -149,7 +131,7 @@ public class PostController {
       }
       log.error("Get Post Detail Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -168,15 +150,7 @@ public class PostController {
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       PostListResponse response = postService.getPostList(challengeId, userId, page, size, category, sortBy, order);
 
@@ -195,7 +169,7 @@ public class PostController {
       }
       log.error("Get Post List Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -211,15 +185,7 @@ public class PostController {
       @RequestBody UpdatePostRequest request) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       CreatePostResponse response = postService.updatePost(challengeId, postId, userId, request);
 
@@ -241,7 +207,7 @@ public class PostController {
       }
       log.error("Update Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -257,15 +223,7 @@ public class PostController {
       @RequestBody PinPostRequest request) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       if (request.getPinned() == null) {
         throw new IllegalArgumentException("VALIDATION_001:pinned 값이 필요합니다");
@@ -292,7 +250,7 @@ public class PostController {
       }
       log.error("Set Post Pin Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -307,15 +265,7 @@ public class PostController {
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       com.woorido.post.dto.response.PostLikeResponse response = postService.toggleLike(challengeId, postId, userId);
 
@@ -349,15 +299,7 @@ public class PostController {
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       com.woorido.post.dto.response.PostLikeResponse response = postService.unlikePost(challengeId, postId, userId);
       return ResponseEntity.ok(ApiResponse.success(response, "Post like removed"));
@@ -388,15 +330,7 @@ public class PostController {
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       com.woorido.post.dto.response.DeletePostResponse response = postService.deletePost(challengeId, postId, userId);
 
@@ -429,16 +363,9 @@ public class PostController {
       @RequestParam(value = "files[]", required = false) List<MultipartFile> filesBracket,
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
+    String userId = null;
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      userId = resolveUserId(authHeader);
 
       Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
       if (memberInfo == null || "LEFT".equals(memberInfo.get("STATUS"))) {
@@ -463,21 +390,15 @@ public class PostController {
       return ResponseEntity.ok(ApiResponse.success(response, "이미지가 업로드되었습니다"));
 
     } catch (IllegalArgumentException e) {
-      String message = e.getMessage();
-      if (message != null && message.startsWith("MEMBER_001")) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(message));
-      }
-      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+      throw e;
     } catch (RuntimeException e) {
-      if (e instanceof ImageValidationException) {
-        throw e;
-      }
-      if (e.getMessage() != null && e.getMessage().startsWith("AUTH_")) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
-      }
-      log.error("Post Image Upload Error", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+      log.error(
+          "Post image upload error: endpoint=/challenges/{}/posts/images, policy={}, userId={}",
+          challengeId,
+          ImagePolicyType.POST_ATTACHMENT.name(),
+          userId,
+          e);
+      throw e;
     }
   }
 
@@ -492,15 +413,7 @@ public class PostController {
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
     try {
-      if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("AUTH_001:Authorization header is required");
-      }
-      String accessToken = authHeader.substring(7);
-
-      if (!jwtUtil.validateToken(accessToken)) {
-        throw new RuntimeException("AUTH_002:Invalid access token");
-      }
-      String userId = jwtUtil.getUserIdFromToken(accessToken);
+      String userId = resolveUserId(authHeader);
 
       // Check Membership
       Map<String, Object> memberInfo = challengeMemberMapper.findByUserIdAndChallengeId(userId, challengeId);
@@ -540,7 +453,7 @@ public class PostController {
       }
       log.error("File Upload Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다: " + e.getMessage()));
+          .body(ApiResponse.error("서버 오류가 발생했습니다"));
     }
   }
 
@@ -562,5 +475,10 @@ public class PostController {
     String normalizedPath = uploadedPath.startsWith("/") ? uploadedPath.substring(1) : uploadedPath;
     return baseUrl + "/uploads/" + normalizedPath;
   }
+
+  private String resolveUserId(String authHeader) {
+    return authHeaderResolver.resolveUserId(authHeader);
+  }
 }
+
 

@@ -166,6 +166,13 @@ public class ChallengeController {
     } catch (SecurityException e) {
       return ResponseEntity.status(HttpStatus.FORBIDDEN)
           .body(ApiResponse.error("챌린지 멤버가 아닙니다"));
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith("LEDGER_004")) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ApiResponse.error(message));
+      }
+      throw e;
     } catch (Exception e) {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));

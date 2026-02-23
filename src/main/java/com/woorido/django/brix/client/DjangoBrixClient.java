@@ -12,8 +12,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.woorido.django.brix.dto.DjangoBrixCalculateRequest;
 import com.woorido.django.brix.dto.DjangoBrixCalculateResponse;
 import java.util.Objects;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
+@Slf4j
 public class DjangoBrixClient {
 
   private final RestClient restClient;
@@ -22,7 +24,7 @@ public class DjangoBrixClient {
 
   public DjangoBrixClient(RestClient.Builder restClientBuilder, ObjectMapper objectMapper,
       @Value("${django.brix.base-url:http://localhost:8000}") String baseUrl,
-      @Value("${django.brix.api-key:woorido-django-internal-key}") String apiKey) {
+      @Value("${django.brix.api-key:}") String apiKey) {
     String resolvedBaseUrl = Objects.requireNonNull(baseUrl, "django.brix.base-url must not be null");
     this.restClient = restClientBuilder.baseUrl(resolvedBaseUrl).build();
     this.apiKey = Objects.requireNonNull(apiKey, "django.brix.api-key must not be null");
@@ -53,11 +55,14 @@ public class DjangoBrixClient {
       return response;
     } catch (RestClientException e) {
       if (e instanceof RestClientResponseException responseException) {
-        String detail = "BRIX_001:Django BRIX 계산 호출 실패 status=" + responseException.getStatusCode().value()
-            + ", body=" + responseException.getResponseBodyAsString();
-        throw new RuntimeException(detail, e);
+        log.error("Django BRIX call failed. status={}, body={}",
+            responseException.getStatusCode().value(),
+            responseException.getResponseBodyAsString(),
+            e);
+        throw new RuntimeException("BRIX_001:Django BRIX 계산 호출 실패", e);
       }
-      throw new RuntimeException("BRIX_001:Django BRIX 계산 호출에 실패했습니다: " + e.getMessage(), e);
+      log.error("Django BRIX call failed", e);
+      throw new RuntimeException("BRIX_001:Django BRIX 계산 호출 실패", e);
     }
   }
 }

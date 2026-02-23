@@ -4,7 +4,7 @@ import com.woorido.common.dto.ApiResponse;
 import com.woorido.common.dto.ImageUploadResponse;
 import com.woorido.common.image.ImagePolicyType;
 import com.woorido.common.image.ImageUploadService;
-import com.woorido.common.util.JwtUtil;
+import com.woorido.common.util.AuthHeaderResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,15 +22,16 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class ImageUploadController {
 
-  private final JwtUtil jwtUtil;
+  private final AuthHeaderResolver authHeaderResolver;
   private final ImageUploadService imageUploadService;
 
   @PostMapping("/uploads/challenges/banner")
   public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadChallengeBanner(
       @RequestParam("file") MultipartFile file,
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
+    String userId = null;
     try {
-      requireUserId(authHeader);
+      userId = requireUserId(authHeader);
       String imageUrl = imageUploadService.uploadSingle(
           file,
           ImagePolicyType.CHALLENGE_BANNER,
@@ -40,7 +41,8 @@ public class ImageUploadController {
           ImageUploadResponse.builder().imageUrl(imageUrl).build(),
           "대표 이미지가 업로드되었습니다"));
     } catch (RuntimeException e) {
-      return handleRuntimeError(e, "Banner Upload Error");
+      return handleRuntimeError(e, "Banner Upload Error", "/uploads/challenges/banner", userId,
+          ImagePolicyType.CHALLENGE_BANNER);
     }
   }
 
@@ -48,8 +50,9 @@ public class ImageUploadController {
   public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadChallengeThumbnail(
       @RequestParam("file") MultipartFile file,
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
+    String userId = null;
     try {
-      requireUserId(authHeader);
+      userId = requireUserId(authHeader);
       String imageUrl = imageUploadService.uploadSingle(
           file,
           ImagePolicyType.CHALLENGE_THUMBNAIL,
@@ -59,7 +62,8 @@ public class ImageUploadController {
           ImageUploadResponse.builder().imageUrl(imageUrl).build(),
           "프로필 이미지가 업로드되었습니다"));
     } catch (RuntimeException e) {
-      return handleRuntimeError(e, "Thumbnail Upload Error");
+      return handleRuntimeError(e, "Thumbnail Upload Error", "/uploads/challenges/thumbnail", userId,
+          ImagePolicyType.CHALLENGE_THUMBNAIL);
     }
   }
 
@@ -67,8 +71,9 @@ public class ImageUploadController {
   public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadMyProfileImage(
       @RequestParam("file") MultipartFile file,
       @RequestHeader(value = "Authorization", required = false) String authHeader) {
+    String userId = null;
     try {
-      String userId = requireUserId(authHeader);
+      userId = requireUserId(authHeader);
       String imageUrl = imageUploadService.uploadSingle(
           file,
           ImagePolicyType.USER_PROFILE,
@@ -78,27 +83,32 @@ public class ImageUploadController {
           ImageUploadResponse.builder().imageUrl(imageUrl).build(),
           "프로필 이미지가 업로드되었습니다"));
     } catch (RuntimeException e) {
-      return handleRuntimeError(e, "Profile Upload Error");
+      return handleRuntimeError(e, "Profile Upload Error", "/users/me/profile-image", userId,
+          ImagePolicyType.USER_PROFILE);
     }
   }
 
   private String requireUserId(String authHeader) {
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      throw new RuntimeException("AUTH_001:Authorization header is required");
-    }
-    String token = authHeader.substring(7);
-    if (!jwtUtil.validateToken(token)) {
-      throw new RuntimeException("AUTH_002:Invalid access token");
-    }
-    return jwtUtil.getUserIdFromToken(token);
+    return authHeaderResolver.resolveUserId(authHeader);
   }
 
-  private ResponseEntity<ApiResponse<ImageUploadResponse>> handleRuntimeError(RuntimeException e, String logLabel) {
+  private ResponseEntity<ApiResponse<ImageUploadResponse>> handleRuntimeError(
+      RuntimeException e,
+      String logLabel,
+      String endpoint,
+      String userId,
+      ImagePolicyType policyType) {
     String message = e.getMessage();
     if (message != null && message.startsWith("AUTH_")) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
     }
-    log.error(logLabel, e);
+    log.error(
+        "{}: endpoint={}, policy={}, userId={}",
+        logLabel,
+        endpoint,
+        policyType.name(),
+        userId,
+        e);
     throw e;
   }
 }

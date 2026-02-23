@@ -1,6 +1,5 @@
 package com.woorido.meeting.controller;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,26 +34,8 @@ public class MeetingController {
       @PathVariable("challengeId") String challengeId,
       @RequestHeader("Authorization") String authorization,
       @ModelAttribute MeetingListRequest request) {
-
-    try {
-      MeetingListResponse response = meetingService.getMeetingList(challengeId, authorization, request);
-      return ResponseEntity.ok(ApiResponse.success(response));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("CHALLENGE_001")) {
-          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("챌린지를 찾을 수 없습니다"));
-        }
-        if (message.startsWith("CHALLENGE_003")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    MeetingListResponse response = meetingService.getMeetingList(challengeId, authorization, request);
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   /**
@@ -65,26 +46,8 @@ public class MeetingController {
   public ResponseEntity<ApiResponse<Object>> getMeetingDetail(
       @PathVariable("meetingId") String meetingId,
       @RequestHeader("Authorization") String authorization) {
-
-    try {
-      Object response = meetingService.getMeetingDetail(meetingId, authorization);
-      return ResponseEntity.ok(ApiResponse.success(response));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("MEETING_001")) {
-          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
-        }
-        if (message.startsWith("CHALLENGE_003")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    Object response = meetingService.getMeetingDetail(meetingId, authorization);
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   /**
@@ -96,32 +59,9 @@ public class MeetingController {
       @PathVariable("challengeId") String challengeId,
       @RequestHeader("Authorization") String authorization,
       @RequestBody CreateMeetingRequest request) {
-
-    try {
-      Object response = meetingService.createMeeting(challengeId, authorization, request);
-      return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("CHALLENGE_003")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
-        }
-        if (message.startsWith("CHALLENGE_004")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("리더만 모임을 생성할 수 있습니다"));
-        }
-        if (message.startsWith("MEETING_004")) {
-          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("예정 일시는 최소 24시간 이후여야 합니다"));
-        }
-        if (message.startsWith("CHALLENGE_005")) {
-          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("활성 멤버가 없습니다"));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    Object response = meetingService.createMeeting(challengeId, authorization, request);
+    return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+        .body(ApiResponse.success(response));
   }
 
   /**
@@ -133,29 +73,8 @@ public class MeetingController {
       @PathVariable("meetingId") String meetingId,
       @RequestHeader("Authorization") String authorization,
       @RequestBody UpdateMeetingRequest request) {
-
-    try {
-      Object response = meetingService.updateMeeting(meetingId, authorization, request);
-      return ResponseEntity.ok(ApiResponse.success(response));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("MEETING_001")) {
-          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
-        }
-        if (message.startsWith("CHALLENGE_004")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("리더만 모임을 수정할 수 있습니다"));
-        }
-        if (message.startsWith("MEETING_002")) {
-          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("이미 지난 모임은 수정할 수 없습니다"));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    Object response = meetingService.updateMeeting(meetingId, authorization, request);
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   /**
@@ -167,29 +86,8 @@ public class MeetingController {
       @PathVariable("meetingId") String meetingId,
       @RequestHeader("Authorization") String authorization,
       @RequestBody com.woorido.meeting.dto.request.AttendanceResponseRequest request) {
-
-    try {
-      Object response = meetingService.respondAttendance(meetingId, authorization, request);
-      return ResponseEntity.ok(ApiResponse.success(response));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("MEETING_001")) {
-          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
-        }
-        if (message.startsWith("CHALLENGE_003")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
-        }
-        if (message.startsWith("MEETING_002") || message.startsWith("MEETING_003") || message.startsWith("MEETING_006")) {
-          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    Object response = meetingService.respondAttendance(meetingId, authorization, request);
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   /**
@@ -201,29 +99,8 @@ public class MeetingController {
       @PathVariable("meetingId") String meetingId,
       @RequestHeader("Authorization") String authorization,
       @RequestBody com.woorido.meeting.dto.request.CompleteMeetingRequest request) {
-
-    try {
-      Object response = meetingService.completeMeeting(meetingId, authorization, request);
-      return ResponseEntity.ok(ApiResponse.success(response));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("MEETING_001")) {
-          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
-        }
-        if (message.startsWith("CHALLENGE_004")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("리더만 완료 처리할 수 있습니다"));
-        }
-        if (message.startsWith("MEETING_003") || message.startsWith("MEETING_005") || message.startsWith("ACCOUNT_004")) {
-          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    Object response = meetingService.completeMeeting(meetingId, authorization, request);
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   /**
@@ -234,29 +111,8 @@ public class MeetingController {
   public ResponseEntity<ApiResponse<Object>> deleteMeeting(
       @PathVariable("meetingId") String meetingId,
       @RequestHeader("Authorization") String authorization) {
-
-    try {
-      Object response = meetingService.deleteMeeting(meetingId, authorization);
-      return ResponseEntity.ok(ApiResponse.success(response, "모임이 삭제되었습니다"));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("MEETING_001")) {
-          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
-        }
-        if (message.startsWith("CHALLENGE_004")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("리더만 모임을 삭제할 수 있습니다"));
-        }
-        if (message.startsWith("MEETING_005")) {
-          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("이미 완료된 모임은 삭제할 수 없습니다"));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    Object response = meetingService.deleteMeeting(meetingId, authorization);
+    return ResponseEntity.ok(ApiResponse.success(response, "모임이 삭제되었습니다"));
   }
 
   /**
@@ -267,28 +123,7 @@ public class MeetingController {
   public ResponseEntity<ApiResponse<Object>> cancelAttendance(
       @PathVariable("meetingId") String meetingId,
       @RequestHeader("Authorization") String authorization) {
-
-    try {
-      Object response = meetingService.cancelAttendance(meetingId, authorization);
-      return ResponseEntity.ok(ApiResponse.success(response, "참석 의사가 취소되었습니다"));
-    } catch (RuntimeException e) {
-      String message = e.getMessage();
-      if (message != null) {
-        if (message.startsWith("AUTH_001")) {
-          return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("MEETING_001")) {
-          return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("모임을 찾을 수 없습니다"));
-        }
-        if (message.startsWith("MEETING_002") || message.startsWith("MEETING_006")) {
-          return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
-        }
-        if (message.startsWith("CHALLENGE_003")) {
-          return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("챌린지 멤버가 아닙니다"));
-        }
-      }
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(ApiResponse.error("서버 오류가 발생했습니다"));
-    }
+    Object response = meetingService.cancelAttendance(meetingId, authorization);
+    return ResponseEntity.ok(ApiResponse.success(response, "참석 의사가 취소되었습니다"));
   }
 }

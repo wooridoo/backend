@@ -36,7 +36,19 @@
     </select>
 
     <select id="findById" resultMap="CommentResultMap">
-        SELECT * FROM woorido.comments WHERE id = #{id} AND deleted_at IS NULL
+        SELECT
+            id,
+            post_id,
+            parent_id,
+            created_by,
+            content,
+            like_count,
+            created_at,
+            updated_at,
+            deleted_at
+        FROM woorido.comments
+        WHERE id = #{id}
+          AND deleted_at IS NULL
     </select>
 
     <update id="increaseLikeCount">
