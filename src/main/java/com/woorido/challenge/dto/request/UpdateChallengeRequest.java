@@ -16,6 +16,9 @@ public class UpdateChallengeRequest {
   // 챌린지 이미지 URL
   private String thumbnailImage;
 
+  // 챌린지 배너 이미지 URL
+  private String bannerImage;
+
   // 챌린지 규칙 (최대 1000자)
   private String rules;
 

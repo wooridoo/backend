@@ -34,6 +34,7 @@ public class MyChallengesResponse {
     private Long supportAmount;
     private String nextSupportDate;
     private String thumbnailImage;
+    private String bannerImage;
     private UpcomingMeeting upcomingMeeting;
   }
 

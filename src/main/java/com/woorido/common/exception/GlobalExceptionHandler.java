@@ -17,7 +17,13 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MaxUploadSizeExceededException.class)
   public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .body(ApiResponse.error("POST_006:파일 크기가 10MB를 초과합니다"));
+        .body(ApiResponse.error("IMAGE_002:업로드 가능한 최대 파일 용량을 초과했습니다"));
+  }
+
+  @ExceptionHandler(ImageValidationException.class)
+  public ResponseEntity<ApiResponse<Void>> handleImageValidationException(ImageValidationException e) {
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(ApiResponse.error(e.getApiMessage()));
   }
 
   @ExceptionHandler(Exception.class)

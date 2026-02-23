@@ -1,6 +1,7 @@
 package com.woorido.post.dto.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -19,5 +20,6 @@ public class PostSummaryResponse {
   private Long viewCount;
   private Boolean isPinned;
   private Boolean isLiked;
+  private List<String> images;
   private LocalDateTime createdAt;
 }
