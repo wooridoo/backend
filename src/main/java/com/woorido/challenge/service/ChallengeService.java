@@ -937,7 +937,8 @@ public class ChallengeService {
       throw new IllegalArgumentException("CHALLENGE_001");
     }
 
-    if (ChallengeStatus.RECRUITING != challenge.getStatus()) {
+    if (ChallengeStatus.RECRUITING != challenge.getStatus()
+        && ChallengeStatus.IN_PROGRESS != challenge.getStatus()) {
       throw new IllegalStateException("CHALLENGE_006");
     }
 
