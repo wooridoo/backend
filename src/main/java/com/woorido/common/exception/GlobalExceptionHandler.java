@@ -136,6 +136,9 @@ public class GlobalExceptionHandler {
     if ("LEDGER_004".equals(code)) {
       return HttpStatus.SERVICE_UNAVAILABLE;
     }
+    if ("LEDGER_010".equals(code) || "LEDGER_011".equals(code)) {
+      return HttpStatus.BAD_GATEWAY;
+    }
     if (NOT_FOUND_CODES.contains(code)) {
       return HttpStatus.NOT_FOUND;
     }

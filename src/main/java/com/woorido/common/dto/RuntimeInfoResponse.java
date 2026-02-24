@@ -15,6 +15,9 @@ public class RuntimeInfoResponse {
   private UploadPolicy uploadPolicy;
   private String uploadDir;
   private String djangoBaseUrl;
+  private String ledgerDjangoHealth;
+  private String lastCheckedAt;
+  private String lastErrorCode;
 
   @Getter
   @Builder

@@ -17,6 +17,8 @@ public class ChallengeLedgerGraphResponse {
   private String challengeId;
   private Integer months;
   private String calculatedAt;
+  private String graphSource;
+  private String graphStatusCode;
   private List<MonthlyExpense> monthlyExpenses;
   private List<MonthlyBalance> monthlyBalances;
 

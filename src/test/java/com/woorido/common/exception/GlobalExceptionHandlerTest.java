@@ -81,6 +81,20 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void mapsLedgerAuthMismatchTo502() throws Exception {
+    mockMvc.perform(get("/test/runtime").param("message", "LEDGER_010:Django ledger 인증/설정 불일치"))
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.message").value("LEDGER_010:Django ledger 인증/설정 불일치"));
+  }
+
+  @Test
+  void mapsLedgerContractMismatchTo502() throws Exception {
+    mockMvc.perform(get("/test/runtime").param("message", "LEDGER_011:Django ledger 응답 계약 불일치"))
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.message").value("LEDGER_011:Django ledger 응답 계약 불일치"));
+  }
+
+  @Test
   void mapsUnknownTo500WithoutInternalMessageLeak() throws Exception {
     mockMvc.perform(get("/test/runtime").param("message", "UNKNOWN_ERROR:debug detail")
         .accept(MediaType.APPLICATION_JSON))

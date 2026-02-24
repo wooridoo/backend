@@ -93,6 +93,10 @@ public class PostController {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .body(ApiResponse.error(message));
       }
+      if (message != null && message.startsWith("POST_006")) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse.error(message));
+      }
       log.error("Create Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(ApiResponse.error("서버 오류가 발생했습니다"));
@@ -206,6 +210,9 @@ public class PostController {
       String message = e.getMessage();
       if (message != null && message.startsWith("AUTH_")) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(message));
+      }
+      if (message != null && message.startsWith("POST_006")) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error(message));
       }
       log.error("Update Post Error", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

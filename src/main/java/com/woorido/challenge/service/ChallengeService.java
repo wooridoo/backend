@@ -2,11 +2,18 @@ package com.woorido.challenge.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.YearMonth;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -66,6 +73,11 @@ public class ChallengeService {
   private static final int MIN_GRAPH_MONTHS = 1;
   private static final int MAX_GRAPH_MONTHS = 24;
   private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
+  private static final DateTimeFormatter YEAR_MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+  private static final String LEDGER_STATUS_OK = "LEDGER_OK";
+  private static final String LEDGER_STATUS_NETWORK = "LEDGER_004";
+  private static final String GRAPH_SOURCE_DJANGO = "DJANGO";
+  private static final String GRAPH_SOURCE_JAVA_FALLBACK = "JAVA_FALLBACK";
 
   private final ChallengeMapper challengeMapper;
   private final ChallengeMemberMapper challengeMemberMapper;
@@ -698,8 +710,35 @@ public class ChallengeService {
         .entries(entries)
         .build();
 
-    DjangoLedgerGraphResponse djangoResponse = djangoLedgerClient.calculateGraph(request);
+    try {
+      DjangoLedgerGraphResponse djangoResponse = djangoLedgerClient.calculateGraph(request);
+      return buildDjangoLedgerGraphResponse(challengeId, normalizedMonths, djangoResponse);
+    } catch (RuntimeException e) {
+      String errorCode = extractErrorCode(e.getMessage());
+      if (!LEDGER_STATUS_NETWORK.equals(errorCode)) {
+        throw e;
+      }
+      return buildFallbackLedgerGraphResponse(challengeId, normalizedMonths, request);
+    }
+  }
 
+  private int normalizeGraphMonths(Integer months) {
+    if (months == null) {
+      return DEFAULT_GRAPH_MONTHS;
+    }
+    if (months < MIN_GRAPH_MONTHS) {
+      return MIN_GRAPH_MONTHS;
+    }
+    if (months > MAX_GRAPH_MONTHS) {
+      return MAX_GRAPH_MONTHS;
+    }
+    return months;
+  }
+
+  private ChallengeLedgerGraphResponse buildDjangoLedgerGraphResponse(
+      String challengeId,
+      int normalizedMonths,
+      DjangoLedgerGraphResponse djangoResponse) {
     List<ChallengeLedgerGraphResponse.MonthlyExpense> monthlyExpenses = new ArrayList<>();
     if (djangoResponse.getMonthlyExpenses() != null) {
       for (DjangoLedgerGraphResponse.MonthlyExpense expense : djangoResponse.getMonthlyExpenses()) {
@@ -730,22 +769,153 @@ public class ChallengeService {
         .challengeId(challengeId)
         .months(normalizedMonths)
         .calculatedAt(djangoResponse.getCalculatedAt())
+        .graphSource(GRAPH_SOURCE_DJANGO)
+        .graphStatusCode(LEDGER_STATUS_OK)
         .monthlyExpenses(monthlyExpenses)
         .monthlyBalances(monthlyBalances)
         .build();
   }
 
-  private int normalizeGraphMonths(Integer months) {
-    if (months == null) {
-      return DEFAULT_GRAPH_MONTHS;
+  private ChallengeLedgerGraphResponse buildFallbackLedgerGraphResponse(
+      String challengeId,
+      int normalizedMonths,
+      DjangoLedgerGraphRequest request) {
+    List<String> monthKeys = buildMonthKeys(normalizedMonths);
+    Map<String, Long> monthlyExpensesMap = new LinkedHashMap<>();
+    Map<String, Long> monthEndBalanceMap = new LinkedHashMap<>();
+    Map<String, LocalDateTime> monthEndSeenAt = new LinkedHashMap<>();
+
+    for (String monthKey : monthKeys) {
+      monthlyExpensesMap.put(monthKey, 0L);
+      monthEndBalanceMap.put(monthKey, null);
+      monthEndSeenAt.put(monthKey, null);
     }
-    if (months < MIN_GRAPH_MONTHS) {
-      return MIN_GRAPH_MONTHS;
+
+    List<DjangoLedgerGraphRequest.LedgerEntryItem> entries = request.getEntries() != null
+        ? request.getEntries()
+        : List.of();
+
+    for (DjangoLedgerGraphRequest.LedgerEntryItem entry : entries) {
+      if (entry == null) {
+        continue;
+      }
+      LocalDateTime createdAt = parseLedgerCreatedAt(entry.getCreatedAt());
+      if (createdAt == null) {
+        continue;
+      }
+
+      String monthKey = createdAt.format(YEAR_MONTH_FORMAT);
+      if (!monthlyExpensesMap.containsKey(monthKey)) {
+        continue;
+      }
+
+      String entryType = entry.getType() == null ? "" : entry.getType().trim().toUpperCase(Locale.ROOT);
+      long amount = entry.getAmount() == null ? 0L : entry.getAmount();
+      if ("EXPENSE".equals(entryType)) {
+        monthlyExpensesMap.put(monthKey, monthlyExpensesMap.get(monthKey) + Math.abs(amount));
+      }
+
+      if (entry.getBalanceAfter() == null) {
+        continue;
+      }
+
+      LocalDateTime previousSeenAt = monthEndSeenAt.get(monthKey);
+      if (previousSeenAt == null || !createdAt.isBefore(previousSeenAt)) {
+        monthEndBalanceMap.put(monthKey, entry.getBalanceAfter());
+        monthEndSeenAt.put(monthKey, createdAt);
+      }
     }
-    if (months > MAX_GRAPH_MONTHS) {
-      return MAX_GRAPH_MONTHS;
+
+    long currentBalance = request.getCurrentBalance() != null ? request.getCurrentBalance() : 0L;
+    String currentMonthKey = YearMonth.now(KST_ZONE).format(YEAR_MONTH_FORMAT);
+    if (monthEndBalanceMap.containsKey(currentMonthKey)) {
+      monthEndBalanceMap.put(currentMonthKey, currentBalance);
     }
-    return months;
+
+    List<Long> filledBalances = new ArrayList<>(monthKeys.size());
+    Long lastSeen = null;
+    for (String monthKey : monthKeys) {
+      Long current = monthEndBalanceMap.get(monthKey);
+      if (current == null) {
+        filledBalances.add(lastSeen);
+      } else {
+        lastSeen = current;
+        filledBalances.add(current);
+      }
+    }
+    if (!filledBalances.isEmpty()) {
+      filledBalances.set(filledBalances.size() - 1, currentBalance);
+    }
+
+    List<ChallengeLedgerGraphResponse.MonthlyExpense> monthlyExpenses = new ArrayList<>(monthKeys.size());
+    List<ChallengeLedgerGraphResponse.MonthlyBalance> monthlyBalances = new ArrayList<>(monthKeys.size());
+    for (int index = 0; index < monthKeys.size(); index++) {
+      String monthKey = monthKeys.get(index);
+      monthlyExpenses.add(ChallengeLedgerGraphResponse.MonthlyExpense.builder()
+          .month(monthKey)
+          .expense(monthlyExpensesMap.getOrDefault(monthKey, 0L))
+          .build());
+      monthlyBalances.add(ChallengeLedgerGraphResponse.MonthlyBalance.builder()
+          .month(monthKey)
+          .balance(filledBalances.get(index))
+          .build());
+    }
+
+    return ChallengeLedgerGraphResponse.builder()
+        .challengeId(challengeId)
+        .months(normalizedMonths)
+        .calculatedAt(Instant.now().toString())
+        .graphSource(GRAPH_SOURCE_JAVA_FALLBACK)
+        .graphStatusCode(LEDGER_STATUS_NETWORK)
+        .monthlyExpenses(monthlyExpenses)
+        .monthlyBalances(monthlyBalances)
+        .build();
+  }
+
+  private List<String> buildMonthKeys(int normalizedMonths) {
+    YearMonth currentMonth = YearMonth.now(KST_ZONE);
+    YearMonth firstMonth = currentMonth.minusMonths(normalizedMonths - 1L);
+    List<String> monthKeys = new ArrayList<>(normalizedMonths);
+    for (int index = 0; index < normalizedMonths; index++) {
+      monthKeys.add(firstMonth.plusMonths(index).format(YEAR_MONTH_FORMAT));
+    }
+    return monthKeys;
+  }
+
+  private LocalDateTime parseLedgerCreatedAt(String createdAtValue) {
+    if (createdAtValue == null || createdAtValue.isBlank()) {
+      return null;
+    }
+
+    String normalized = createdAtValue.trim();
+    if (normalized.endsWith("Z")) {
+      try {
+        return Instant.parse(normalized).atZone(KST_ZONE).toLocalDateTime();
+      } catch (DateTimeParseException ignored) {
+        // fall through
+      }
+    }
+
+    try {
+      return LocalDateTime.parse(normalized);
+    } catch (DateTimeParseException ignored) {
+      // fall through
+    }
+
+    try {
+      return OffsetDateTime.parse(normalized).atZoneSameInstant(KST_ZONE).toLocalDateTime();
+    } catch (DateTimeParseException ignored) {
+      return null;
+    }
+  }
+
+  private String extractErrorCode(String message) {
+    if (message == null || message.isBlank()) {
+      return "";
+    }
+    int separatorIndex = message.indexOf(':');
+    String code = separatorIndex >= 0 ? message.substring(0, separatorIndex) : message;
+    return Objects.requireNonNullElse(code, "").trim();
   }
 
   /**

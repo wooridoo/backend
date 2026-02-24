@@ -3,8 +3,11 @@ package com.woorido.common.controller;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.woorido.common.exception.GlobalExceptionHandler;
+import com.woorido.django.ledger.client.DjangoLedgerClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -21,10 +24,15 @@ class InternalRuntimeControllerTest {
   @BeforeEach
   void setUp() {
     StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
+    DjangoLedgerClient djangoLedgerClient = mock(DjangoLedgerClient.class);
+    when(djangoLedgerClient.getLedgerDjangoHealth()).thenReturn("HEALTHY");
+    when(djangoLedgerClient.getLastCheckedAt()).thenReturn("2026-02-24T00:00:00Z");
+    when(djangoLedgerClient.getLastErrorCode()).thenReturn("LEDGER_OK");
     InternalRuntimeController controller = new InternalRuntimeController(
         new MockEnvironment(),
         beanFactory.getBeanProvider(BuildProperties.class),
         beanFactory.getBeanProvider(GitProperties.class),
+        djangoLedgerClient,
         "test-internal-key",
         "uploads",
         "http://127.0.0.1:8000");
@@ -48,6 +56,8 @@ class InternalRuntimeControllerTest {
         .header("X-Internal-Api-Key", "test-internal-key"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.uploadPolicy.post.maxCount").value(10));
+        .andExpect(jsonPath("$.data.uploadPolicy.post.maxCount").value(10))
+        .andExpect(jsonPath("$.data.ledgerDjangoHealth").value("HEALTHY"))
+        .andExpect(jsonPath("$.data.lastErrorCode").value("LEDGER_OK"));
   }
 }

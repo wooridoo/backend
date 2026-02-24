@@ -22,7 +22,10 @@ import com.woorido.post.dto.response.PostListResponse;
 import com.woorido.post.dto.response.PostSummaryResponse;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +54,7 @@ public class PostService {
   private final SocialRateLimitService socialRateLimitService;
   private final NotificationService notificationService;
   private static final int MAX_POST_IMAGE_COUNT = 10;
+  private static final Set<String> ALLOWED_POST_CATEGORIES = Set.of("GENERAL", "NOTICE", "QUESTION");
 
   /**
    * 게시글 생성.
@@ -61,9 +65,10 @@ public class PostService {
     Map<String, Object> memberInfo = requireActiveMember(challengeId, userId);
 
     String role = (String) memberInfo.get("ROLE");
+    String normalizedCategory = normalizeCategory(request.getCategory());
 
     // 공지 글은 리더만 작성 가능
-    boolean isNotice = "NOTICE".equals(request.getCategory());
+    boolean isNotice = "NOTICE".equals(normalizedCategory);
     if (isNotice) {
       if (!"LEADER".equals(role)) {
         throw new IllegalArgumentException("POST_002:공지 게시글은 리더만 작성할 수 있습니다");
@@ -73,21 +78,25 @@ public class PostService {
     String isNoticeFlag = isNotice ? "Y" : "N";
     String isPinnedFlag = isNotice ? "Y" : "N";
 
-    // 공지 작성 시 기존 공지 고정을 해제해 챌린지당 1개 고정 정책을 보장한다.
-    if (isNotice) {
-      postMapper.clearPinnedNotices(challengeId);
-    }
-
     // 도메인 팩토리로 게시글 엔티티 생성
-    Post post = postFactory.create(challengeId, userId, request, isNoticeFlag, isPinnedFlag);
+    Post post = postFactory.create(challengeId, userId, request, normalizedCategory, isNoticeFlag, isPinnedFlag);
 
     validateImageUrls(request.getImageUrls());
 
-    // 게시글 본문 저장
-    postMapper.insert(post);
+    try {
+      // 공지 작성 시 기존 공지 고정을 해제해 챌린지당 1개 고정 정책을 보장한다.
+      if (isNotice) {
+        postMapper.clearPinnedNotices(challengeId);
+      }
 
-    // 첨부 이미지 메타데이터 저장
-    saveImages(post.getId(), request.getImageUrls());
+      // 게시글 본문 저장
+      postMapper.insert(post);
+
+      // 첨부 이미지 메타데이터 저장
+      saveImages(post.getId(), request.getImageUrls());
+    } catch (DataAccessException e) {
+      handlePostWriteFailure(challengeId, userId, role, normalizedCategory, e);
+    }
 
     // 작성자 정보 포함 응답 구성
     User user = userMapper.findById(userId);
@@ -131,13 +140,16 @@ public class PostService {
     }
 
     // category 미입력 시 기존 값을 유지한다.
-    String nextCategory = request.getCategory() != null ? request.getCategory() : post.getCategory();
+    String nextCategory = request.getCategory() != null
+        ? normalizeCategory(request.getCategory())
+        : normalizeCategory(post.getCategory());
     boolean isNotice = "NOTICE".equals(nextCategory);
     if (isNotice) {
       if (!"LEADER".equals(role)) {
         throw new IllegalArgumentException("POST_002:공지 게시글은 리더만 작성할 수 있습니다");
       }
     }
+    request.setCategory(nextCategory);
 
     // Visitor 패턴으로 변경값 반영
     PostUpdateVisitor visitor = new PostUpdateVisitor(request, isNotice ? "Y" : "N");
@@ -145,21 +157,25 @@ public class PostService {
 
     validateImageUrls(request.getImageUrls());
 
-    // 게시글 본문 업데이트
-    postMapper.update(post);
+    try {
+      // 게시글 본문 업데이트
+      postMapper.update(post);
 
-    if (isNotice) {
-      // 공지 상태라면 항상 단일 고정 정책을 맞춘다.
-      postMapper.clearPinnedNotices(challengeId);
-      postMapper.updatePinned(postId, "Y");
-    } else {
-      // 일반 게시글은 고정 상태를 유지하지 않는다.
-      postMapper.updatePinned(postId, "N");
+      if (isNotice) {
+        // 공지 상태라면 항상 단일 고정 정책을 맞춘다.
+        postMapper.clearPinnedNotices(challengeId);
+        postMapper.updatePinned(postId, "Y");
+      } else {
+        // 일반 게시글은 고정 상태를 유지하지 않는다.
+        postMapper.updatePinned(postId, "N");
+      }
+
+      // 이미지 목록은 전체 교체 방식으로 동기화
+      postImageMapper.deleteAllByPostId(postId);
+      saveImages(postId, request.getImageUrls());
+    } catch (DataAccessException e) {
+      handlePostWriteFailure(challengeId, userId, role, nextCategory, e);
     }
-
-    // 이미지 목록은 전체 교체 방식으로 동기화
-    postImageMapper.deleteAllByPostId(postId);
-    saveImages(postId, request.getImageUrls());
 
     User user = userMapper.findById(userId);
     return CreatePostResponse.builder()
@@ -561,6 +577,47 @@ public class PostService {
     if (imageUrls.size() > MAX_POST_IMAGE_COUNT) {
       throw new IllegalArgumentException("IMAGE_004:게시글 이미지는 최대 10장까지 업로드할 수 있습니다");
     }
+  }
+
+  private String normalizeCategory(String rawCategory) {
+    String normalized = rawCategory == null ? "GENERAL" : rawCategory.trim().toUpperCase(Locale.ROOT);
+    if (!ALLOWED_POST_CATEGORIES.contains(normalized)) {
+      throw new IllegalArgumentException("VALIDATION_001:지원하지 않는 게시글 유형입니다");
+    }
+    return normalized;
+  }
+
+  private void handlePostWriteFailure(
+      String challengeId,
+      String userId,
+      String userRole,
+      String category,
+      DataAccessException exception) {
+    String dbErrorCode = resolveDbErrorCode(exception);
+    log.error(
+        "Post write failed. challengeId={}, userId={}, userRole={}, category={}, dbErrorCode={}",
+        challengeId,
+        userId,
+        userRole,
+        category,
+        dbErrorCode,
+        exception);
+    throw new RuntimeException("POST_006:게시글 저장 중 오류가 발생했습니다", exception);
+  }
+
+  private String resolveDbErrorCode(Throwable throwable) {
+    Throwable cursor = throwable;
+    while (cursor != null) {
+      if (cursor instanceof java.sql.SQLException sqlException) {
+        String state = sqlException.getSQLState();
+        if (state != null && !state.isBlank()) {
+          return state;
+        }
+        return "SQL-" + sqlException.getErrorCode();
+      }
+      cursor = cursor.getCause();
+    }
+    return "DB_UNKNOWN";
   }
 
   private List<String> getImageUrlsForPost(String postId) {

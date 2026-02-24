@@ -3,6 +3,7 @@ package com.woorido.common.controller;
 import com.woorido.common.dto.ApiResponse;
 import com.woorido.common.dto.RuntimeInfoResponse;
 import com.woorido.common.image.ImagePolicyType;
+import com.woorido.django.ledger.client.DjangoLedgerClient;
 import java.time.Instant;
 import java.util.Arrays;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,17 +31,20 @@ public class InternalRuntimeController {
   private final String internalApiKey;
   private final String uploadDir;
   private final String djangoBaseUrl;
+  private final DjangoLedgerClient djangoLedgerClient;
 
   public InternalRuntimeController(
       Environment environment,
       ObjectProvider<BuildProperties> buildPropertiesProvider,
       ObjectProvider<GitProperties> gitPropertiesProvider,
+      DjangoLedgerClient djangoLedgerClient,
       @Value("${django.brix.api-key:}") String internalApiKey,
       @Value("${file.upload.dir:uploads}") String uploadDir,
       @Value("${django.brix.base-url:http://127.0.0.1:8000}") String djangoBaseUrl) {
     this.environment = environment;
     this.buildPropertiesProvider = buildPropertiesProvider;
     this.gitPropertiesProvider = gitPropertiesProvider;
+    this.djangoLedgerClient = djangoLedgerClient;
     this.internalApiKey = internalApiKey;
     this.uploadDir = uploadDir;
     this.djangoBaseUrl = djangoBaseUrl;
@@ -67,6 +71,9 @@ public class InternalRuntimeController {
         .activeProfiles(Arrays.asList(environment.getActiveProfiles()))
         .uploadDir(uploadDir)
         .djangoBaseUrl(djangoBaseUrl)
+        .ledgerDjangoHealth(djangoLedgerClient.getLedgerDjangoHealth())
+        .lastCheckedAt(djangoLedgerClient.getLastCheckedAt())
+        .lastErrorCode(djangoLedgerClient.getLastErrorCode())
         .uploadPolicy(RuntimeInfoResponse.UploadPolicy.builder()
             .post(toPolicyItem(ImagePolicyType.POST_ATTACHMENT))
             .banner(toPolicyItem(ImagePolicyType.CHALLENGE_BANNER))
