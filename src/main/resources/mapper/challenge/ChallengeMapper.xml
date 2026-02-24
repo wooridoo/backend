@@ -213,9 +213,11 @@
             c.activated_at AS started_at,
             c.created_at,
             u.id AS leader_id,
-            u.nickname AS leader_nickname
+            u.nickname AS leader_nickname,
+            NVL(us.total_score, 12) AS leader_brix
         FROM woorido.challenges c
         LEFT JOIN woorido.users u ON c.creator_id = u.id
+        LEFT JOIN woorido.user_scores us ON u.id = us.user_id
         WHERE c.id = #{id}
     </select>
 

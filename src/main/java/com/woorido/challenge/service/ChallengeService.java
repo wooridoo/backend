@@ -413,6 +413,7 @@ public class ChallengeService {
         .leader(ChallengeDetailResponse.Leader.builder()
             .id(getString(challenge, "LEADER_ID"))
             .nickname(getString(challenge, "LEADER_NICKNAME"))
+            .brix(challenge.get("LEADER_BRIX") != null ? Double.parseDouble(challenge.get("LEADER_BRIX").toString()) : 12.0)
             .build())
         .account(ChallengeDetailResponse.Account.builder()
             .balance(getLong(challenge, "BALANCE"))

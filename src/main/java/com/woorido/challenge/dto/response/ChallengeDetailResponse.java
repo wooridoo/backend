@@ -52,6 +52,7 @@ public class ChallengeDetailResponse {
   public static class Leader {
     private String id;
     private String nickname;
+    private Double brix;
     private String profileImage;
   }
 
