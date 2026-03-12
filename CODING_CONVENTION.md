@@ -6,7 +6,7 @@
 ---
 
 ## 1. 핵심 철학: Vibe Coding Strategy
-> 참조: [00_VIBE_CODING_STRATEGY.md](../../01_PLANNING/00_VIBE_CODING_STRATEGY.md)
+> 참조: [woorido_skills Maintainer Docs](../woorido_skills/DOCS/README.md)
 
 *   **참조(Reference) vs 실행(Executable) 분리**:
     *   **Docs (`/docs`)**: 비즈니스 로직, 정책, API 명세, 데이터 구조 등 **"What & Why"**를 기록합니다.
@@ -17,7 +17,7 @@
 ---
 
 ## 2. 네이밍 컨벤션 및 용어 (Naming & Terminology)
-> 참조: [TERMINOLOGY.md](../../01_PLANNING/Product/TERMINOLOGY.md)
+> 참조: [TERMINOLOGY.md](../docs/09_SOURCE_INPUTS/01_PLANNING/Product/TERMINOLOGY.md)
 
 ### 2.1 도메인 용어 (Strict Enforcement)
 법적 리스크 회피 및 로직 명확성을 위해 아래 용어를 엄격히 준수합니다.
@@ -45,7 +45,7 @@
 ---
 
 ## 3. 아키텍처 표준 (Architecture Standards)
-> 참조: [SYSTEM_ARCHITECTURE.md](../Architecture/SYSTEM_ARCHITECTURE.md)
+> 참조: [SYSTEM_ARCHITECTURE.md](../docs/09_SOURCE_INPUTS/02_ENGINEERING/Architecture/SYSTEM_ARCHITECTURE.md)
 
 ### 3.1 3-Tier & 역할 분담
 *   **Frontend**: React (UI/UX)
@@ -64,7 +64,7 @@
 ---
 
 ## 4. 프론트엔드 컨벤션 (Frontend - WDS)
-> 참조: [DESIGN_TOKENS.md](../Frontend/DesignSystem/DESIGN_TOKENS.md)
+> 참조: [DESIGN_TOKENS.md](../docs/09_SOURCE_INPUTS/02_ENGINEERING/Frontend/DesignSystem/DESIGN_TOKENS.md)
 
 ### 4.1 디자인 토큰 필수 사용
 *   **Hardcoded Hex Value 금지**: 색상 코드를 직접 입력하지 마십시오.
@@ -84,7 +84,7 @@
 ---
 
 ## 5. 백엔드 및 데이터베이스 패턴
-> 참조: [IMPLEMENTATION_PATTERNS.md](../Database/07_IMPLEMENTATION_PATTERNS.md)
+> 참조: [IMPLEMENTATION_PATTERNS.md](../docs/09_SOURCE_INPUTS/02_ENGINEERING/Database/07_IMPLEMENTATION_PATTERNS.md)
 
 ### 5.1 트랜잭션 및 락(Lock)
 *   **동시성 제어**: `version` 컬럼을 이용한 **낙관적 락(Optimistic Locking)**을 기본으로 합니다.
